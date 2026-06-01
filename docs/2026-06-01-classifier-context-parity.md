@@ -55,9 +55,9 @@ The original wrapper did this before calling the model:
 The key design point: model browsing was optional. The prompt already contained
 enough context to classify the item.
 
-## Current Gap
+## Historical Gap
 
-Current Localpager has only part of that behavior:
+Before this migration, Localpager had only part of that behavior:
 
 - `internal/sources/gitcrawl/gitcrawl.go` reads gitcrawl title, author, URL,
   content hash, timestamps, and state, but ignores `body`, `labels_json`, and
@@ -70,8 +70,28 @@ Current Localpager has only part of that behavior:
 - `scripts/localpager-classifier` calls `localpager-agent` with the rendered
   prompt, but does not enrich the prompt with GitHub context.
 
-The result is a prompt that says "inspect this target" while only providing a
-URL. Local models cannot reliably do that.
+The result was a prompt that said "inspect this target" while only providing a
+URL. Local models could not reliably do that.
+
+## Implemented Behavior
+
+Localpager now stores the source body and labels on `localpager_items`, renders
+a GitHub context file before classification, and passes that file to
+`localpager-classifier` as `--github-context-file`.
+
+The renderer replaces `__GITHUB_CONTEXT__` in the configured prompt template.
+The default prompt tells the model to classify from that injected context
+instead of assuming it can browse a GitHub URL.
+
+For GitHub items, the context builder can include:
+
+- stored URL, title, state, author, repo, number, body, and labels
+- issue and PR comments fetched from GitHub
+- PR changed files fetched from GitHub
+- selected PR diff excerpts fetched from GitHub
+- caveats when optional fetched context is unavailable
+
+Deployments can set these options under `classifier.context.github`.
 
 ## Target Behavior
 
@@ -172,22 +192,24 @@ context assembly in code.
 
 ## Implementation Plan
 
-1. Add body and labels fields to `IngestItem`.
-2. Add `Body` and `LabelsJSON` columns to `Item`.
-3. Update `upsertGenericItem` so fresh source updates persist body and labels.
-4. Update the gitcrawl source query to read `threads.body` and
+1. Done: add body and labels fields to `IngestItem`.
+2. Done: add `Body` and `LabelsJSON` columns to `Item`.
+3. Done: update `upsertGenericItem` so fresh source updates persist body and
+   labels.
+4. Done: update the gitcrawl source query to read `threads.body` and
    `threads.labels_json`.
-5. Update the GitHub API source to collect labels and persist them.
-6. Add a GitHub context builder in Localpager that can:
+5. Done: update the GitHub API source to collect labels and persist them.
+6. Done: add a GitHub context builder in Localpager that can:
    - use stored title/body/labels
    - fetch comments from GitHub when enabled
    - fetch PR changed files and diff when enabled
    - truncate large sections
    - escape control-like tags
-7. Pass the rendered context to `localpager-classifier`.
-8. Make `localpager-render-profile.mjs` replace `__GITHUB_CONTEXT__`.
-9. Update default and local prompt templates to include `__GITHUB_CONTEXT__`.
-10. Keep runtime schema enum generation exactly as-is.
+7. Done: pass the rendered context to `localpager-classifier`.
+8. Done: make `localpager-render-profile.mjs` replace `__GITHUB_CONTEXT__`.
+9. Done: update default and local prompt templates to include
+   `__GITHUB_CONTEXT__`.
+10. Done: keep runtime schema enum generation exactly as-is.
 
 ## Tests
 

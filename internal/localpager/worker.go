@@ -36,6 +36,7 @@ type WorkerOptions struct {
 	ClassifierSchema         string
 	ClassifierPromptTemplate string
 	ClassifierTopicTaxonomy  string
+	ClassifierContext        ClassifierContextOptions
 	Model                    string
 	DestinationRef           string
 	DiscordToken             string
@@ -43,6 +44,20 @@ type WorkerOptions struct {
 	DryRunDiscord            bool
 	PollInterval             time.Duration
 	NotifyTopicsAny          []string
+}
+
+type ClassifierContextOptions struct {
+	IncludeBody          bool
+	IncludeLabels        bool
+	IncludeComments      bool
+	IncludeChangedFiles  bool
+	IncludeDiff          bool
+	MaxBodyChars         int
+	MaxCommentsChars     int
+	MaxChangedFilesChars int
+	MaxDiffChars         int
+	GitHubBaseURL        string
+	GitHubToken          string
 }
 
 type WorkerStats struct {

@@ -33,6 +33,8 @@ type Thread struct {
 	Number           int
 	State            string
 	Title            string
+	Body             sql.NullString
+	LabelsJSON       string
 	Author           sql.NullString
 	URL              string
 	ContentHash      string
@@ -166,7 +168,7 @@ func readThreads(ctx context.Context, db *sql.DB, repo, itemType string, limit i
 		args = append(args, limit)
 	}
 	query := fmt.Sprintf(`
-	SELECT threads.kind, threads.number, threads.state, threads.title, threads.author_login,
+	SELECT threads.kind, threads.number, threads.state, threads.title, threads.body, threads.labels_json, threads.author_login,
 	       threads.html_url, threads.content_hash, threads.updated_at_gh, threads.updated_at,
 	       threads.closed_at_local, threads.close_reason_local
 	FROM threads
@@ -207,7 +209,7 @@ func readActiveThreads(ctx context.Context, db *sql.DB, repo string, active acti
 		return nil, nil
 	}
 	query := fmt.Sprintf(`
-SELECT threads.kind, threads.number, threads.state, threads.title, threads.author_login,
+SELECT threads.kind, threads.number, threads.state, threads.title, threads.body, threads.labels_json, threads.author_login,
        threads.html_url, threads.content_hash, threads.updated_at_gh, threads.updated_at,
        threads.closed_at_local, threads.close_reason_local
 FROM threads
@@ -228,7 +230,7 @@ func queryThreads(ctx context.Context, db *sql.DB, query string, args ...any) ([
 	var threads []Thread
 	for rows.Next() {
 		var thread Thread
-		if err := rows.Scan(&thread.Type, &thread.Number, &thread.State, &thread.Title, &thread.Author, &thread.URL, &thread.ContentHash, &thread.UpdatedAtGH, &thread.UpdatedAt, &thread.ClosedAtLocal, &thread.CloseReasonLocal); err != nil {
+		if err := rows.Scan(&thread.Type, &thread.Number, &thread.State, &thread.Title, &thread.Body, &thread.LabelsJSON, &thread.Author, &thread.URL, &thread.ContentHash, &thread.UpdatedAtGH, &thread.UpdatedAt, &thread.ClosedAtLocal, &thread.CloseReasonLocal); err != nil {
 			return nil, err
 		}
 		threads = append(threads, thread)
@@ -247,6 +249,8 @@ func MapThread(repo string, thread Thread) localpager.IngestItem {
 		Ref:         fmt.Sprintf("%s#%d", repo, thread.Number),
 		URL:         thread.URL,
 		Title:       thread.Title,
+		Body:        sqlNullString(thread.Body),
+		LabelsJSON:  thread.LabelsJSON,
 		State:       thread.State,
 		Author:      sqlNullString(thread.Author),
 		UpdatedAt:   updatedAt(thread),

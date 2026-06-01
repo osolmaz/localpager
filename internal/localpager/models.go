@@ -11,6 +11,8 @@ type Item struct {
 	SourceRef         string     `gorm:"column:source_ref;type:text;not null;uniqueIndex:uq_localpager_items_source,priority:2"`
 	SourceURL         *string    `gorm:"column:source_url;type:text"`
 	Title             *string    `gorm:"column:title;type:text"`
+	Body              *string    `gorm:"column:body;type:text"`
+	LabelsJSON        *string    `gorm:"column:labels_json;type:text"`
 	State             *string    `gorm:"column:state;type:text"`
 	Author            *string    `gorm:"column:author;type:text"`
 	LatestContentHash *string    `gorm:"column:latest_content_hash;type:text"`

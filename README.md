@@ -51,7 +51,16 @@ Notification policy is deployment config, not classifier logic:
   "classifier": {
     "schema": "~/.config/localpager/classification.schema.json",
     "prompt_template": "~/.config/localpager/classifier.prompt.md",
-    "topic_taxonomy": "~/.config/localpager/topics.json"
+    "topic_taxonomy": "~/.config/localpager/topics.json",
+    "context": {
+      "github": {
+        "include_body": true,
+        "include_labels": true,
+        "include_comments": true,
+        "include_changed_files": true,
+        "include_diff": true
+      }
+    }
   },
   "worker": {
     "notify_topics_any": ["local_models", "open_weight_models"]
@@ -66,6 +75,10 @@ Classifier prompts, topic taxonomies, and schemas should be configured as a
 deployment profile. See [Classifier Profiles](docs/2026-06-01-classifier-profiles.md).
 When `classifier.topic_taxonomy` is set, `localpager-classifier` generates a
 runtime schema that rejects topics outside that taxonomy.
+
+Before the classifier runs, Localpager renders GitHub context into the prompt:
+stored title/body/labels plus optional comments, changed files, and selected PR
+diff. Prompt templates can include that block with `__GITHUB_CONTEXT__`.
 
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:

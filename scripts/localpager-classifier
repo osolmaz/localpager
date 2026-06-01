@@ -6,9 +6,10 @@ agent_dir="$root/localpager-agent"
 schema="${LOCALPAGER_CLASSIFIER_SCHEMA:-$root/schemas/classification.schema.json}"
 prompt_template="${LOCALPAGER_CLASSIFIER_PROMPT_TEMPLATE:-$root/prompts/github-relevance-classifier.md}"
 topic_taxonomy="${LOCALPAGER_CLASSIFIER_TOPIC_TAXONOMY:-}"
+github_context_file="${LOCALPAGER_CLASSIFIER_GITHUB_CONTEXT_FILE:-}"
 
 if [[ $# -lt 1 ]]; then
-  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>] [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>]" >&2
+  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>] [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>] [--github-context-file <path>]" >&2
   exit 2
 fi
 
@@ -50,6 +51,14 @@ while [[ $# -gt 0 ]]; do
       topic_taxonomy="$2"
       shift 2
       ;;
+    --github-context-file)
+      if [[ $# -lt 2 ]]; then
+        echo "--github-context-file requires a value" >&2
+        exit 2
+      fi
+      github_context_file="$2"
+      shift 2
+      ;;
     *)
       echo "unsupported classifier argument: $1" >&2
       exit 2
@@ -69,6 +78,9 @@ schema="$(expand_path "$schema")"
 prompt_template="$(expand_path "$prompt_template")"
 if [[ -n "$topic_taxonomy" ]]; then
   topic_taxonomy="$(expand_path "$topic_taxonomy")"
+fi
+if [[ -n "$github_context_file" ]]; then
+  github_context_file="$(expand_path "$github_context_file")"
 fi
 
 if [[ ! -f "$prompt_template" ]]; then
@@ -99,6 +111,13 @@ render_args=(
 )
 if [[ -n "$topic_taxonomy" ]]; then
   render_args+=(--topic-taxonomy "$topic_taxonomy")
+fi
+if [[ -n "$github_context_file" ]]; then
+  if [[ ! -f "$github_context_file" ]]; then
+    echo "missing GitHub context file: $github_context_file" >&2
+    exit 2
+  fi
+  render_args+=(--github-context-file "$github_context_file")
 fi
 node "${render_args[@]}"
 

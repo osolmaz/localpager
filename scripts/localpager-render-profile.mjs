@@ -14,11 +14,14 @@ if (!options.target || !options.schema || !options.promptTemplate || !options.ou
 const topics = options.topicTaxonomy ? loadTopics(options.topicTaxonomy) : [];
 const schema = JSON.parse(readFileSync(options.schema, "utf8"));
 const promptTemplate = readFileSync(options.promptTemplate, "utf8");
+const githubContext = options.githubContextFile
+  ? readFileSync(options.githubContextFile, "utf8")
+  : "GitHub context unavailable. Classify only from the target text and say so in caveats.";
 
 mkdirSync(path.dirname(options.outputSchema), { recursive: true });
 mkdirSync(path.dirname(options.outputPrompt), { recursive: true });
 writeFileSync(options.outputSchema, JSON.stringify(renderSchema(schema, topics), null, 2) + "\n");
-writeFileSync(options.outputPrompt, renderPrompt(promptTemplate, options.target, topics));
+writeFileSync(options.outputPrompt, renderPrompt(promptTemplate, options.target, topics, githubContext));
 
 function parseArgs(args) {
   const parsed = {
@@ -27,6 +30,7 @@ function parseArgs(args) {
     schema: "",
     promptTemplate: "",
     topicTaxonomy: "",
+    githubContextFile: "",
     outputSchema: "",
     outputPrompt: "",
   };
@@ -50,6 +54,10 @@ function parseArgs(args) {
     }
     if (arg === "--topic-taxonomy") {
       parsed.topicTaxonomy = requiredValue(args, ++index, arg);
+      continue;
+    }
+    if (arg === "--github-context-file") {
+      parsed.githubContextFile = requiredValue(args, ++index, arg);
       continue;
     }
     if (arg === "--output-schema") {
@@ -78,7 +86,7 @@ function usage(status) {
   output.write(
     [
       "usage: localpager-render-profile --target TARGET --schema PATH --prompt-template PATH",
-      "       --output-schema PATH --output-prompt PATH [--topic-taxonomy PATH]",
+      "       --output-schema PATH --output-prompt PATH [--topic-taxonomy PATH] [--github-context-file PATH]",
       "",
     ].join("\n"),
   );
@@ -132,7 +140,7 @@ function renderSchema(schema, topics) {
   return rendered;
 }
 
-function renderPrompt(template, target, topics) {
+function renderPrompt(template, target, topics, githubContext) {
   const allowedTopicsJSON =
     topics.length > 0
       ? JSON.stringify(topics.map((topic) => topic.id), null, 2)
@@ -146,6 +154,7 @@ function renderPrompt(template, target, topics) {
       : "No topic taxonomy configured.";
   return template
     .replaceAll("__TARGET__", target)
+    .replaceAll("__GITHUB_CONTEXT__", githubContext.trim())
     .replaceAll("__ALLOWED_TOPICS_JSON__", allowedTopicsJSON)
     .replaceAll("__TOPIC_TAXONOMY_JSON__", taxonomyJSON)
     .replaceAll("__TOPIC_DESCRIPTIONS__", descriptions);

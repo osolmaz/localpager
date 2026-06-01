@@ -192,6 +192,7 @@ type pullRequest struct {
 	HTMLURL   string    `json:"html_url"`
 	UpdatedAt time.Time `json:"updated_at"`
 	User      user      `json:"user"`
+	Labels    []label   `json:"labels"`
 }
 
 type issue struct {
@@ -202,6 +203,7 @@ type issue struct {
 	HTMLURL     string          `json:"html_url"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 	User        user            `json:"user"`
+	Labels      []label         `json:"labels"`
 	PullRequest json.RawMessage `json:"pull_request"`
 }
 
@@ -209,35 +211,57 @@ type user struct {
 	Login string `json:"login"`
 }
 
+type label struct {
+	Name string `json:"name"`
+}
+
 func mapPullRequest(repo string, pr pullRequest) localpager.IngestItem {
-	return mapGitHubItem(repo, "github_pr", pr.Number, pr.HTMLURL, pr.Title, pr.Body, pr.State, pr.User.Login, pr.UpdatedAt)
+	return mapGitHubItem(repo, "github_pr", pr.Number, pr.HTMLURL, pr.Title, pr.Body, labelsJSON(pr.Labels), pr.State, pr.User.Login, pr.UpdatedAt)
 }
 
 func mapIssue(repo string, issue issue) localpager.IngestItem {
-	return mapGitHubItem(repo, "github_issue", issue.Number, issue.HTMLURL, issue.Title, issue.Body, issue.State, issue.User.Login, issue.UpdatedAt)
+	return mapGitHubItem(repo, "github_issue", issue.Number, issue.HTMLURL, issue.Title, issue.Body, labelsJSON(issue.Labels), issue.State, issue.User.Login, issue.UpdatedAt)
 }
 
-func mapGitHubItem(repo string, itemType string, number int, url string, title string, body string, state string, author string, updatedAt time.Time) localpager.IngestItem {
+func mapGitHubItem(repo string, itemType string, number int, url string, title string, body string, labels string, state string, author string, updatedAt time.Time) localpager.IngestItem {
 	item := localpager.IngestItem{
-		Source:    "github",
-		Type:      itemType,
-		Ref:       fmt.Sprintf("%s#%d", repo, number),
-		URL:       url,
-		Title:     title,
-		Body:      body,
-		State:     state,
-		Author:    author,
-		UpdatedAt: updatedAt.UTC(),
-		Metadata:  map[string]any{"repo": repo, "number": number},
+		Source:     "github",
+		Type:       itemType,
+		Ref:        fmt.Sprintf("%s#%d", repo, number),
+		URL:        url,
+		Title:      title,
+		Body:       body,
+		LabelsJSON: labels,
+		State:      state,
+		Author:     author,
+		UpdatedAt:  updatedAt.UTC(),
+		Metadata:   map[string]any{"repo": repo, "number": number},
 	}
 	item.ContentHash = contentHash(item)
 	return item
 }
 
 func contentHash(item localpager.IngestItem) string {
-	payload := []string{item.Type, item.Ref, item.Title, item.Body, item.State, item.Author, item.UpdatedAt.Format(time.RFC3339Nano)}
+	payload := []string{item.Type, item.Ref, item.Title, item.Body, item.LabelsJSON, item.State, item.Author, item.UpdatedAt.Format(time.RFC3339Nano)}
 	sum := sha256.Sum256([]byte(strings.Join(payload, "\x00")))
 	return hex.EncodeToString(sum[:])
+}
+
+func labelsJSON(labels []label) string {
+	names := make([]string, 0, len(labels))
+	for _, label := range labels {
+		if strings.TrimSpace(label.Name) != "" {
+			names = append(names, label.Name)
+		}
+	}
+	if len(names) == 0 {
+		return ""
+	}
+	encoded, err := json.Marshal(names)
+	if err != nil {
+		return ""
+	}
+	return string(encoded)
 }
 
 func limitForKind(limit, seen int) int {

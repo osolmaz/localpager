@@ -20,7 +20,20 @@
   "classifier": {
     "schema": "./schemas/classification.schema.json",
     "prompt_template": "./prompts/github-relevance-classifier.md",
-    "topic_taxonomy": "./examples/profiles/maintainer-topics.example.json"
+    "topic_taxonomy": "./examples/profiles/maintainer-topics.example.json",
+    "context": {
+      "github": {
+        "include_body": true,
+        "include_labels": true,
+        "include_comments": true,
+        "include_changed_files": true,
+        "include_diff": true,
+        "max_body_chars": 2500,
+        "max_comments_chars": 1500,
+        "max_changed_files_chars": 2000,
+        "max_diff_chars": 5000
+      }
+    }
   },
   "worker": {
     "max_concurrency": 2,

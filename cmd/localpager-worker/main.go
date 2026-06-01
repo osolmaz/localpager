@@ -25,6 +25,8 @@ func main() {
 	flag.StringVar(&flags.classifierSchema, "classifier-schema", "", "classifier JSON schema path")
 	flag.StringVar(&flags.classifierPromptTemplate, "classifier-prompt-template", "", "classifier prompt template path")
 	flag.StringVar(&flags.classifierTopicTaxonomy, "classifier-topic-taxonomy", "", "classifier topic taxonomy path")
+	flag.StringVar(&flags.githubBaseURL, "github-base-url", "https://api.github.com", "GitHub API base URL for classifier context")
+	flag.StringVar(&flags.githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token for classifier context")
 	flag.StringVar(&flags.model, "model", "", "optional localpager-agent model override")
 	flag.StringVar(&flags.discordChannelID, "discord-channel-id", os.Getenv("DISCORD_CHANNEL_ID"), "Discord channel for notifications")
 	flag.StringVar(&flags.discordTokenEnv, "discord-token-env", "DISCORD_BOT_TOKEN", "environment variable containing Discord bot token")
@@ -71,6 +73,7 @@ func main() {
 		ClassifierSchema:         flags.classifierSchema,
 		ClassifierPromptTemplate: flags.classifierPromptTemplate,
 		ClassifierTopicTaxonomy:  flags.classifierTopicTaxonomy,
+		ClassifierContext:        classifierContextOptions(cfg, flags.githubBaseURL, flags.githubTokenEnv),
 		Model:                    flags.model,
 		DestinationRef:           flags.discordChannelID,
 		DiscordToken:             token,
@@ -106,6 +109,8 @@ type workerFlags struct {
 	classifierSchema         string
 	classifierPromptTemplate string
 	classifierTopicTaxonomy  string
+	githubBaseURL            string
+	githubTokenEnv           string
 	model                    string
 	discordChannelID         string
 	discordTokenEnv          string
@@ -119,6 +124,7 @@ func (flags *workerFlags) applyConfig(cfg config.Config, setFlags map[string]boo
 	flags.applyCoreConfig(cfg, setFlags)
 	flags.applyClassifierConfig(cfg, setFlags)
 	flags.applyDiscordConfig(cfg, setFlags)
+	flags.applyGitHubConfig(cfg, setFlags)
 }
 
 func (flags *workerFlags) applyCoreConfig(cfg config.Config, setFlags map[string]bool) {
@@ -182,4 +188,48 @@ func (flags *workerFlags) applyDiscordConfig(cfg config.Config, setFlags map[str
 	if cfg.Worker.SendPendingOnly && !config.FlagSet(setFlags, "send-pending-only") {
 		flags.sendPendingOnly = cfg.Worker.SendPendingOnly
 	}
+}
+
+func (flags *workerFlags) applyGitHubConfig(cfg config.Config, setFlags map[string]bool) {
+	if cfg.GitHubBaseURL != "" && !config.FlagSet(setFlags, "github-base-url") {
+		flags.githubBaseURL = cfg.GitHubBaseURL
+	}
+	if cfg.GitHubTokenEnv != "" && !config.FlagSet(setFlags, "github-token-env") {
+		flags.githubTokenEnv = cfg.GitHubTokenEnv
+	}
+}
+
+func classifierContextOptions(cfg config.Config, githubBaseURL string, githubTokenEnv string) localpager.ClassifierContextOptions {
+	github := cfg.Classifier.Context.GitHub
+	opts := localpager.DefaultClassifierContextOptions()
+	opts.IncludeBody = boolValue(github.IncludeBody, opts.IncludeBody)
+	opts.IncludeLabels = boolValue(github.IncludeLabels, opts.IncludeLabels)
+	opts.IncludeComments = boolValue(github.IncludeComments, opts.IncludeComments)
+	opts.IncludeChangedFiles = boolValue(github.IncludeChangedFiles, opts.IncludeChangedFiles)
+	opts.IncludeDiff = boolValue(github.IncludeDiff, opts.IncludeDiff)
+	if github.MaxBodyChars > 0 {
+		opts.MaxBodyChars = github.MaxBodyChars
+	}
+	if github.MaxCommentsChars > 0 {
+		opts.MaxCommentsChars = github.MaxCommentsChars
+	}
+	if github.MaxChangedFilesChars > 0 {
+		opts.MaxChangedFilesChars = github.MaxChangedFilesChars
+	}
+	if github.MaxDiffChars > 0 {
+		opts.MaxDiffChars = github.MaxDiffChars
+	}
+	opts.GitHubBaseURL = githubBaseURL
+	if githubTokenEnv == "" {
+		githubTokenEnv = "GITHUB_TOKEN"
+	}
+	opts.GitHubToken = os.Getenv(githubTokenEnv)
+	return opts
+}
+
+func boolValue(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
 }

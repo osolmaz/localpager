@@ -46,6 +46,12 @@ func TestEnqueueMapsGitcrawlRowsThroughGenericIngest(t *testing.T) {
 	if item.Ref == nil || *item.Ref != "example/repo#80568" {
 		t.Fatalf("item ref = %v, want example/repo#80568", item.Ref)
 	}
+	if item.Body == nil || *item.Body != "Fixture body mentioning local model context." {
+		t.Fatalf("item body = %v, want fixture body", item.Body)
+	}
+	if item.LabelsJSON == nil || *item.LabelsJSON != `["local_models","bug"]` {
+		t.Fatalf("item labels = %v, want fixture labels", item.LabelsJSON)
+	}
 }
 
 func TestEnqueueSkipsSuppressedGitcrawlRows(t *testing.T) {
@@ -243,6 +249,8 @@ CREATE TABLE threads (
   kind text not null,
   state text not null,
   title text not null,
+  body text,
+  labels_json text not null default '[]',
   author_login text,
   html_url text not null,
   content_hash text not null,
@@ -253,9 +261,10 @@ CREATE TABLE threads (
 );
 INSERT INTO repositories (id, full_name) VALUES (1, 'example/repo');
 INSERT INTO threads (
-  repo_id, number, kind, state, title, author_login, html_url, content_hash, updated_at_gh, updated_at
+  repo_id, number, kind, state, title, body, labels_json, author_login, html_url, content_hash, updated_at_gh, updated_at
 ) VALUES (
   1, 80568, 'pull_request', 'open', 'Example pull request title',
+  'Fixture body mentioning local model context.', '["local_models","bug"]',
   'example-user', 'https://github.com/example/repo/pull/80568', 'hash-1',
   '2026-05-20T00:00:00Z', '2026-05-20T00:00:00Z'
 );

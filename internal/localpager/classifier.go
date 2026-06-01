@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -19,6 +21,11 @@ func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (Cla
 		return ClassifierOutput{}, "", "", "", err
 	}
 	target := classifierTarget(job)
+	jobCtx, cancel, err := classifierContext(ctx, job)
+	if err != nil {
+		return ClassifierOutput{}, "", "", "", err
+	}
+	defer cancel()
 	args := []string{target}
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
@@ -32,11 +39,13 @@ func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (Cla
 	if opts.ClassifierTopicTaxonomy != "" {
 		args = append(args, "--topic-taxonomy", opts.ClassifierTopicTaxonomy)
 	}
-	jobCtx, cancel, err := classifierContext(ctx, job)
+	contextPath, err := writeClassifierContextFile(jobCtx, job.Item, opts.ClassifierContext)
 	if err != nil {
 		return ClassifierOutput{}, "", "", "", err
 	}
-	defer cancel()
+	if contextPath != "" {
+		args = append(args, "--github-context-file", contextPath)
+	}
 
 	stdout, stderr, err := runClassifierCommand(jobCtx, commandPath, args)
 	if err != nil {
@@ -51,6 +60,37 @@ func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (Cla
 		return ClassifierOutput{}, "", "", "", fmt.Errorf("classifier returned invalid JSON: %w stdout=%s stderr=%s", err, outputJSON, strings.TrimSpace(stderr))
 	}
 	return output, outputJSON, parseStderrPath(stderr, "prompt"), parseStderrPath(stderr, "session"), nil
+}
+
+func writeClassifierContextFile(ctx context.Context, item Item, opts ClassifierContextOptions) (string, error) {
+	body := renderClassifierContext(ctx, item, opts)
+	if strings.TrimSpace(body) == "" {
+		return "", nil
+	}
+	dir, err := classifierContextDir()
+	if err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("create classifier context dir: %w", err)
+	}
+	file, err := os.CreateTemp(dir, "context-*.md")
+	if err != nil {
+		return "", fmt.Errorf("create classifier context file: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	if _, err := file.WriteString(body); err != nil {
+		return "", fmt.Errorf("write classifier context file: %w", err)
+	}
+	return file.Name(), nil
+}
+
+func classifierContextDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".local/state/localpager/classifier/contexts"), nil
 }
 
 func classifierTarget(job ClaimedJob) string {

@@ -6,8 +6,15 @@ Target:
 __TARGET__
 ```
 
-Inspect the target if your runtime has tools or web access. If you cannot inspect
-it directly, classify only from the target text and say so in `caveats`.
+GitHub context:
+
+```markdown
+__GITHUB_CONTEXT__
+```
+
+Use the GitHub context as the source of truth. If the context says a section is
+missing, unavailable, selected, or truncated, classify from the available context
+and mention that limit in `caveats`.
 
 Return the final answer by calling the final JSON tool. Do not include prose
 outside the final JSON.

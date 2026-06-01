@@ -8,7 +8,7 @@ import (
 
 func TestLoadReadsConfigFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"repo":"example/repo","classifier":{"schema":"schema.json","prompt_template":"prompt.md","topic_taxonomy":"topics.json"},"worker":{"send_discord":true,"notify_topics_any":["local_models"]}}`), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"repo":"example/repo","classifier":{"schema":"schema.json","prompt_template":"prompt.md","topic_taxonomy":"topics.json","context":{"github":{"include_body":true,"include_diff":false,"max_body_chars":1200}}},"worker":{"send_discord":true,"notify_topics_any":["local_models"]}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load(path)
@@ -29,6 +29,15 @@ func TestLoadReadsConfigFile(t *testing.T) {
 	}
 	if cfg.Classifier.TopicTaxonomy != "topics.json" {
 		t.Fatalf("Classifier.TopicTaxonomy = %q, want topics.json", cfg.Classifier.TopicTaxonomy)
+	}
+	if cfg.Classifier.Context.GitHub.IncludeBody == nil || !*cfg.Classifier.Context.GitHub.IncludeBody {
+		t.Fatalf("Classifier.Context.GitHub.IncludeBody = %v, want true", cfg.Classifier.Context.GitHub.IncludeBody)
+	}
+	if cfg.Classifier.Context.GitHub.IncludeDiff == nil || *cfg.Classifier.Context.GitHub.IncludeDiff {
+		t.Fatalf("Classifier.Context.GitHub.IncludeDiff = %v, want false", cfg.Classifier.Context.GitHub.IncludeDiff)
+	}
+	if cfg.Classifier.Context.GitHub.MaxBodyChars != 1200 {
+		t.Fatalf("Classifier.Context.GitHub.MaxBodyChars = %d, want 1200", cfg.Classifier.Context.GitHub.MaxBodyChars)
 	}
 }
 

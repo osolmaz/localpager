@@ -37,9 +37,26 @@ type Watch struct {
 }
 
 type Classifier struct {
-	Schema         string `json:"schema"`
-	PromptTemplate string `json:"prompt_template"`
-	TopicTaxonomy  string `json:"topic_taxonomy"`
+	Schema         string  `json:"schema"`
+	PromptTemplate string  `json:"prompt_template"`
+	TopicTaxonomy  string  `json:"topic_taxonomy"`
+	Context        Context `json:"context"`
+}
+
+type Context struct {
+	GitHub GitHubContext `json:"github"`
+}
+
+type GitHubContext struct {
+	IncludeBody          *bool `json:"include_body"`
+	IncludeLabels        *bool `json:"include_labels"`
+	IncludeComments      *bool `json:"include_comments"`
+	IncludeChangedFiles  *bool `json:"include_changed_files"`
+	IncludeDiff          *bool `json:"include_diff"`
+	MaxBodyChars         int   `json:"max_body_chars"`
+	MaxCommentsChars     int   `json:"max_comments_chars"`
+	MaxChangedFilesChars int   `json:"max_changed_files_chars"`
+	MaxDiffChars         int   `json:"max_diff_chars"`
 }
 
 type Worker struct {

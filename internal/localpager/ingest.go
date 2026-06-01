@@ -20,6 +20,7 @@ type IngestItem struct {
 	URL         string         `json:"url"`
 	Title       string         `json:"title"`
 	Body        string         `json:"body"`
+	LabelsJSON  string         `json:"labels_json"`
 	State       string         `json:"state"`
 	Author      string         `json:"author"`
 	UpdatedAt   time.Time      `json:"updated_at"`
@@ -163,6 +164,8 @@ func normalizeIngestItem(item IngestItem) (IngestItem, error) {
 	item.Ref = strings.TrimSpace(item.Ref)
 	item.URL = strings.TrimSpace(item.URL)
 	item.Title = strings.TrimSpace(item.Title)
+	item.Body = strings.TrimSpace(item.Body)
+	item.LabelsJSON = strings.TrimSpace(item.LabelsJSON)
 	item.State = strings.TrimSpace(item.State)
 	item.Author = strings.TrimSpace(item.Author)
 	item.ContentHash = strings.TrimSpace(item.ContentHash)
@@ -200,6 +203,7 @@ func hashIngestItem(item IngestItem) (string, error) {
 		URL       string         `json:"url"`
 		Title     string         `json:"title"`
 		Body      string         `json:"body"`
+		Labels    string         `json:"labels_json"`
 		State     string         `json:"state"`
 		Author    string         `json:"author"`
 		UpdatedAt time.Time      `json:"updated_at"`
@@ -211,6 +215,7 @@ func hashIngestItem(item IngestItem) (string, error) {
 		URL:       item.URL,
 		Title:     item.Title,
 		Body:      item.Body,
+		Labels:    item.LabelsJSON,
 		State:     item.State,
 		Author:    item.Author,
 		UpdatedAt: item.UpdatedAt,
@@ -238,6 +243,8 @@ func upsertGenericItem(ctx context.Context, tx *gorm.DB, item IngestItem) (Item,
 		SourceRef:         legacySourceRef(item),
 		SourceURL:         stringPtrOrNil(item.URL),
 		Title:             stringPtrOrNil(item.Title),
+		Body:              stringPtrOrNil(item.Body),
+		LabelsJSON:        stringPtrOrNil(item.LabelsJSON),
 		State:             stringPtrOrNil(item.State),
 		Author:            stringPtrOrNil(item.Author),
 		LatestContentHash: stringPtr(item.ContentHash),
@@ -258,6 +265,8 @@ func upsertGenericItem(ctx context.Context, tx *gorm.DB, item IngestItem) (Item,
 			"source_ref":          stored.SourceRef,
 			"source_url":          freshColumn("source_url"),
 			"title":               freshColumn("title"),
+			"body":                freshColumn("body"),
+			"labels_json":         freshColumn("labels_json"),
 			"state":               freshColumn("state"),
 			"author":              freshColumn("author"),
 			"latest_content_hash": freshColumn("latest_content_hash"),
