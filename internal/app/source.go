@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 	"github.com/osolmaz/localpager/internal/sources"
 	"github.com/osolmaz/localpager/internal/sources/gitcrawl"
 	githubsource "github.com/osolmaz/localpager/internal/sources/github"
@@ -28,7 +28,7 @@ type SourceOptions struct {
 	GitHubTokenEnv   string
 }
 
-func EnqueueSource(ctx context.Context, ingestor notifier.Ingestor, opts SourceOptions) (sources.EnqueueStats, error) {
+func EnqueueSource(ctx context.Context, ingestor localpager.Ingestor, opts SourceOptions) (sources.EnqueueStats, error) {
 	switch opts.Source {
 	case "gitcrawl":
 		return enqueueGitcrawl(ctx, ingestor, opts)
@@ -39,7 +39,7 @@ func EnqueueSource(ctx context.Context, ingestor notifier.Ingestor, opts SourceO
 	}
 }
 
-func enqueueGitcrawl(ctx context.Context, ingestor notifier.Ingestor, opts SourceOptions) (sources.EnqueueStats, error) {
+func enqueueGitcrawl(ctx context.Context, ingestor localpager.Ingestor, opts SourceOptions) (sources.EnqueueStats, error) {
 	db, err := gitcrawl.OpenDB(ctx, opts.GitcrawlDBPath)
 	if err != nil {
 		return sources.EnqueueStats{}, err
@@ -57,7 +57,7 @@ func enqueueGitcrawl(ctx context.Context, ingestor notifier.Ingestor, opts Sourc
 	})
 }
 
-func enqueueGitHub(ctx context.Context, ingestor notifier.Ingestor, opts SourceOptions) (sources.EnqueueStats, error) {
+func enqueueGitHub(ctx context.Context, ingestor localpager.Ingestor, opts SourceOptions) (sources.EnqueueStats, error) {
 	return githubsource.Enqueue(ctx, ingestor, githubsource.EnqueueOptions{
 		Repo:             opts.Repo,
 		Type:             opts.Type,

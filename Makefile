@@ -1,7 +1,7 @@
 PREFIX ?= $(HOME)/.local
 BINDIR ?= $(PREFIX)/bin
 
-COMMANDS := localpager notifier-enqueue-github notifier-ingest-json notifier-watch notifier-worker
+COMMANDS := localpager localpager-enqueue-github localpager-ingest-json localpager-watch localpager-worker
 
 .PHONY: all build install test
 

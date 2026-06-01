@@ -7,7 +7,7 @@ OnUnitActiveSec=10m
 AccuracySec=1m
 RandomizedDelaySec=2m
 Persistent=true
-Unit=localpager-notifier-enqueue-github.service
+Unit=localpager-enqueue-github.service
 
 [Install]
 WantedBy=timers.target

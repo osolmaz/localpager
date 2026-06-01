@@ -9,7 +9,7 @@ import (
 	"os"
 
 	"github.com/osolmaz/localpager/internal/app"
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 )
 
 func main() {
@@ -23,11 +23,11 @@ func main() {
 	var suppressionReason string
 	var cutoverAt string
 
-	flag.StringVar(&dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
-	flag.StringVar(&itemJSON, "item-json", "", "generic notifier item JSON; reads stdin when empty")
+	flag.StringVar(&dbPath, "db", localpager.DefaultDBPath, "localpager SQLite database path")
+	flag.StringVar(&itemJSON, "item-json", "", "generic localpager item JSON; reads stdin when empty")
 	flag.StringVar(&jobType, "job-type", "", "job type; defaults to classify_<item type>")
-	flag.StringVar(&processorName, "processor-name", notifier.DefaultProcessorName, "processor name")
-	flag.StringVar(&processorVersion, "processor-version", notifier.DefaultProcessorVer, "processor version")
+	flag.StringVar(&processorName, "processor-name", localpager.DefaultProcessorName, "processor name")
+	flag.StringVar(&processorVersion, "processor-version", localpager.DefaultProcessorVer, "processor version")
 	flag.IntVar(&priority, "priority", 100, "job priority")
 	flag.BoolVar(&initialHydration, "initial-hydration", false, "record item as already handled without classifying it")
 	flag.StringVar(&suppressionReason, "suppression-reason", "", "optional notification suppression reason")
@@ -41,20 +41,20 @@ func main() {
 		}
 		itemJSON = string(data)
 	}
-	var item notifier.IngestItem
+	var item localpager.IngestItem
 	if err := json.Unmarshal([]byte(itemJSON), &item); err != nil {
 		log.Fatalf("invalid item JSON: %v", err)
 	}
 	cutover := app.ParseCutoverFlag(cutoverAt)
 
 	ctx := context.Background()
-	pool, err := notifier.NewPool(ctx, dbPath)
+	pool, err := localpager.NewPool(ctx, dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer app.ClosePool(pool)
 
-	result, err := notifier.Ingest(ctx, pool, item, notifier.IngestOptions{
+	result, err := localpager.Ingest(ctx, pool, item, localpager.IngestOptions{
 		JobType:                       jobType,
 		ProcessorName:                 processorName,
 		ProcessorVersion:              processorVersion,

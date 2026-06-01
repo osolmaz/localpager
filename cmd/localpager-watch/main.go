@@ -10,7 +10,7 @@ import (
 
 	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/config"
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 	sourcepkg "github.com/osolmaz/localpager/internal/sources"
 	"github.com/osolmaz/localpager/internal/timing"
 )
@@ -40,12 +40,12 @@ func main() {
 	cutover := app.ParseCutoverFlag(flags.cutoverAt)
 
 	ctx := context.Background()
-	pool, err := notifier.NewPool(ctx, flags.dbPath)
+	pool, err := localpager.NewPool(ctx, flags.dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer app.ClosePool(pool)
-	ingestor := notifier.NewIngestor(pool)
+	ingestor := localpager.NewIngestor(pool)
 
 	for {
 		total := sourcepkg.EnqueueStats{}
@@ -65,13 +65,13 @@ func main() {
 			})
 			if err != nil {
 				log.Printf("source=%s error=%v", source, err)
-				_ = notifier.RecordWatcherError(ctx, pool, source, watcherName(flags.repo), err)
+				_ = localpager.RecordWatcherError(ctx, pool, source, watcherName(flags.repo), err)
 				if flags.once {
 					os.Exit(1)
 				}
 				continue
 			}
-			_ = notifier.RecordWatcherSuccess(ctx, pool, source, watcherName(flags.repo), time.Now().UTC().Format(time.RFC3339Nano))
+			_ = localpager.RecordWatcherSuccess(ctx, pool, source, watcherName(flags.repo), time.Now().UTC().Format(time.RFC3339Nano))
 			total.Add(stats)
 		}
 		app.Printf(os.Stdout, "%s\n", total)

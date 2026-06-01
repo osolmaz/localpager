@@ -1,4 +1,4 @@
-package notifier
+package localpager
 
 import (
 	"context"
@@ -265,9 +265,9 @@ func claimJobs(ctx context.Context, db *gorm.DB, max int, leaseTTL time.Duration
 			Where("status = ? AND attempts < ? AND (run_after IS NULL OR run_after <= ?)", "pending", maxAttempts, now).
 			Where(`EXISTS (
 				SELECT 1
-				FROM notifier_items
-				WHERE notifier_items.id = notifier_jobs.item_id
-				  AND (notifier_items.latest_content_hash IS NULL OR notifier_items.latest_content_hash = notifier_jobs.content_hash)
+				FROM localpager_items
+				WHERE localpager_items.id = localpager_jobs.item_id
+				  AND (localpager_items.latest_content_hash IS NULL OR localpager_items.latest_content_hash = localpager_jobs.content_hash)
 			)`).
 			Order("CASE WHEN notification_suppression_reason IS NULL THEN 0 ELSE 1 END, priority ASC, created_at ASC").
 			Limit(max).
@@ -306,7 +306,7 @@ func claimJobs(ctx context.Context, db *gorm.DB, max int, leaseTTL time.Duration
 
 func skipSupersededPendingJobs(ctx context.Context, db *gorm.DB, now time.Time) error {
 	return db.WithContext(ctx).Exec(`
-UPDATE notifier_jobs
+UPDATE localpager_jobs
 SET status = 'skipped',
     last_error = 'superseded_content_hash',
     leased_until = NULL,
@@ -315,10 +315,10 @@ SET status = 'skipped',
 WHERE status = 'pending'
   AND EXISTS (
     SELECT 1
-    FROM notifier_items
-    WHERE notifier_items.id = notifier_jobs.item_id
-      AND notifier_items.latest_content_hash IS NOT NULL
-      AND notifier_items.latest_content_hash != notifier_jobs.content_hash
+    FROM localpager_items
+    WHERE localpager_items.id = localpager_jobs.item_id
+      AND localpager_items.latest_content_hash IS NOT NULL
+      AND localpager_items.latest_content_hash != localpager_jobs.content_hash
   )`, now).Error
 }
 
@@ -451,9 +451,9 @@ func markClaimedJobSucceeded(ctx context.Context, tx *gorm.DB, job ClaimedJob) e
 		Where("id = ? AND status = ? AND leased_until = ?", job.ID, "running", job.LeasedUntil).
 		Where(`EXISTS (
 			SELECT 1
-			FROM notifier_items
-			WHERE notifier_items.id = notifier_jobs.item_id
-			  AND (notifier_items.latest_content_hash IS NULL OR notifier_items.latest_content_hash = notifier_jobs.content_hash)
+			FROM localpager_items
+			WHERE localpager_items.id = localpager_jobs.item_id
+			  AND (localpager_items.latest_content_hash IS NULL OR localpager_items.latest_content_hash = localpager_jobs.content_hash)
 		)`).
 		Updates(map[string]any{
 			"status":       "succeeded",
@@ -498,10 +498,10 @@ func skipClaimedJobIfSuperseded(ctx context.Context, tx *gorm.DB, job ClaimedJob
 		Where("id = ? AND status = ? AND leased_until = ?", job.ID, "running", job.LeasedUntil).
 		Where(`EXISTS (
 			SELECT 1
-			FROM notifier_items
-			WHERE notifier_items.id = notifier_jobs.item_id
-			  AND notifier_items.latest_content_hash IS NOT NULL
-			  AND notifier_items.latest_content_hash != notifier_jobs.content_hash
+			FROM localpager_items
+			WHERE localpager_items.id = localpager_jobs.item_id
+			  AND localpager_items.latest_content_hash IS NOT NULL
+			  AND localpager_items.latest_content_hash != localpager_jobs.content_hash
 		)`).
 		Updates(map[string]any{
 			"status":       "skipped",

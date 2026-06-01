@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 )
 
 func TestEnqueueMapsGitcrawlRowsThroughGenericIngest(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := notifier.NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := localpager.NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -21,7 +21,7 @@ func TestEnqueueMapsGitcrawlRowsThroughGenericIngest(t *testing.T) {
 	gitcrawlDB := createFixture(t, filepath.Join(dir, "gitcrawl.sqlite"))
 	defer gitcrawlDB.Close()
 
-	stats, err := Enqueue(ctx, notifier.NewIngestor(pool), gitcrawlDB, EnqueueOptions{
+	stats, err := Enqueue(ctx, localpager.NewIngestor(pool), gitcrawlDB, EnqueueOptions{
 		Repo:         "example/repo",
 		Type:         "prs",
 		RecentWindow: time.Hour,
@@ -33,7 +33,7 @@ func TestEnqueueMapsGitcrawlRowsThroughGenericIngest(t *testing.T) {
 		t.Fatalf("stats = %+v, want one item and one job", stats)
 	}
 
-	var item notifier.Item
+	var item localpager.Item
 	if err := pool.GORM().First(&item).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestEnqueueMapsGitcrawlRowsThroughGenericIngest(t *testing.T) {
 func TestEnqueueSkipsSuppressedGitcrawlRows(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := notifier.NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := localpager.NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +62,7 @@ func TestEnqueueSkipsSuppressedGitcrawlRows(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	stats, err := Enqueue(ctx, notifier.NewIngestor(pool), gitcrawlDB, EnqueueOptions{
+	stats, err := Enqueue(ctx, localpager.NewIngestor(pool), gitcrawlDB, EnqueueOptions{
 		Repo: "example/repo",
 		Type: "prs",
 	})
@@ -77,14 +77,14 @@ func TestEnqueueSkipsSuppressedGitcrawlRows(t *testing.T) {
 func TestEnqueueCancelsPendingJobWhenGitcrawlRowCloses(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := notifier.NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := localpager.NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
 	gitcrawlDB := createFixture(t, filepath.Join(dir, "gitcrawl.sqlite"))
 	defer gitcrawlDB.Close()
-	ingestor := notifier.NewIngestor(pool)
+	ingestor := localpager.NewIngestor(pool)
 
 	stats, err := Enqueue(ctx, ingestor, gitcrawlDB, EnqueueOptions{
 		Repo: "example/repo",
@@ -117,7 +117,7 @@ WHERE number = 80568`); err != nil {
 		t.Fatalf("closed stats = %+v, want closed active item re-ingested", stats)
 	}
 
-	var item notifier.Item
+	var item localpager.Item
 	if err := pool.GORM().First(&item).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +127,7 @@ WHERE number = 80568`); err != nil {
 	if item.LatestContentHash == nil || *item.LatestContentHash != "hash-closed" {
 		t.Fatalf("latest content hash = %v, want hash-closed", item.LatestContentHash)
 	}
-	var job notifier.Job
+	var job localpager.Job
 	if err := pool.GORM().Where("content_hash = ?", "hash-1").First(&job).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -142,14 +142,14 @@ WHERE number = 80568`); err != nil {
 func TestEnqueueSuppressesPendingNotificationWhenGitcrawlRowCloses(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := notifier.NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := localpager.NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
 	gitcrawlDB := createFixture(t, filepath.Join(dir, "gitcrawl.sqlite"))
 	defer gitcrawlDB.Close()
-	ingestor := notifier.NewIngestor(pool)
+	ingestor := localpager.NewIngestor(pool)
 
 	if _, err := Enqueue(ctx, ingestor, gitcrawlDB, EnqueueOptions{
 		Repo: "example/repo",
@@ -157,18 +157,18 @@ func TestEnqueueSuppressesPendingNotificationWhenGitcrawlRowCloses(t *testing.T)
 	}); err != nil {
 		t.Fatal(err)
 	}
-	var item notifier.Item
+	var item localpager.Item
 	if err := pool.GORM().First(&item).Error; err != nil {
 		t.Fatal(err)
 	}
-	var job notifier.Job
+	var job localpager.Job
 	if err := pool.GORM().First(&job).Error; err != nil {
 		t.Fatal(err)
 	}
-	if err := pool.GORM().Model(&notifier.Job{}).Where("id = ?", job.ID).Update("status", "succeeded").Error; err != nil {
+	if err := pool.GORM().Model(&localpager.Job{}).Where("id = ?", job.ID).Update("status", "succeeded").Error; err != nil {
 		t.Fatal(err)
 	}
-	result := notifier.Result{
+	result := localpager.Result{
 		ItemID:     item.ID,
 		JobID:      job.ID,
 		JobKind:    job.JobKind,
@@ -177,7 +177,7 @@ func TestEnqueueSuppressesPendingNotificationWhenGitcrawlRowCloses(t *testing.T)
 	if err := pool.GORM().Create(&result).Error; err != nil {
 		t.Fatal(err)
 	}
-	notification := notifier.Notification{
+	notification := localpager.Notification{
 		ItemID:           item.ID,
 		ResultID:         result.ID,
 		JobID:            job.ID,
@@ -210,7 +210,7 @@ WHERE number = 80568`); err != nil {
 		t.Fatalf("closed stats = %+v, want closed item re-ingested for pending notification", stats)
 	}
 
-	var updated notifier.Notification
+	var updated localpager.Notification
 	if err := pool.GORM().First(&updated, notification.ID).Error; err != nil {
 		t.Fatal(err)
 	}

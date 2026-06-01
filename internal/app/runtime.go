@@ -4,7 +4,7 @@ import (
 	"flag"
 	"strings"
 
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 )
 
 type MultiFlag []string
@@ -26,6 +26,6 @@ func SeenFlags(fs *flag.FlagSet) map[string]bool {
 	return flags
 }
 
-func ClosePool(pool *notifier.Pool) {
+func ClosePool(pool *localpager.Pool) {
 	_ = pool.Close()
 }

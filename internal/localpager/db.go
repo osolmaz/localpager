@@ -1,4 +1,4 @@
-package notifier
+package localpager
 
 import (
 	"context"
@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	DefaultDBPath        = "~/.local/state/localpager/notifier.sqlite"
+	DefaultDBPath        = "~/.local/state/localpager/localpager.sqlite"
 	DefaultRepo          = "owner/repo"
 	DefaultProcessorName = "github_interest_classifier"
 	DefaultProcessorVer  = "v1"
@@ -52,7 +52,8 @@ func NewPool(ctx context.Context, path string) (*Pool, error) {
 		return nil, err
 	}
 	gdb, err := gorm.Open(sqlite.Open(sqliteDSN(expanded)), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Silent),
+		DisableForeignKeyConstraintWhenMigrating: true,
+		Logger:                                   logger.Default.LogMode(logger.Silent),
 		NowFunc: func() time.Time {
 			return time.Now().UTC()
 		},
@@ -112,7 +113,7 @@ func (p *Pool) BackfillGenericIdentity(ctx context.Context) error {
 		return fmt.Errorf("database pool is not initialized")
 	}
 	return p.gdb.WithContext(ctx).Exec(`
-UPDATE notifier_items
+UPDATE localpager_items
 SET source = 'gitcrawl',
     type = source_kind,
     ref = source_ref

@@ -1,4 +1,4 @@
-package notifier
+package localpager
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 func TestSQLitePoolWaitsForConcurrentWriter(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	dbPath := filepath.Join(dir, "notifier.sqlite")
+	dbPath := filepath.Join(dir, "localpager.sqlite")
 	pool, err := NewPool(ctx, dbPath)
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +74,7 @@ func TestInitialHydrationSkipsClassification(t *testing.T) {
 	}
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestInitialHydrationSkipsClassification(t *testing.T) {
 func TestCutoverSkipsOlderItems(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +173,7 @@ func TestCutoverSkipsOlderItems(t *testing.T) {
 func TestCutoverUsesGenericItemUpdatedAt(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -211,7 +211,7 @@ func TestCutoverUsesGenericItemUpdatedAt(t *testing.T) {
 func TestSuppressionDoesNotReskipExistingQueuedJob(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,7 @@ func TestSuppressionDoesNotReskipExistingQueuedJob(t *testing.T) {
 func TestSuppressedSourceItemsAreNotEnqueued(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestSuppressedSourceItemsAreNotEnqueued(t *testing.T) {
 func TestSuppressedSourceItemsSkipExistingPendingJobs(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -301,7 +301,7 @@ func TestSuppressedSourceItemsSkipExistingPendingJobs(t *testing.T) {
 func TestSuppressedSourceItemsSkipExistingRunningJobs(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +342,7 @@ func TestSuppressedSourceItemsSkipExistingRunningJobs(t *testing.T) {
 func TestUnsuppressedSourceItemRequeuesSkippedSuppressionJob(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -386,7 +386,7 @@ func TestUnsuppressedSourceItemRequeuesSkippedSuppressionJob(t *testing.T) {
 func TestRevertedSupersededContentHashRequeuesSkippedJob(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -435,7 +435,7 @@ func TestRevertedSupersededContentHashRequeuesSkippedJob(t *testing.T) {
 func TestClaimJobsIgnoresSupersededContentHashWithoutSweep(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -475,7 +475,7 @@ func TestClaimJobsIgnoresSupersededContentHashWithoutSweep(t *testing.T) {
 func TestGenericIngestAllowsSameTypeAndRefFromDifferentSources(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -504,7 +504,7 @@ func TestGenericIngestAllowsSameTypeAndRefFromDifferentSources(t *testing.T) {
 func TestFallbackContentHashIsStableWhenUpdatedAtIsOmitted(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -539,7 +539,7 @@ func TestFallbackContentHashIsStableWhenUpdatedAtIsOmitted(t *testing.T) {
 func TestFallbackContentHashNormalizesEquivalentUpdatedAtOffsets(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -578,7 +578,7 @@ func TestFallbackContentHashNormalizesEquivalentUpdatedAtOffsets(t *testing.T) {
 func TestStaleIngestDoesNotRegressLatestContentPointer(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -629,7 +629,7 @@ func TestStaleIngestDoesNotRegressLatestContentPointer(t *testing.T) {
 func TestStaleSuppressedIngestDoesNotCancelCurrentWork(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -725,7 +725,7 @@ func TestLiveLocalModelResultCreatesDryRunNotification(t *testing.T) {
 	}
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -798,7 +798,7 @@ func TestSourceSuppressionSuppressesPendingNotification(t *testing.T) {
 	}
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -854,7 +854,7 @@ func TestWorkerKeepsConcurrencySlotsFilled(t *testing.T) {
 	}
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -931,7 +931,7 @@ JSON
 func TestSuppressedClaimedNotificationIsNotDelivered(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1002,7 +1002,7 @@ func TestSuppressedClaimedNotificationIsNotDelivered(t *testing.T) {
 func TestPermanentDiscordSendFailureDoesNotStarveLaterNotifications(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1105,7 +1105,7 @@ func TestPermanentDiscordSendFailureDoesNotStarveLaterNotifications(t *testing.T
 func TestManualNotificationResetDryRunsSend(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1179,7 +1179,7 @@ func TestManualNotificationResetDryRunsSend(t *testing.T) {
 func TestSendPendingDiscordDrainsMultipleBatches(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1363,7 +1363,7 @@ func TestShouldNotifyHonorsConfidenceAndInterestPolicy(t *testing.T) {
 func TestExpiredFinalAttemptJobIsMarkedDead(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1507,7 +1507,7 @@ func TestStaleLeaseDoesNotFinalizeResult(t *testing.T) {
 	}
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1589,7 +1589,7 @@ func TestSupersededRunningJobDoesNotFinalizeResult(t *testing.T) {
 	}
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1658,7 +1658,7 @@ JSON
 func TestSupersededPendingNotificationIsSuppressed(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1731,7 +1731,7 @@ func TestSupersededPendingNotificationIsSuppressed(t *testing.T) {
 func TestClaimJobsSkipsSupersededContentHash(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1791,7 +1791,7 @@ func TestClaimJobsSkipsSupersededContentHash(t *testing.T) {
 func TestClaimJobsUsesFIFOWithinPriority(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1849,7 +1849,7 @@ func TestClaimJobsUsesFIFOWithinPriority(t *testing.T) {
 func TestFailedJobUsesRunAfterBackoff(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1911,7 +1911,7 @@ func TestFailedJobUsesRunAfterBackoff(t *testing.T) {
 func TestResetUnsentNotificationsReturnsClaimedRowsToPending(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
-	pool, err := NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}

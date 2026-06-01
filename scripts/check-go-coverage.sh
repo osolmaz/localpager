@@ -20,7 +20,7 @@ go test ./internal/... -coverprofile="$coverfile"
 
 {
   head -n 1 "$coverfile"
-  grep -E '/internal/(config/config|sources/(kind|stats)|notifier/policy)\.go:' "$coverfile"
+  grep -E '/internal/(config/config|sources/(kind|stats)|localpager/policy)\.go:' "$coverfile"
 } >"$core_coverfile"
 
 total="$(coverage_total "$core_coverfile")"

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 	"github.com/osolmaz/localpager/internal/sources"
 )
 
@@ -52,7 +52,7 @@ type activeNumbers struct {
 }
 
 func OpenDB(ctx context.Context, path string) (*sql.DB, error) {
-	expanded, err := notifier.ExpandPath(path)
+	expanded, err := localpager.ExpandPath(path)
 	if err != nil {
 		return nil, err
 	}
@@ -68,18 +68,18 @@ func OpenDB(ctx context.Context, path string) (*sql.DB, error) {
 	return db, nil
 }
 
-func Enqueue(ctx context.Context, ingestor notifier.Ingestor, db *sql.DB, opts EnqueueOptions) (EnqueueStats, error) {
+func Enqueue(ctx context.Context, ingestor localpager.Ingestor, db *sql.DB, opts EnqueueOptions) (EnqueueStats, error) {
 	if opts.Repo == "" {
-		opts.Repo = notifier.DefaultRepo
+		opts.Repo = localpager.DefaultRepo
 	}
 	if opts.Type == "" {
 		opts.Type = "both"
 	}
 	if opts.ProcessorName == "" {
-		opts.ProcessorName = notifier.DefaultProcessorName
+		opts.ProcessorName = localpager.DefaultProcessorName
 	}
 	if opts.ProcessorVersion == "" {
-		opts.ProcessorVersion = notifier.DefaultProcessorVer
+		opts.ProcessorVersion = localpager.DefaultProcessorVer
 	}
 	if opts.RecentWindow == 0 {
 		opts.RecentWindow = 48 * time.Hour
@@ -99,7 +99,7 @@ func Enqueue(ctx context.Context, ingestor notifier.Ingestor, db *sql.DB, opts E
 	stats := EnqueueStats{ItemsSeen: len(threads)}
 	for _, thread := range threads {
 		item := MapThread(opts.Repo, thread)
-		result, err := ingestor.Ingest(ctx, item, notifier.IngestOptions{
+		result, err := ingestor.Ingest(ctx, item, localpager.IngestOptions{
 			JobType:                       jobTypeFor(thread),
 			ProcessorName:                 opts.ProcessorName,
 			ProcessorVersion:              opts.ProcessorVersion,
@@ -125,7 +125,7 @@ func Enqueue(ctx context.Context, ingestor notifier.Ingestor, db *sql.DB, opts E
 	return stats, nil
 }
 
-func activeNumbersFor(ctx context.Context, ingestor notifier.Ingestor, repo, itemType string) (activeNumbers, error) {
+func activeNumbersFor(ctx context.Context, ingestor localpager.Ingestor, repo, itemType string) (activeNumbers, error) {
 	provider, ok := ingestor.(activeJobRefProvider)
 	if !ok {
 		return activeNumbers{}, nil
@@ -236,12 +236,12 @@ func queryThreads(ctx context.Context, db *sql.DB, query string, args ...any) ([
 	return threads, rows.Err()
 }
 
-func MapThread(repo string, thread Thread) notifier.IngestItem {
+func MapThread(repo string, thread Thread) localpager.IngestItem {
 	itemType := "github_issue"
 	if thread.Type == "pull_request" {
 		itemType = "github_pr"
 	}
-	return notifier.IngestItem{
+	return localpager.IngestItem{
 		Source:      "gitcrawl",
 		Type:        itemType,
 		Ref:         fmt.Sprintf("%s#%d", repo, thread.Number),

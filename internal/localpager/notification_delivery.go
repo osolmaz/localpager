@@ -1,4 +1,4 @@
-package notifier
+package localpager
 
 import (
 	"context"
@@ -183,10 +183,10 @@ func pendingNotificationRows(tx *gorm.DB, limit int) ([]Notification, error) {
 		Where("status = ? AND destination_kind = ?", "pending", "discord_channel").
 		Where(`EXISTS (
 			SELECT 1
-			FROM notifier_jobs
-			JOIN notifier_items ON notifier_items.id = notifier_jobs.item_id
-			WHERE notifier_jobs.id = notifier_notifications.job_id
-			  AND (notifier_items.latest_content_hash IS NULL OR notifier_items.latest_content_hash = notifier_jobs.content_hash)
+			FROM localpager_jobs
+			JOIN localpager_items ON localpager_items.id = localpager_jobs.item_id
+			WHERE localpager_jobs.id = localpager_notifications.job_id
+			  AND (localpager_items.latest_content_hash IS NULL OR localpager_items.latest_content_hash = localpager_jobs.content_hash)
 		)`).
 		Order("created_at ASC").
 		Limit(limit).
@@ -211,11 +211,11 @@ func suppressSupersededPendingNotifications(ctx context.Context, db *gorm.DB, no
 		Where("status IN ?", []string{"pending", "sending"}).
 		Where(`EXISTS (
 			SELECT 1
-			FROM notifier_jobs
-			JOIN notifier_items ON notifier_items.id = notifier_jobs.item_id
-			WHERE notifier_jobs.id = notifier_notifications.job_id
-			  AND notifier_items.latest_content_hash IS NOT NULL
-			  AND notifier_items.latest_content_hash != notifier_jobs.content_hash
+			FROM localpager_jobs
+			JOIN localpager_items ON localpager_items.id = localpager_jobs.item_id
+			WHERE localpager_jobs.id = localpager_notifications.job_id
+			  AND localpager_items.latest_content_hash IS NOT NULL
+			  AND localpager_items.latest_content_hash != localpager_jobs.content_hash
 		)`).
 		Updates(map[string]any{
 			"status":              "sent",

@@ -1,6 +1,6 @@
 {
   "repo": "owner/repo",
-  "db": "~/.local/state/localpager/notifier.sqlite",
+  "db": "~/.local/state/localpager/localpager.sqlite",
   "gitcrawl_db": "~/.config/gitcrawl/gitcrawl.db",
   "github_base_url": "https://api.github.com",
   "github_token_env": "GITHUB_TOKEN",

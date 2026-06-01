@@ -8,7 +8,7 @@ import (
 
 	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/config"
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 )
 
 func main() {
@@ -33,12 +33,12 @@ func main() {
 	window := app.ParseDurationFlag("recent-window", flags.recentWindow)
 	cutover := app.ParseCutoverFlag(flags.cutoverAt)
 	ctx := context.Background()
-	pool, err := notifier.NewPool(ctx, flags.dbPath)
+	pool, err := localpager.NewPool(ctx, flags.dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer app.ClosePool(pool)
-	stats, err := app.EnqueueSource(ctx, notifier.NewIngestor(pool), app.SourceOptions{
+	stats, err := app.EnqueueSource(ctx, localpager.NewIngestor(pool), app.SourceOptions{
 		Source:           flags.source,
 		Repo:             flags.repo,
 		Type:             flags.sourceType,

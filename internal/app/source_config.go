@@ -4,7 +4,7 @@ import (
 	"flag"
 
 	"github.com/osolmaz/localpager/internal/config"
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 	"github.com/osolmaz/localpager/internal/sources/gitcrawl"
 	githubsource "github.com/osolmaz/localpager/internal/sources/github"
 )
@@ -23,14 +23,14 @@ type SourceCLIFields struct {
 }
 
 func RegisterSourceCLIFlags(fs *flag.FlagSet, fields SourceCLIFields, typeUsage string) {
-	fs.StringVar(fields.DBPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
+	fs.StringVar(fields.DBPath, "db", localpager.DefaultDBPath, "localpager SQLite database path")
 	fs.StringVar(fields.GitcrawlDBPath, "gitcrawl-db", gitcrawl.DefaultDBPath, "gitcrawl SQLite database path")
 	fs.StringVar(fields.GitHubBaseURL, "github-base-url", githubsource.DefaultBaseURL, "GitHub API base URL")
 	fs.StringVar(fields.GitHubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token")
-	fs.StringVar(fields.Repo, "repo", notifier.DefaultRepo, "GitHub repo full name")
+	fs.StringVar(fields.Repo, "repo", localpager.DefaultRepo, "GitHub repo full name")
 	fs.StringVar(fields.Type, "type", "both", typeUsage)
-	fs.StringVar(fields.ProcessorName, "processor-name", notifier.DefaultProcessorName, "processor name")
-	fs.StringVar(fields.ProcessorVersion, "processor-version", notifier.DefaultProcessorVer, "processor version")
+	fs.StringVar(fields.ProcessorName, "processor-name", localpager.DefaultProcessorName, "processor name")
+	fs.StringVar(fields.ProcessorVersion, "processor-version", localpager.DefaultProcessorVer, "processor version")
 	fs.StringVar(fields.RecentWindow, "recent-window", "48h", "duration considered recent for priority")
 	fs.StringVar(fields.CutoverAt, "cutover-at", "", "RFC3339 timestamp; items updated before this are recorded as skipped")
 }

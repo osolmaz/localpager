@@ -1,4 +1,4 @@
-package notifier
+package localpager
 
 import (
 	"context"
@@ -70,12 +70,12 @@ func (ingestor DBIngestor) ActiveJobRefs(ctx context.Context, source, itemType s
 	var refs []string
 	err := ingestor.pool.GORM().WithContext(ctx).
 		Model(&Item{}).
-		Joins("LEFT JOIN notifier_jobs ON notifier_jobs.item_id = notifier_items.id AND notifier_jobs.status IN ?", []string{"pending", "running"}).
-		Joins("LEFT JOIN notifier_notifications ON notifier_notifications.item_id = notifier_items.id AND notifier_notifications.status IN ?", []string{"pending", "sending"}).
-		Where("notifier_items.source = ? AND notifier_items.type = ? AND notifier_items.ref IS NOT NULL", source, itemType).
-		Where("notifier_jobs.id IS NOT NULL OR notifier_notifications.id IS NOT NULL").
-		Group("notifier_items.ref").
-		Pluck("notifier_items.ref", &refs).Error
+		Joins("LEFT JOIN localpager_jobs ON localpager_jobs.item_id = localpager_items.id AND localpager_jobs.status IN ?", []string{"pending", "running"}).
+		Joins("LEFT JOIN localpager_notifications ON localpager_notifications.item_id = localpager_items.id AND localpager_notifications.status IN ?", []string{"pending", "sending"}).
+		Where("localpager_items.source = ? AND localpager_items.type = ? AND localpager_items.ref IS NOT NULL", source, itemType).
+		Where("localpager_jobs.id IS NOT NULL OR localpager_notifications.id IS NOT NULL").
+		Group("localpager_items.ref").
+		Pluck("localpager_items.ref", &refs).Error
 	if err != nil {
 		return nil, err
 	}
@@ -247,9 +247,9 @@ func upsertGenericItem(ctx context.Context, tx *gorm.DB, item IngestItem) (Item,
 		LastSeenAt:        now,
 		UpdatedAt:         now,
 	}
-	freshSource := "notifier_items.source_updated_at IS NULL OR excluded.source_updated_at >= notifier_items.source_updated_at"
+	freshSource := "localpager_items.source_updated_at IS NULL OR excluded.source_updated_at >= localpager_items.source_updated_at"
 	freshColumn := func(column string) clause.Expr {
-		return gorm.Expr("CASE WHEN " + freshSource + " THEN excluded." + column + " ELSE notifier_items." + column + " END")
+		return gorm.Expr("CASE WHEN " + freshSource + " THEN excluded." + column + " ELSE localpager_items." + column + " END")
 	}
 	err = tx.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name: "source"}, {Name: "type"}, {Name: "ref"}},

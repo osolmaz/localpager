@@ -30,7 +30,7 @@ go:
   mutation:
     targets:
       - internal/config
-      - internal/notifier
+      - internal/localpager
       - internal/sources/github
   dependency_boundaries:
     - from: cmd
@@ -38,24 +38,24 @@ go:
         - internal/app
         - internal/cli
         - internal/config
-        - internal/notifier
+        - internal/localpager
         - internal/sources
         - internal/timing
     - from: internal/app
       allow:
         - internal/config
-        - internal/notifier
+        - internal/localpager
         - internal/sources
     - from: internal/cli
       allow:
         - internal/config
-        - internal/notifier
+        - internal/localpager
     - from: internal/config
       allow: []
-    - from: internal/notifier
+    - from: internal/localpager
       allow:
         - internal/timing
     - from: internal/sources
       allow:
-        - internal/notifier
+        - internal/localpager
         - internal/sources

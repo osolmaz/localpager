@@ -8,20 +8,20 @@ import (
 
 	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/config"
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 )
 
 func main() {
 	flags := workerFlags{}
 
 	flag.StringVar(&flags.configPath, "config", "", "JSON config file path")
-	flag.StringVar(&flags.dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
+	flag.StringVar(&flags.dbPath, "db", localpager.DefaultDBPath, "localpager SQLite database path")
 	flag.IntVar(&flags.maxConcurrency, "max-concurrency", 2, "maximum concurrent classifier processes")
 	flag.StringVar(&flags.leaseTTL, "lease-ttl", "30m", "job lease TTL")
 	flag.IntVar(&flags.maxAttempts, "max-attempts", 3, "maximum attempts before marking a job dead")
 	flag.IntVar(&flags.limit, "limit", 0, "maximum jobs to process")
 	flag.BoolVar(&flags.once, "once", false, "process current work and exit")
-	flag.StringVar(&flags.classifierCommand, "classifier-command", notifier.DefaultClassifierCommand, "classifier wrapper command")
+	flag.StringVar(&flags.classifierCommand, "classifier-command", localpager.DefaultClassifierCommand, "classifier wrapper command")
 	flag.StringVar(&flags.model, "model", "", "optional localpager-agent model override")
 	flag.StringVar(&flags.discordChannelID, "discord-channel-id", os.Getenv("DISCORD_CHANNEL_ID"), "Discord channel for notifications")
 	flag.StringVar(&flags.discordTokenEnv, "discord-token-env", "DISCORD_BOT_TOKEN", "environment variable containing Discord bot token")
@@ -42,7 +42,7 @@ func main() {
 	ttl := app.ParseDurationFlag("lease-ttl", flags.leaseTTL)
 	pollEvery := app.ParseDurationFlag("poll-interval", flags.pollInterval)
 	ctx := context.Background()
-	pool, err := notifier.NewPool(ctx, flags.dbPath)
+	pool, err := localpager.NewPool(ctx, flags.dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func main() {
 			log.Printf("Discord sending enabled but %s is unset; pending notifications will remain pending", flags.discordTokenEnv)
 		}
 	}
-	opts := notifier.WorkerOptions{
+	opts := localpager.WorkerOptions{
 		MaxConcurrency:      flags.maxConcurrency,
 		LeaseTTL:            ttl,
 		MaxAttempts:         flags.maxAttempts,
@@ -76,14 +76,14 @@ func main() {
 		NotifyConfidenceMin: cfg.Worker.NotifyConfidenceMin,
 	}
 	if flags.sendPendingOnly {
-		sent, err := notifier.SendPendingDiscord(ctx, pool, opts)
+		sent, err := localpager.SendPendingDiscord(ctx, pool, opts)
 		if err != nil {
 			log.Fatal(err)
 		}
 		app.Printf(os.Stdout, "sent=%d\n", sent)
 		return
 	}
-	stats, err := notifier.RunWorker(ctx, pool, opts)
+	stats, err := localpager.RunWorker(ctx, pool, opts)
 	if err != nil {
 		log.Fatal(err)
 	}

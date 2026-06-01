@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 	"github.com/osolmaz/localpager/internal/sources"
 )
 
@@ -39,18 +39,18 @@ type Client struct {
 	HTTPClient *http.Client
 }
 
-func Enqueue(ctx context.Context, ingestor notifier.Ingestor, opts EnqueueOptions) (EnqueueStats, error) {
+func Enqueue(ctx context.Context, ingestor localpager.Ingestor, opts EnqueueOptions) (EnqueueStats, error) {
 	if opts.Repo == "" {
-		opts.Repo = notifier.DefaultRepo
+		opts.Repo = localpager.DefaultRepo
 	}
 	if opts.Type == "" {
 		opts.Type = "both"
 	}
 	if opts.ProcessorName == "" {
-		opts.ProcessorName = notifier.DefaultProcessorName
+		opts.ProcessorName = localpager.DefaultProcessorName
 	}
 	if opts.ProcessorVersion == "" {
-		opts.ProcessorVersion = notifier.DefaultProcessorVer
+		opts.ProcessorVersion = localpager.DefaultProcessorVer
 	}
 	if opts.RecentWindow == 0 {
 		opts.RecentWindow = 48 * time.Hour
@@ -63,7 +63,7 @@ func Enqueue(ctx context.Context, ingestor notifier.Ingestor, opts EnqueueOption
 	}
 	stats := EnqueueStats{ItemsSeen: len(items)}
 	for _, item := range items {
-		result, err := ingestor.Ingest(ctx, item, notifier.IngestOptions{
+		result, err := ingestor.Ingest(ctx, item, localpager.IngestOptions{
 			JobType:          "classify_" + item.Type,
 			ProcessorName:    opts.ProcessorName,
 			ProcessorVersion: opts.ProcessorVersion,
@@ -88,11 +88,11 @@ func Enqueue(ctx context.Context, ingestor notifier.Ingestor, opts EnqueueOption
 	return stats, nil
 }
 
-func (client Client) List(ctx context.Context, repo, itemType string, limit int) ([]notifier.IngestItem, error) {
+func (client Client) List(ctx context.Context, repo, itemType string, limit int) ([]localpager.IngestItem, error) {
 	if !sources.WantsPullRequests(itemType) && !sources.WantsIssues(itemType) {
 		return nil, fmt.Errorf("unknown type %q", itemType)
 	}
-	var items []notifier.IngestItem
+	var items []localpager.IngestItem
 	if sources.WantsPullRequests(itemType) {
 		pullRequests, err := client.listPullRequests(ctx, repo, limitForKind(limit, len(items)))
 		if err != nil {
@@ -116,24 +116,24 @@ func (client Client) List(ctx context.Context, repo, itemType string, limit int)
 	return items, nil
 }
 
-func (client Client) listPullRequests(ctx context.Context, repo string, limit int) ([]notifier.IngestItem, error) {
+func (client Client) listPullRequests(ctx context.Context, repo string, limit int) ([]localpager.IngestItem, error) {
 	var pulls []pullRequest
 	if err := client.listPages(ctx, repo, "pulls", limit, &pulls); err != nil {
 		return nil, err
 	}
-	items := make([]notifier.IngestItem, 0, len(pulls))
+	items := make([]localpager.IngestItem, 0, len(pulls))
 	for _, pr := range pulls {
 		items = append(items, mapPullRequest(repo, pr))
 	}
 	return items, nil
 }
 
-func (client Client) listIssues(ctx context.Context, repo string, limit int) ([]notifier.IngestItem, error) {
+func (client Client) listIssues(ctx context.Context, repo string, limit int) ([]localpager.IngestItem, error) {
 	var issues []issue
 	if err := client.listPages(ctx, repo, "issues", limit, &issues); err != nil {
 		return nil, err
 	}
-	items := make([]notifier.IngestItem, 0, len(issues))
+	items := make([]localpager.IngestItem, 0, len(issues))
 	for _, issue := range issues {
 		if issue.PullRequest != nil {
 			continue
@@ -209,16 +209,16 @@ type user struct {
 	Login string `json:"login"`
 }
 
-func mapPullRequest(repo string, pr pullRequest) notifier.IngestItem {
+func mapPullRequest(repo string, pr pullRequest) localpager.IngestItem {
 	return mapGitHubItem(repo, "github_pr", pr.Number, pr.HTMLURL, pr.Title, pr.Body, pr.State, pr.User.Login, pr.UpdatedAt)
 }
 
-func mapIssue(repo string, issue issue) notifier.IngestItem {
+func mapIssue(repo string, issue issue) localpager.IngestItem {
 	return mapGitHubItem(repo, "github_issue", issue.Number, issue.HTMLURL, issue.Title, issue.Body, issue.State, issue.User.Login, issue.UpdatedAt)
 }
 
-func mapGitHubItem(repo string, itemType string, number int, url string, title string, body string, state string, author string, updatedAt time.Time) notifier.IngestItem {
-	item := notifier.IngestItem{
+func mapGitHubItem(repo string, itemType string, number int, url string, title string, body string, state string, author string, updatedAt time.Time) localpager.IngestItem {
+	item := localpager.IngestItem{
 		Source:    "github",
 		Type:      itemType,
 		Ref:       fmt.Sprintf("%s#%d", repo, number),
@@ -234,7 +234,7 @@ func mapGitHubItem(repo string, itemType string, number int, url string, title s
 	return item
 }
 
-func contentHash(item notifier.IngestItem) string {
+func contentHash(item localpager.IngestItem) string {
 	payload := []string{item.Type, item.Ref, item.Title, item.Body, item.State, item.Author, item.UpdatedAt.Format(time.RFC3339Nano)}
 	sum := sha256.Sum256([]byte(strings.Join(payload, "\x00")))
 	return hex.EncodeToString(sum[:])

@@ -1,17 +1,19 @@
 [Unit]
-Description=Localpager GitHub enqueue from gitcrawl
+Description=Localpager source watcher
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=oneshot
+Type=simple
 Environment=HOME=%h
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-%h/.config/localpager/localpager.env
 EnvironmentFile=-%h/.config/localpager/secrets.env
 WorkingDirectory=%h/repos/localpager
-ExecStart=%h/.local/bin/notifier-enqueue-github --config %h/.config/localpager/config.json
-TimeoutStartSec=10m
+ExecStart=%h/.local/bin/localpager-watch --config %h/.config/localpager/config.json
+Restart=always
+RestartSec=30s
+TimeoutStartSec=2m
 
 [Install]
 WantedBy=default.target

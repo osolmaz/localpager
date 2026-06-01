@@ -16,7 +16,7 @@ linters:
   settings:
     errcheck:
       exclude-functions:
-        - "(*github.com/osolmaz/localpager/internal/notifier.Pool).Close"
+        - "(*github.com/osolmaz/localpager/internal/localpager.Pool).Close"
         - "(*database/sql.DB).Close"
         - fmt.Fprintf
         - fmt.Fprintln

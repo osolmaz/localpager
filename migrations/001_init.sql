@@ -1,6 +1,6 @@
 PRAGMA foreign_keys = ON;
 
-CREATE TABLE IF NOT EXISTS notifier_items (
+CREATE TABLE IF NOT EXISTS localpager_items (
   id INTEGER PRIMARY KEY,
   source TEXT,
   type TEXT,
@@ -19,9 +19,9 @@ CREATE TABLE IF NOT EXISTS notifier_items (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS notifier_jobs (
+CREATE TABLE IF NOT EXISTS localpager_jobs (
   id INTEGER PRIMARY KEY,
-  item_id INTEGER NOT NULL REFERENCES notifier_items(id),
+  item_id INTEGER NOT NULL REFERENCES localpager_items(id),
   job_kind TEXT NOT NULL,
   processor_name TEXT NOT NULL,
   processor_version TEXT NOT NULL,
@@ -37,10 +37,10 @@ CREATE TABLE IF NOT EXISTS notifier_jobs (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS notifier_results (
+CREATE TABLE IF NOT EXISTS localpager_results (
   id INTEGER PRIMARY KEY,
-  item_id INTEGER NOT NULL REFERENCES notifier_items(id),
-  job_id INTEGER NOT NULL REFERENCES notifier_jobs(id),
+  item_id INTEGER NOT NULL REFERENCES localpager_items(id),
+  job_id INTEGER NOT NULL REFERENCES localpager_jobs(id),
   job_kind TEXT NOT NULL,
   output_json TEXT NOT NULL,
   interest TEXT,
@@ -51,11 +51,11 @@ CREATE TABLE IF NOT EXISTS notifier_results (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE IF NOT EXISTS notifier_notifications (
+CREATE TABLE IF NOT EXISTS localpager_notifications (
   id INTEGER PRIMARY KEY,
-  item_id INTEGER NOT NULL REFERENCES notifier_items(id),
-  result_id INTEGER NOT NULL REFERENCES notifier_results(id),
-  job_id INTEGER NOT NULL REFERENCES notifier_jobs(id),
+  item_id INTEGER NOT NULL REFERENCES localpager_items(id),
+  result_id INTEGER NOT NULL REFERENCES localpager_results(id),
+  job_id INTEGER NOT NULL REFERENCES localpager_jobs(id),
   notification_kind TEXT NOT NULL,
   destination_kind TEXT NOT NULL,
   destination_ref TEXT NOT NULL,
@@ -71,43 +71,43 @@ CREATE TABLE IF NOT EXISTS notifier_notifications (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX IF NOT EXISTS notifier_items_source_idx
-ON notifier_items(source_kind, source_ref);
+CREATE INDEX IF NOT EXISTS localpager_items_source_idx
+ON localpager_items(source_kind, source_ref);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_notifier_items_source
-ON notifier_items(source_kind, source_ref);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_localpager_items_source
+ON localpager_items(source_kind, source_ref);
 
-CREATE INDEX IF NOT EXISTS notifier_items_seen_idx
-ON notifier_items(source_kind, last_seen_at);
+CREATE INDEX IF NOT EXISTS localpager_items_seen_idx
+ON localpager_items(source_kind, last_seen_at);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_notifier_items_generic
-ON notifier_items(source, type, ref);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_localpager_items_generic
+ON localpager_items(source, type, ref);
 
-CREATE INDEX IF NOT EXISTS notifier_items_generic_seen_idx
-ON notifier_items(source, type, source_updated_at);
+CREATE INDEX IF NOT EXISTS localpager_items_generic_seen_idx
+ON localpager_items(source, type, source_updated_at);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_notifier_jobs_content
-ON notifier_jobs(item_id, processor_name, processor_version, content_hash);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_localpager_jobs_content
+ON localpager_jobs(item_id, processor_name, processor_version, content_hash);
 
-CREATE INDEX IF NOT EXISTS notifier_jobs_pending_idx
-ON notifier_jobs(status, run_after, priority, created_at);
+CREATE INDEX IF NOT EXISTS localpager_jobs_pending_idx
+ON localpager_jobs(status, run_after, priority, created_at);
 
-CREATE INDEX IF NOT EXISTS notifier_jobs_lease_idx
-ON notifier_jobs(status, leased_until);
+CREATE INDEX IF NOT EXISTS localpager_jobs_lease_idx
+ON localpager_jobs(status, leased_until);
 
-CREATE INDEX IF NOT EXISTS notifier_results_item_idx
-ON notifier_results(item_id, created_at);
+CREATE INDEX IF NOT EXISTS localpager_results_item_idx
+ON localpager_results(item_id, created_at);
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_notifier_notifications_message
-ON notifier_notifications(message_key, destination_kind, destination_ref);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_localpager_notifications_message
+ON localpager_notifications(message_key, destination_kind, destination_ref);
 
-CREATE INDEX IF NOT EXISTS notifier_notifications_pending_idx
-ON notifier_notifications(status, created_at);
+CREATE INDEX IF NOT EXISTS localpager_notifications_pending_idx
+ON localpager_notifications(status, created_at);
 
-CREATE INDEX IF NOT EXISTS notifier_notifications_item_idx
-ON notifier_notifications(item_id, notification_kind);
+CREATE INDEX IF NOT EXISTS localpager_notifications_item_idx
+ON localpager_notifications(item_id, notification_kind);
 
-CREATE TABLE IF NOT EXISTS notifier_watchers (
+CREATE TABLE IF NOT EXISTS localpager_watchers (
   id INTEGER PRIMARY KEY,
   source TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -119,5 +119,5 @@ CREATE TABLE IF NOT EXISTS notifier_watchers (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_notifier_watchers
-ON notifier_watchers(source, name);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_localpager_watchers
+ON localpager_watchers(source, name);

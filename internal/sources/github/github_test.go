@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/localpager"
 )
 
 func TestEnqueueMapsGitHubAPIItems(t *testing.T) {
@@ -48,13 +48,13 @@ func TestEnqueueMapsGitHubAPIItems(t *testing.T) {
 	defer server.Close()
 
 	dir := t.TempDir()
-	pool, err := notifier.NewPool(ctx, filepath.Join(dir, "notifier.sqlite"))
+	pool, err := localpager.NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
 
-	stats, err := Enqueue(ctx, notifier.NewIngestor(pool), EnqueueOptions{
+	stats, err := Enqueue(ctx, localpager.NewIngestor(pool), EnqueueOptions{
 		Repo:    "example/repo",
 		Type:    "both",
 		BaseURL: server.URL,
@@ -66,7 +66,7 @@ func TestEnqueueMapsGitHubAPIItems(t *testing.T) {
 		t.Fatalf("stats = %+v, want 2 seen and 2 jobs", stats)
 	}
 
-	var items []notifier.Item
+	var items []localpager.Item
 	if err := pool.GORM().Order("source_kind").Find(&items).Error; err != nil {
 		t.Fatal(err)
 	}

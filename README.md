@@ -1,11 +1,11 @@
 # Localpager
 
-Localpager is a local-first notifier for GitHub issues and pull requests.
+Localpager is a local-first triage and paging tool for GitHub issues and pull requests.
 
 It watches repo activity, queues new items, runs a classifier command, stores the
 structured result, and sends matching notifications to Discord.
 
-This repository is an early extraction of a working notifier prototype. The
+This repository is an early extraction of a working triage prototype. The
 current code is intentionally small: it provides the worker, queue, GitHub and
 gitcrawl source adapters, classifier command boundary, SQLite state, Discord
 delivery, a bundled local model runner in `localpager-agent/`, and a small
@@ -15,10 +15,10 @@ delivery, a bundled local model runner in `localpager-agent/`, and a small
 
 ```text
 cmd/localpager               validate config, show status, install services, test Discord
-cmd/notifier-enqueue-github  enqueue GitHub issues and PRs once
-cmd/notifier-ingest-json     ingest one normalized item from JSON
-cmd/notifier-watch           poll source adapters and enqueue items
-cmd/notifier-worker          run classifier jobs and send notifications
+cmd/localpager-enqueue-github  enqueue GitHub issues and PRs once
+cmd/localpager-ingest-json     ingest one normalized item from JSON
+cmd/localpager-watch           poll source adapters and enqueue items
+cmd/localpager-worker          run classifier jobs and send notifications
 ```
 
 ## Classifier Contract
@@ -80,7 +80,7 @@ npm install --prefix localpager-agent
 make test
 make install
 localpager validate --config examples/config.example.json
-notifier-worker --config examples/config.example.json --once --dry-run-discord
+localpager-worker --config examples/config.example.json --once --dry-run-discord
 ```
 
 Check the bundled agent:
@@ -93,7 +93,7 @@ To send Discord messages, pass a channel ID and set a bot token:
 
 ```bash
 export DISCORD_BOT_TOKEN="<discord bot token>"
-notifier-worker \
+localpager-worker \
   --config examples/config.example.json \
   --discord-channel-id "$DISCORD_CHANNEL_ID" \
   --send-discord
@@ -128,17 +128,17 @@ The default public source is the GitHub API:
 
 ```bash
 export GITHUB_TOKEN="<github token>"
-notifier-watch --config examples/config.example.json --source github --once
+localpager-watch --config examples/config.example.json --source github --once
 ```
 
 The gitcrawl source remains available for machines that already maintain a
 gitcrawl SQLite database:
 
 ```bash
-notifier-watch --config examples/config.example.json --source gitcrawl --once
+localpager-watch --config examples/config.example.json --source gitcrawl --once
 ```
 
-`notifier-watch` can run continuously under systemd. `notifier-enqueue-github`
+`localpager-watch` can run continuously under systemd. `localpager-enqueue-github`
 is the one-shot equivalent.
 
 ## Services
@@ -149,7 +149,7 @@ Install compiled binaries and write user systemd units:
 make install
 localpager install-service --config ~/.config/localpager/config.json --work-dir "$PWD"
 systemctl --user daemon-reload
-systemctl --user enable --now localpager-notifier-worker.service localpager-notifier-watch.service
+systemctl --user enable --now localpager-worker.service localpager-watch.service
 ```
 
 Check state:
@@ -164,7 +164,7 @@ localpager test-discord --config ~/.config/localpager/config.json
 The default SQLite state path is:
 
 ```text
-~/.local/state/localpager/notifier.sqlite
+~/.local/state/localpager/localpager.sqlite
 ```
 
 Override it with `--db`.
