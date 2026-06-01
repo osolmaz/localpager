@@ -57,6 +57,9 @@ Notification policy is deployment config, not classifier logic:
 If `notify_topics_any` is set, at least one classifier topic must match before a
 notification is created.
 
+Classifier prompts, topic taxonomies, and schemas should be configured as a
+deployment profile. See [Classifier Profiles](docs/2026-06-01-classifier-profiles.md).
+
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:
 
