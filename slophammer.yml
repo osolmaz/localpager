@@ -1,0 +1,61 @@
+go:
+  coverage_threshold: 85
+  targets:
+    - internal/config
+    - internal/sources/kind.go
+    - internal/sources/stats.go
+  exclude:
+    - "**/*_test.go"
+    - "localpager-agent/**"
+    - "examples/**"
+    - "bin/**"
+  dry:
+    max_findings: 0
+    paths:
+      - cmd
+      - internal
+    exclude:
+      - "**/*_test.go"
+      - "localpager-agent/**"
+      - "examples/**"
+    structural:
+      enabled: true
+      threshold: 0.82
+      min_lines: 4
+      min_nodes: 20
+    copied_blocks:
+      enabled: true
+      min_tokens: 100
+  crap_max_score: 8
+  mutation:
+    targets:
+      - internal/config
+      - internal/notifier
+      - internal/sources/github
+  dependency_boundaries:
+    - from: cmd
+      allow:
+        - internal/app
+        - internal/cli
+        - internal/config
+        - internal/notifier
+        - internal/sources
+        - internal/timing
+    - from: internal/app
+      allow:
+        - internal/config
+        - internal/notifier
+        - internal/sources
+    - from: internal/cli
+      allow:
+        - internal/config
+        - internal/notifier
+    - from: internal/config
+      allow: []
+    - from: internal/notifier
+      allow:
+        - internal/timing
+    - from: internal/sources
+      allow:
+        - internal/notifier
+        - internal/sources

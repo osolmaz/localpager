@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/config"
 	"github.com/osolmaz/localpager/internal/notifier"
 )
@@ -42,11 +43,11 @@ func runValidate(args []string) {
 	cfg := loadConfig(*configPath)
 	warnings := cfg.Validate()
 	if len(warnings) == 0 {
-		fmt.Println("config_ok=true")
+		app.Println(os.Stdout, "config_ok=true")
 		return
 	}
 	for _, warning := range warnings {
-		fmt.Fprintf(os.Stdout, "warning=%s\n", warning)
+		app.Printf(os.Stdout, "warning=%s\n", warning)
 	}
 }
 
@@ -60,14 +61,14 @@ func runStatus(args []string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer pool.Close()
+	defer app.ClosePool(pool)
 
-	fmt.Fprintf(os.Stdout, "repo=%s\n", cfg.Repo)
-	fmt.Fprintf(os.Stdout, "db=%s\n", valueOrDefault(cfg.DBPath, notifier.DefaultDBPath))
-	fmt.Fprintf(os.Stdout, "model=%s\n", cfg.Worker.Model)
-	fmt.Fprintf(os.Stdout, "send_discord=%t\n", cfg.Worker.SendDiscord)
-	fmt.Fprintf(os.Stdout, "dry_run_discord=%t\n", cfg.Worker.DryRunDiscord)
-	fmt.Fprintf(os.Stdout, "notify_topics_any=%s\n", strings.Join(cfg.Worker.NotifyTopicsAny, ","))
+	app.Printf(os.Stdout, "repo=%s\n", cfg.Repo)
+	app.Printf(os.Stdout, "db=%s\n", valueOrDefault(cfg.DBPath, notifier.DefaultDBPath))
+	app.Printf(os.Stdout, "model=%s\n", cfg.Worker.Model)
+	app.Printf(os.Stdout, "send_discord=%t\n", cfg.Worker.SendDiscord)
+	app.Printf(os.Stdout, "dry_run_discord=%t\n", cfg.Worker.DryRunDiscord)
+	app.Printf(os.Stdout, "notify_topics_any=%s\n", strings.Join(cfg.Worker.NotifyTopicsAny, ","))
 	printCounts(ctx, pool, "jobs", &notifier.Job{}, "status")
 	printCounts(ctx, pool, "notifications", &notifier.Notification{}, "status")
 	printLast(ctx, pool)
@@ -95,7 +96,7 @@ func runTestDiscord(args []string) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Fprintf(os.Stdout, "sent=true id=%s\n", id)
+	app.Printf(os.Stdout, "sent=true id=%s\n", id)
 }
 
 func runInstallService(args []string) {
@@ -130,7 +131,7 @@ func runInstallService(args []string) {
 		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 			log.Fatal(err)
 		}
-		fmt.Fprintf(os.Stdout, "wrote=%s\n", path)
+		app.Printf(os.Stdout, "wrote=%s\n", path)
 	}
 }
 
@@ -152,22 +153,22 @@ func printCounts(ctx context.Context, pool *notifier.Pool, name string, model an
 		log.Fatal(err)
 	}
 	for _, row := range rows {
-		fmt.Fprintf(os.Stdout, "%s_%s=%d\n", name, row.Status, row.Count)
+		app.Printf(os.Stdout, "%s_%s=%d\n", name, row.Status, row.Count)
 	}
 }
 
 func printLast(ctx context.Context, pool *notifier.Pool) {
 	var item notifier.Item
 	if err := pool.GORM().WithContext(ctx).Order("last_seen_at DESC").First(&item).Error; err == nil {
-		fmt.Fprintf(os.Stdout, "last_item=%s %s\n", item.SourceKind, item.SourceRef)
+		app.Printf(os.Stdout, "last_item=%s %s\n", item.SourceKind, item.SourceRef)
 	}
 	var result notifier.Result
 	if err := pool.GORM().WithContext(ctx).Order("created_at DESC").First(&result).Error; err == nil {
-		fmt.Fprintf(os.Stdout, "last_result=%s\n", result.CreatedAt.Format(time.RFC3339))
+		app.Printf(os.Stdout, "last_result=%s\n", result.CreatedAt.Format(time.RFC3339))
 	}
 	var notification notifier.Notification
 	if err := pool.GORM().WithContext(ctx).Order("updated_at DESC").First(&notification).Error; err == nil {
-		fmt.Fprintf(os.Stdout, "last_notification=%s %s\n", notification.Status, notification.UpdatedAt.Format(time.RFC3339))
+		app.Printf(os.Stdout, "last_notification=%s %s\n", notification.Status, notification.UpdatedAt.Format(time.RFC3339))
 	}
 }
 
@@ -209,5 +210,5 @@ func mustExpand(path string) string {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service> [flags]")
+	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service> [flags]")
 }

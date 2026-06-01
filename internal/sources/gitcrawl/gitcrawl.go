@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/sources"
 )
 
 const DefaultDBPath = "~/.config/gitcrawl/gitcrawl.db"
@@ -25,13 +26,7 @@ type EnqueueOptions struct {
 	CutoverAt                     *time.Time
 }
 
-type EnqueueStats struct {
-	ItemsSeen     int
-	ItemsUpserted int
-	JobsInserted  int
-	JobsSkipped   int
-	JobsExisting  int
-}
+type EnqueueStats = sources.EnqueueStats
 
 type Thread struct {
 	Type             string
@@ -136,14 +131,14 @@ func activeNumbersFor(ctx context.Context, ingestor notifier.Ingestor, repo, ite
 		return activeNumbers{}, nil
 	}
 	result := activeNumbers{}
-	if wantsPullRequests(itemType) {
+	if sources.WantsPullRequests(itemType) {
 		refs, err := provider.ActiveJobRefs(ctx, "gitcrawl", "github_pr")
 		if err != nil {
 			return activeNumbers{}, err
 		}
 		result.pullRequests = numbersFromRefs(repo, refs)
 	}
-	if wantsIssues(itemType) {
+	if sources.WantsIssues(itemType) {
 		refs, err := provider.ActiveJobRefs(ctx, "gitcrawl", "github_issue")
 		if err != nil {
 			return activeNumbers{}, err
@@ -228,7 +223,7 @@ func queryThreads(ctx context.Context, db *sql.DB, query string, args ...any) ([
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var threads []Thread
 	for rows.Next() {
@@ -268,24 +263,6 @@ func LocallySuppressed(thread Thread) bool {
 	return thread.State != "open" ||
 		(thread.ClosedAtLocal.Valid && thread.ClosedAtLocal.String != "") ||
 		(thread.CloseReasonLocal.Valid && thread.CloseReasonLocal.String != "")
-}
-
-func wantsPullRequests(itemType string) bool {
-	switch itemType {
-	case "pr", "prs", "pull_request", "pull_requests", "github_pr", "both", "all", "":
-		return true
-	default:
-		return false
-	}
-}
-
-func wantsIssues(itemType string) bool {
-	switch itemType {
-	case "issue", "issues", "github_issue", "both", "all", "":
-		return true
-	default:
-		return false
-	}
 }
 
 func numbersFromRefs(repo string, refs map[string]struct{}) map[int]struct{} {

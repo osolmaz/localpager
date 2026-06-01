@@ -20,4 +20,4 @@ install: build
 	done
 
 test:
-	go test ./...
+	go test $$(./scripts/go-packages.sh)

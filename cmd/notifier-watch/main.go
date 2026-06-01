@@ -3,193 +3,148 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/config"
 	"github.com/osolmaz/localpager/internal/notifier"
-	"github.com/osolmaz/localpager/internal/sources/gitcrawl"
-	githubsource "github.com/osolmaz/localpager/internal/sources/github"
+	sourcepkg "github.com/osolmaz/localpager/internal/sources"
+	"github.com/osolmaz/localpager/internal/timing"
 )
 
 func main() {
-	var dbPath string
-	var gitcrawlDBPath string
-	var githubBaseURL string
-	var githubTokenEnv string
-	var sources multiFlag
-	var repo string
-	var itemType string
-	var interval string
-	var once bool
-	var limit int
-	var processorName string
-	var processorVersion string
-	var recentWindow string
-	var cutoverAt string
-	var configPath string
+	flags := watchFlags{}
 
-	flag.StringVar(&configPath, "config", "", "JSON config file path")
-	flag.StringVar(&dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
-	flag.StringVar(&gitcrawlDBPath, "gitcrawl-db", gitcrawl.DefaultDBPath, "gitcrawl SQLite database path")
-	flag.StringVar(&githubBaseURL, "github-base-url", githubsource.DefaultBaseURL, "GitHub API base URL")
-	flag.StringVar(&githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token")
-	flag.Var(&sources, "source", "source watcher to run; supports gitcrawl and github")
-	flag.StringVar(&repo, "repo", notifier.DefaultRepo, "GitHub repo full name")
-	flag.StringVar(&itemType, "type", "both", "source item type: prs, issues, or both")
-	flag.StringVar(&interval, "interval", "5s", "poll interval")
-	flag.BoolVar(&once, "once", false, "poll once and exit")
-	flag.IntVar(&limit, "limit", 0, "maximum source items per poll")
-	flag.StringVar(&processorName, "processor-name", notifier.DefaultProcessorName, "processor name")
-	flag.StringVar(&processorVersion, "processor-version", notifier.DefaultProcessorVer, "processor version")
-	flag.StringVar(&recentWindow, "recent-window", "48h", "duration considered recent for priority")
-	flag.StringVar(&cutoverAt, "cutover-at", "", "RFC3339 timestamp; items updated before this are recorded as skipped")
+	flag.StringVar(&flags.configPath, "config", "", "JSON config file path")
+	app.RegisterSourceCLIFlags(flag.CommandLine, flags.sourceFields(), "source item type: prs, issues, or both")
+	flag.Var(&flags.sources, "source", "source watcher to run; supports gitcrawl and github")
+	flag.StringVar(&flags.interval, "interval", "5s", "poll interval")
+	flag.BoolVar(&flags.once, "once", false, "poll once and exit")
+	flag.IntVar(&flags.limit, "limit", 0, "maximum source items per poll")
 	flag.Parse()
-	setFlags := seenFlags()
+	setFlags := app.SeenFlags(flag.CommandLine)
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if configPath != "" {
-		for _, warning := range cfg.Validate() {
-			log.Printf("config warning: %s", warning)
-		}
-	}
-	if cfg.DBPath != "" && !config.FlagSet(setFlags, "db") {
-		dbPath = cfg.DBPath
-	}
-	if cfg.GitcrawlDBPath != "" && !config.FlagSet(setFlags, "gitcrawl-db") {
-		gitcrawlDBPath = cfg.GitcrawlDBPath
-	}
-	if cfg.GitHubBaseURL != "" && !config.FlagSet(setFlags, "github-base-url") {
-		githubBaseURL = cfg.GitHubBaseURL
-	}
-	if cfg.GitHubTokenEnv != "" && !config.FlagSet(setFlags, "github-token-env") {
-		githubTokenEnv = cfg.GitHubTokenEnv
-	}
-	if len(cfg.Watch.Sources) > 0 && !config.FlagSet(setFlags, "source") {
-		sources = append(sources[:0], cfg.Watch.Sources...)
-	}
-	if cfg.Repo != "" && !config.FlagSet(setFlags, "repo") {
-		repo = cfg.Repo
-	}
-	if cfg.SourceType != "" && !config.FlagSet(setFlags, "type") {
-		itemType = cfg.SourceType
-	}
-	if cfg.Watch.Interval != "" && !config.FlagSet(setFlags, "interval") {
-		interval = cfg.Watch.Interval
-	}
-	if cfg.Watch.Once && !config.FlagSet(setFlags, "once") {
-		once = cfg.Watch.Once
-	}
-	if cfg.Watch.Limit != 0 && !config.FlagSet(setFlags, "limit") {
-		limit = cfg.Watch.Limit
-	}
-	if cfg.ProcessorName != "" && !config.FlagSet(setFlags, "processor-name") {
-		processorName = cfg.ProcessorName
-	}
-	if cfg.ProcessorVersion != "" && !config.FlagSet(setFlags, "processor-version") {
-		processorVersion = cfg.ProcessorVersion
-	}
-	if cfg.RecentWindow != "" && !config.FlagSet(setFlags, "recent-window") {
-		recentWindow = cfg.RecentWindow
-	}
-	if cfg.CutoverAt != "" && !config.FlagSet(setFlags, "cutover-at") {
-		cutoverAt = cfg.CutoverAt
-	}
+	app.LogConfigWarnings(flags.configPath, cfg)
+	flags.applyConfig(cfg, setFlags)
+	flags.defaultSources()
 
-	if len(sources) == 0 {
-		sources = append(sources, "gitcrawl")
-	}
-	pollEvery, err := time.ParseDuration(interval)
-	if err != nil {
-		log.Fatalf("invalid --interval: %v", err)
-	}
-	window, err := time.ParseDuration(recentWindow)
-	if err != nil {
-		log.Fatalf("invalid --recent-window: %v", err)
-	}
-	var cutover *time.Time
-	if cutoverAt != "" {
-		parsedCutover, err := time.Parse(time.RFC3339, cutoverAt)
-		if err != nil {
-			log.Fatalf("invalid --cutover-at: %v", err)
-		}
-		cutover = &parsedCutover
-	}
+	pollEvery := app.ParseDurationFlag("interval", flags.interval)
+	window := app.ParseDurationFlag("recent-window", flags.recentWindow)
+	cutover := app.ParseCutoverFlag(flags.cutoverAt)
 
 	ctx := context.Background()
-	pool, err := notifier.NewPool(ctx, dbPath)
+	pool, err := notifier.NewPool(ctx, flags.dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer pool.Close()
+	defer app.ClosePool(pool)
 	ingestor := notifier.NewIngestor(pool)
 
 	for {
-		total := gitcrawl.EnqueueStats{}
-		for _, source := range sources {
-			switch source {
-			case "gitcrawl":
-				stats, err := pollGitcrawl(ctx, ingestor, gitcrawlDBPath, repo, itemType, limit, processorName, processorVersion, window, cutover)
-				if err != nil {
-					log.Printf("source=%s error=%v", source, err)
-					_ = notifier.RecordWatcherError(ctx, pool, source, watcherName(repo), err)
-					if once {
-						os.Exit(1)
-					}
-					continue
-				}
-				_ = notifier.RecordWatcherSuccess(ctx, pool, source, watcherName(repo), time.Now().UTC().Format(time.RFC3339Nano))
-				total.ItemsSeen += stats.ItemsSeen
-				total.ItemsUpserted += stats.ItemsUpserted
-				total.JobsInserted += stats.JobsInserted
-				total.JobsSkipped += stats.JobsSkipped
-				total.JobsExisting += stats.JobsExisting
-			case "github":
-				stats, err := githubsource.Enqueue(ctx, ingestor, githubsource.EnqueueOptions{
-					Repo:             repo,
-					Type:             itemType,
-					Limit:            limit,
-					ProcessorName:    processorName,
-					ProcessorVersion: processorVersion,
-					RecentWindow:     window,
-					CutoverAt:        cutover,
-					BaseURL:          githubBaseURL,
-					Token:            os.Getenv(githubTokenEnv),
-				})
-				if err != nil {
-					log.Printf("source=%s error=%v", source, err)
-					_ = notifier.RecordWatcherError(ctx, pool, source, watcherName(repo), err)
-					if once {
-						os.Exit(1)
-					}
-					continue
-				}
-				_ = notifier.RecordWatcherSuccess(ctx, pool, source, watcherName(repo), time.Now().UTC().Format(time.RFC3339Nano))
-				total.ItemsSeen += stats.ItemsSeen
-				total.ItemsUpserted += stats.ItemsUpserted
-				total.JobsInserted += stats.JobsInserted
-				total.JobsSkipped += stats.JobsSkipped
-				total.JobsExisting += stats.JobsExisting
-			default:
-				log.Printf("unsupported source %q", source)
-				if once {
+		total := sourcepkg.EnqueueStats{}
+		for _, source := range flags.sources {
+			stats, err := app.EnqueueSource(ctx, ingestor, app.SourceOptions{
+				Source:           source,
+				Repo:             flags.repo,
+				Type:             flags.itemType,
+				Limit:            flags.limit,
+				ProcessorName:    flags.processorName,
+				ProcessorVersion: flags.processorVersion,
+				RecentWindow:     window,
+				CutoverAt:        cutover,
+				GitcrawlDBPath:   flags.gitcrawlDBPath,
+				GitHubBaseURL:    flags.githubBaseURL,
+				GitHubTokenEnv:   flags.githubTokenEnv,
+			})
+			if err != nil {
+				log.Printf("source=%s error=%v", source, err)
+				_ = notifier.RecordWatcherError(ctx, pool, source, watcherName(flags.repo), err)
+				if flags.once {
 					os.Exit(1)
 				}
+				continue
 			}
+			_ = notifier.RecordWatcherSuccess(ctx, pool, source, watcherName(flags.repo), time.Now().UTC().Format(time.RFC3339Nano))
+			total.Add(stats)
 		}
-		fmt.Fprintf(os.Stdout, "items_seen=%d items_upserted=%d jobs_inserted=%d jobs_skipped=%d jobs_existing=%d\n", total.ItemsSeen, total.ItemsUpserted, total.JobsInserted, total.JobsSkipped, total.JobsExisting)
-		if once {
+		app.Printf(os.Stdout, "%s\n", total)
+		if flags.once {
 			return
 		}
-		if err := sleepContext(ctx, pollEvery); err != nil {
+		if err := timing.SleepContext(ctx, pollEvery); err != nil {
 			log.Fatal(err)
 		}
+	}
+}
+
+type watchFlags struct {
+	configPath       string
+	dbPath           string
+	gitcrawlDBPath   string
+	githubBaseURL    string
+	githubTokenEnv   string
+	sources          app.MultiFlag
+	repo             string
+	itemType         string
+	interval         string
+	once             bool
+	limit            int
+	processorName    string
+	processorVersion string
+	recentWindow     string
+	cutoverAt        string
+}
+
+func (flags *watchFlags) applyConfig(cfg config.Config, setFlags map[string]bool) {
+	flags.applySourceConfig(cfg, setFlags)
+	flags.applyWatchConfig(cfg, setFlags)
+}
+
+func (flags *watchFlags) applySourceConfig(cfg config.Config, setFlags map[string]bool) {
+	app.ApplySourceConfig(flags.sourceFields(), cfg, setFlags)
+}
+
+func (flags *watchFlags) applyWatchConfig(cfg config.Config, setFlags map[string]bool) {
+	if len(cfg.Watch.Sources) > 0 && !config.FlagSet(setFlags, "source") {
+		flags.sources = append(flags.sources[:0], cfg.Watch.Sources...)
+	}
+	if cfg.Watch.Interval != "" && !config.FlagSet(setFlags, "interval") {
+		flags.interval = cfg.Watch.Interval
+	}
+	if cfg.Watch.Once && !config.FlagSet(setFlags, "once") {
+		flags.once = cfg.Watch.Once
+	}
+	if cfg.Watch.Limit != 0 && !config.FlagSet(setFlags, "limit") {
+		flags.limit = cfg.Watch.Limit
+	}
+	flags.applyProcessingConfig(cfg, setFlags)
+}
+
+func (flags *watchFlags) applyProcessingConfig(cfg config.Config, setFlags map[string]bool) {
+	if cfg.ProcessorName != "" && !config.FlagSet(setFlags, "processor-name") {
+		flags.processorName = cfg.ProcessorName
+	}
+	if cfg.ProcessorVersion != "" && !config.FlagSet(setFlags, "processor-version") {
+		flags.processorVersion = cfg.ProcessorVersion
+	}
+	if cfg.RecentWindow != "" && !config.FlagSet(setFlags, "recent-window") {
+		flags.recentWindow = cfg.RecentWindow
+	}
+	if cfg.CutoverAt != "" && !config.FlagSet(setFlags, "cutover-at") {
+		flags.cutoverAt = cfg.CutoverAt
+	}
+}
+
+func (flags *watchFlags) defaultSources() {
+	if len(flags.sources) == 0 {
+		flags.sources = append(flags.sources, "gitcrawl")
 	}
 }
 
@@ -200,49 +155,17 @@ func watcherName(repo string) string {
 	return repo
 }
 
-func pollGitcrawl(ctx context.Context, ingestor notifier.Ingestor, dbPath, repo, itemType string, limit int, processorName, processorVersion string, recentWindow time.Duration, cutoverAt *time.Time) (gitcrawl.EnqueueStats, error) {
-	db, err := gitcrawl.OpenDB(ctx, dbPath)
-	if err != nil {
-		return gitcrawl.EnqueueStats{}, err
-	}
-	defer db.Close()
-	return gitcrawl.Enqueue(ctx, ingestor, db, gitcrawl.EnqueueOptions{
-		Repo:             repo,
-		Type:             itemType,
-		Limit:            limit,
-		ProcessorName:    processorName,
-		ProcessorVersion: processorVersion,
-		RecentWindow:     recentWindow,
-		CutoverAt:        cutoverAt,
-	})
-}
-
-func sleepContext(ctx context.Context, interval time.Duration) error {
-	timer := time.NewTimer(interval)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
-}
-
-type multiFlag []string
-
-func (values *multiFlag) String() string {
-	return strings.Join(*values, ",")
-}
-
-func (values *multiFlag) Set(value string) error {
-	*values = append(*values, value)
-	return nil
-}
-
-func seenFlags() map[string]bool {
-	flags := map[string]bool{}
-	flag.Visit(func(f *flag.Flag) {
-		flags[f.Name] = true
-	})
-	return flags
+func (flags *watchFlags) sourceFields() app.SourceCLIFields {
+	fields := app.SourceCLIFields{}
+	fields.DBPath = &flags.dbPath
+	fields.GitcrawlDBPath = &flags.gitcrawlDBPath
+	fields.GitHubBaseURL = &flags.githubBaseURL
+	fields.GitHubTokenEnv = &flags.githubTokenEnv
+	fields.Repo = &flags.repo
+	fields.Type = &flags.itemType
+	fields.ProcessorName = &flags.processorName
+	fields.ProcessorVersion = &flags.processorVersion
+	fields.RecentWindow = &flags.recentWindow
+	fields.CutoverAt = &flags.cutoverAt
+	return fields
 }

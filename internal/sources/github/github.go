@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/osolmaz/localpager/internal/notifier"
+	"github.com/osolmaz/localpager/internal/sources"
 )
 
 const DefaultBaseURL = "https://api.github.com"
@@ -30,13 +31,7 @@ type EnqueueOptions struct {
 	Token            string
 }
 
-type EnqueueStats struct {
-	ItemsSeen     int
-	ItemsUpserted int
-	JobsInserted  int
-	JobsSkipped   int
-	JobsExisting  int
-}
+type EnqueueStats = sources.EnqueueStats
 
 type Client struct {
 	BaseURL    string
@@ -94,11 +89,11 @@ func Enqueue(ctx context.Context, ingestor notifier.Ingestor, opts EnqueueOption
 }
 
 func (client Client) List(ctx context.Context, repo, itemType string, limit int) ([]notifier.IngestItem, error) {
-	if !wantsPullRequests(itemType) && !wantsIssues(itemType) {
+	if !sources.WantsPullRequests(itemType) && !sources.WantsIssues(itemType) {
 		return nil, fmt.Errorf("unknown type %q", itemType)
 	}
 	var items []notifier.IngestItem
-	if wantsPullRequests(itemType) {
+	if sources.WantsPullRequests(itemType) {
 		pullRequests, err := client.listPullRequests(ctx, repo, limitForKind(limit, len(items)))
 		if err != nil {
 			return nil, err
@@ -108,7 +103,7 @@ func (client Client) List(ctx context.Context, repo, itemType string, limit int)
 	if limit > 0 && len(items) >= limit {
 		return items[:limit], nil
 	}
-	if wantsIssues(itemType) {
+	if sources.WantsIssues(itemType) {
 		issues, err := client.listIssues(ctx, repo, limitForKind(limit, len(items)))
 		if err != nil {
 			return nil, err
@@ -182,7 +177,7 @@ func (client Client) listPages(ctx context.Context, repo, endpoint string, limit
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("github %s returned status %d", endpoint, resp.StatusCode)
 	}
@@ -215,34 +210,25 @@ type user struct {
 }
 
 func mapPullRequest(repo string, pr pullRequest) notifier.IngestItem {
-	item := notifier.IngestItem{
-		Source:    "github",
-		Type:      "github_pr",
-		Ref:       fmt.Sprintf("%s#%d", repo, pr.Number),
-		URL:       pr.HTMLURL,
-		Title:     pr.Title,
-		Body:      pr.Body,
-		State:     pr.State,
-		Author:    pr.User.Login,
-		UpdatedAt: pr.UpdatedAt.UTC(),
-		Metadata:  map[string]any{"repo": repo, "number": pr.Number},
-	}
-	item.ContentHash = contentHash(item)
-	return item
+	return mapGitHubItem(repo, "github_pr", pr.Number, pr.HTMLURL, pr.Title, pr.Body, pr.State, pr.User.Login, pr.UpdatedAt)
 }
 
 func mapIssue(repo string, issue issue) notifier.IngestItem {
+	return mapGitHubItem(repo, "github_issue", issue.Number, issue.HTMLURL, issue.Title, issue.Body, issue.State, issue.User.Login, issue.UpdatedAt)
+}
+
+func mapGitHubItem(repo string, itemType string, number int, url string, title string, body string, state string, author string, updatedAt time.Time) notifier.IngestItem {
 	item := notifier.IngestItem{
 		Source:    "github",
-		Type:      "github_issue",
-		Ref:       fmt.Sprintf("%s#%d", repo, issue.Number),
-		URL:       issue.HTMLURL,
-		Title:     issue.Title,
-		Body:      issue.Body,
-		State:     issue.State,
-		Author:    issue.User.Login,
-		UpdatedAt: issue.UpdatedAt.UTC(),
-		Metadata:  map[string]any{"repo": repo, "number": issue.Number},
+		Type:      itemType,
+		Ref:       fmt.Sprintf("%s#%d", repo, number),
+		URL:       url,
+		Title:     title,
+		Body:      body,
+		State:     state,
+		Author:    author,
+		UpdatedAt: updatedAt.UTC(),
+		Metadata:  map[string]any{"repo": repo, "number": number},
 	}
 	item.ContentHash = contentHash(item)
 	return item
@@ -252,24 +238,6 @@ func contentHash(item notifier.IngestItem) string {
 	payload := []string{item.Type, item.Ref, item.Title, item.Body, item.State, item.Author, item.UpdatedAt.Format(time.RFC3339Nano)}
 	sum := sha256.Sum256([]byte(strings.Join(payload, "\x00")))
 	return hex.EncodeToString(sum[:])
-}
-
-func wantsPullRequests(itemType string) bool {
-	switch itemType {
-	case "pr", "prs", "pull_request", "pull_requests", "github_pr", "both", "all", "":
-		return true
-	default:
-		return false
-	}
-}
-
-func wantsIssues(itemType string) bool {
-	switch itemType {
-	case "issue", "issues", "github_issue", "both", "all", "":
-		return true
-	default:
-		return false
-	}
 }
 
 func limitForKind(limit, seen int) int {

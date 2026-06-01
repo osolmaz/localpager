@@ -38,7 +38,7 @@ func sendDiscordMessage(ctx context.Context, token, channelID, content string) (
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	var decoded struct {
 		ID      string `json:"id"`
 		Message string `json:"message"`

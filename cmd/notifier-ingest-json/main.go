@@ -4,12 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"io"
 	"log"
 	"os"
-	"time"
 
+	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/notifier"
 )
 
@@ -46,21 +45,14 @@ func main() {
 	if err := json.Unmarshal([]byte(itemJSON), &item); err != nil {
 		log.Fatalf("invalid item JSON: %v", err)
 	}
-	var cutover *time.Time
-	if cutoverAt != "" {
-		parsed, err := time.Parse(time.RFC3339, cutoverAt)
-		if err != nil {
-			log.Fatalf("invalid --cutover-at: %v", err)
-		}
-		cutover = &parsed
-	}
+	cutover := app.ParseCutoverFlag(cutoverAt)
 
 	ctx := context.Background()
 	pool, err := notifier.NewPool(ctx, dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer pool.Close()
+	defer app.ClosePool(pool)
 
 	result, err := notifier.Ingest(ctx, pool, item, notifier.IngestOptions{
 		JobType:                       jobType,
@@ -74,5 +66,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Fprintf(os.Stdout, "item_id=%d job_inserted=%t job_skipped=%t job_existing=%t suppressed=%t\n", result.ItemID, result.JobInserted, result.JobSkipped, result.JobExisting, result.Suppressed)
+	app.Printf(os.Stdout, "item_id=%d job_inserted=%t job_skipped=%t job_existing=%t suppressed=%t\n", result.ItemID, result.JobInserted, result.JobSkipped, result.JobExisting, result.Suppressed)
 }

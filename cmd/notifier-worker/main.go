@@ -3,166 +3,167 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"log"
 	"os"
-	"time"
 
+	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/config"
 	"github.com/osolmaz/localpager/internal/notifier"
 )
 
 func main() {
-	var dbPath string
-	var maxConcurrency int
-	var leaseTTL string
-	var maxAttempts int
-	var limit int
-	var once bool
-	var classifierCommand string
-	var model string
-	var discordChannelID string
-	var discordTokenEnv string
-	var sendDiscord bool
-	var dryRunDiscord bool
-	var sendPendingOnly bool
-	var pollInterval string
-	var configPath string
+	flags := workerFlags{}
 
-	flag.StringVar(&configPath, "config", "", "JSON config file path")
-	flag.StringVar(&dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
-	flag.IntVar(&maxConcurrency, "max-concurrency", 2, "maximum concurrent classifier processes")
-	flag.StringVar(&leaseTTL, "lease-ttl", "30m", "job lease TTL")
-	flag.IntVar(&maxAttempts, "max-attempts", 3, "maximum attempts before marking a job dead")
-	flag.IntVar(&limit, "limit", 0, "maximum jobs to process")
-	flag.BoolVar(&once, "once", false, "process current work and exit")
-	flag.StringVar(&classifierCommand, "classifier-command", notifier.DefaultClassifierCommand, "classifier wrapper command")
-	flag.StringVar(&model, "model", "", "optional localpager-agent model override")
-	flag.StringVar(&discordChannelID, "discord-channel-id", os.Getenv("DISCORD_CHANNEL_ID"), "Discord channel for notifications")
-	flag.StringVar(&discordTokenEnv, "discord-token-env", "DISCORD_BOT_TOKEN", "environment variable containing Discord bot token")
-	flag.BoolVar(&sendDiscord, "send-discord", false, "send pending Discord notifications")
-	flag.BoolVar(&dryRunDiscord, "dry-run-discord", false, "mark Discord sends as dry-run without calling Discord")
-	flag.BoolVar(&sendPendingOnly, "send-pending-only", false, "only send pending notifications, do not process jobs")
-	flag.StringVar(&pollInterval, "poll-interval", "30s", "idle poll interval for long-running mode")
+	flag.StringVar(&flags.configPath, "config", "", "JSON config file path")
+	flag.StringVar(&flags.dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
+	flag.IntVar(&flags.maxConcurrency, "max-concurrency", 2, "maximum concurrent classifier processes")
+	flag.StringVar(&flags.leaseTTL, "lease-ttl", "30m", "job lease TTL")
+	flag.IntVar(&flags.maxAttempts, "max-attempts", 3, "maximum attempts before marking a job dead")
+	flag.IntVar(&flags.limit, "limit", 0, "maximum jobs to process")
+	flag.BoolVar(&flags.once, "once", false, "process current work and exit")
+	flag.StringVar(&flags.classifierCommand, "classifier-command", notifier.DefaultClassifierCommand, "classifier wrapper command")
+	flag.StringVar(&flags.model, "model", "", "optional localpager-agent model override")
+	flag.StringVar(&flags.discordChannelID, "discord-channel-id", os.Getenv("DISCORD_CHANNEL_ID"), "Discord channel for notifications")
+	flag.StringVar(&flags.discordTokenEnv, "discord-token-env", "DISCORD_BOT_TOKEN", "environment variable containing Discord bot token")
+	flag.BoolVar(&flags.sendDiscord, "send-discord", false, "send pending Discord notifications")
+	flag.BoolVar(&flags.dryRunDiscord, "dry-run-discord", false, "mark Discord sends as dry-run without calling Discord")
+	flag.BoolVar(&flags.sendPendingOnly, "send-pending-only", false, "only send pending notifications, do not process jobs")
+	flag.StringVar(&flags.pollInterval, "poll-interval", "30s", "idle poll interval for long-running mode")
 	flag.Parse()
-	setFlags := seenFlags()
+	setFlags := app.SeenFlags(flag.CommandLine)
 
-	cfg, err := config.Load(configPath)
+	cfg, err := config.Load(flags.configPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if configPath != "" {
-		for _, warning := range cfg.Validate() {
-			log.Printf("config warning: %s", warning)
-		}
-	}
-	if cfg.DBPath != "" && !config.FlagSet(setFlags, "db") {
-		dbPath = cfg.DBPath
-	}
-	if cfg.Worker.MaxConcurrency != 0 && !config.FlagSet(setFlags, "max-concurrency") {
-		maxConcurrency = cfg.Worker.MaxConcurrency
-	}
-	if cfg.Worker.LeaseTTL != "" && !config.FlagSet(setFlags, "lease-ttl") {
-		leaseTTL = cfg.Worker.LeaseTTL
-	}
-	if cfg.Worker.MaxAttempts != 0 && !config.FlagSet(setFlags, "max-attempts") {
-		maxAttempts = cfg.Worker.MaxAttempts
-	}
-	if cfg.Worker.Limit != 0 && !config.FlagSet(setFlags, "limit") {
-		limit = cfg.Worker.Limit
-	}
-	if cfg.Worker.Once && !config.FlagSet(setFlags, "once") {
-		once = cfg.Worker.Once
-	}
-	if cfg.Worker.ClassifierCommand != "" && !config.FlagSet(setFlags, "classifier-command") {
-		classifierCommand = cfg.Worker.ClassifierCommand
-	}
-	if cfg.Worker.Model != "" && !config.FlagSet(setFlags, "model") {
-		model = cfg.Worker.Model
-	}
-	if cfg.Worker.DiscordChannelID != "" && !config.FlagSet(setFlags, "discord-channel-id") {
-		discordChannelID = cfg.Worker.DiscordChannelID
-	}
-	if discordChannelID == "" && cfg.Worker.DiscordChannelIDEnv != "" && !config.FlagSet(setFlags, "discord-channel-id") {
-		discordChannelID = os.Getenv(cfg.Worker.DiscordChannelIDEnv)
-	}
-	if cfg.Worker.DiscordTokenEnv != "" && !config.FlagSet(setFlags, "discord-token-env") {
-		discordTokenEnv = cfg.Worker.DiscordTokenEnv
-	}
-	if cfg.Worker.SendDiscord && !config.FlagSet(setFlags, "send-discord") {
-		sendDiscord = cfg.Worker.SendDiscord
-	}
-	if cfg.Worker.DryRunDiscord && !config.FlagSet(setFlags, "dry-run-discord") {
-		dryRunDiscord = cfg.Worker.DryRunDiscord
-	}
-	if cfg.Worker.SendPendingOnly && !config.FlagSet(setFlags, "send-pending-only") {
-		sendPendingOnly = cfg.Worker.SendPendingOnly
-	}
-	if cfg.Worker.PollInterval != "" && !config.FlagSet(setFlags, "poll-interval") {
-		pollInterval = cfg.Worker.PollInterval
-	}
+	app.LogConfigWarnings(flags.configPath, cfg)
+	flags.applyConfig(cfg, setFlags)
 
-	ttl, err := time.ParseDuration(leaseTTL)
-	if err != nil {
-		log.Fatalf("invalid --lease-ttl: %v", err)
-	}
-	pollEvery, err := time.ParseDuration(pollInterval)
-	if err != nil {
-		log.Fatalf("invalid --poll-interval: %v", err)
-	}
+	ttl := app.ParseDurationFlag("lease-ttl", flags.leaseTTL)
+	pollEvery := app.ParseDurationFlag("poll-interval", flags.pollInterval)
 	ctx := context.Background()
-	pool, err := notifier.NewPool(ctx, dbPath)
+	pool, err := notifier.NewPool(ctx, flags.dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer pool.Close()
+	defer app.ClosePool(pool)
 
 	token := ""
-	if sendDiscord && discordChannelID == "" {
+	if flags.sendDiscord && flags.discordChannelID == "" {
 		log.Printf("Discord sending enabled but --discord-channel-id/DISCORD_CHANNEL_ID is unset; notifications will remain pending")
 	}
-	if sendDiscord && !dryRunDiscord {
-		token = os.Getenv(discordTokenEnv)
+	if flags.sendDiscord && !flags.dryRunDiscord {
+		token = os.Getenv(flags.discordTokenEnv)
 		if token == "" {
-			log.Printf("Discord sending enabled but %s is unset; pending notifications will remain pending", discordTokenEnv)
+			log.Printf("Discord sending enabled but %s is unset; pending notifications will remain pending", flags.discordTokenEnv)
 		}
 	}
 	opts := notifier.WorkerOptions{
-		MaxConcurrency:      maxConcurrency,
+		MaxConcurrency:      flags.maxConcurrency,
 		LeaseTTL:            ttl,
-		MaxAttempts:         maxAttempts,
-		Limit:               limit,
-		Once:                once,
-		ClassifierCommand:   classifierCommand,
-		Model:               model,
-		DestinationRef:      discordChannelID,
+		MaxAttempts:         flags.maxAttempts,
+		Limit:               flags.limit,
+		Once:                flags.once,
+		ClassifierCommand:   flags.classifierCommand,
+		Model:               flags.model,
+		DestinationRef:      flags.discordChannelID,
 		DiscordToken:        token,
-		SendDiscord:         sendDiscord,
-		DryRunDiscord:       dryRunDiscord,
+		SendDiscord:         flags.sendDiscord,
+		DryRunDiscord:       flags.dryRunDiscord,
 		PollInterval:        pollEvery,
 		NotifyTopicsAny:     cfg.Worker.NotifyTopicsAny,
 		NotifyInterestNot:   cfg.Worker.NotifyInterestNot,
 		NotifyConfidenceMin: cfg.Worker.NotifyConfidenceMin,
 	}
-	if sendPendingOnly {
+	if flags.sendPendingOnly {
 		sent, err := notifier.SendPendingDiscord(ctx, pool, opts)
 		if err != nil {
 			log.Fatal(err)
 		}
-		fmt.Fprintf(os.Stdout, "sent=%d\n", sent)
+		app.Printf(os.Stdout, "sent=%d\n", sent)
 		return
 	}
 	stats, err := notifier.RunWorker(ctx, pool, opts)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Fprintf(os.Stdout, "claimed=%d succeeded=%d failed=%d notifications=%d sent=%d\n", stats.Claimed, stats.Succeeded, stats.Failed, stats.Notifications, stats.Sent)
+	app.Printf(os.Stdout, "claimed=%d succeeded=%d failed=%d notifications=%d sent=%d\n", stats.Claimed, stats.Succeeded, stats.Failed, stats.Notifications, stats.Sent)
 }
 
-func seenFlags() map[string]bool {
-	flags := map[string]bool{}
-	flag.Visit(func(f *flag.Flag) {
-		flags[f.Name] = true
-	})
-	return flags
+type workerFlags struct {
+	configPath        string
+	dbPath            string
+	maxConcurrency    int
+	leaseTTL          string
+	maxAttempts       int
+	limit             int
+	once              bool
+	classifierCommand string
+	model             string
+	discordChannelID  string
+	discordTokenEnv   string
+	sendDiscord       bool
+	dryRunDiscord     bool
+	sendPendingOnly   bool
+	pollInterval      string
+}
+
+func (flags *workerFlags) applyConfig(cfg config.Config, setFlags map[string]bool) {
+	flags.applyCoreConfig(cfg, setFlags)
+	flags.applyClassifierConfig(cfg, setFlags)
+	flags.applyDiscordConfig(cfg, setFlags)
+}
+
+func (flags *workerFlags) applyCoreConfig(cfg config.Config, setFlags map[string]bool) {
+	if cfg.DBPath != "" && !config.FlagSet(setFlags, "db") {
+		flags.dbPath = cfg.DBPath
+	}
+	if cfg.Worker.MaxConcurrency != 0 && !config.FlagSet(setFlags, "max-concurrency") {
+		flags.maxConcurrency = cfg.Worker.MaxConcurrency
+	}
+	if cfg.Worker.LeaseTTL != "" && !config.FlagSet(setFlags, "lease-ttl") {
+		flags.leaseTTL = cfg.Worker.LeaseTTL
+	}
+	if cfg.Worker.MaxAttempts != 0 && !config.FlagSet(setFlags, "max-attempts") {
+		flags.maxAttempts = cfg.Worker.MaxAttempts
+	}
+	if cfg.Worker.Limit != 0 && !config.FlagSet(setFlags, "limit") {
+		flags.limit = cfg.Worker.Limit
+	}
+	if cfg.Worker.Once && !config.FlagSet(setFlags, "once") {
+		flags.once = cfg.Worker.Once
+	}
+	if cfg.Worker.PollInterval != "" && !config.FlagSet(setFlags, "poll-interval") {
+		flags.pollInterval = cfg.Worker.PollInterval
+	}
+}
+
+func (flags *workerFlags) applyClassifierConfig(cfg config.Config, setFlags map[string]bool) {
+	if cfg.Worker.ClassifierCommand != "" && !config.FlagSet(setFlags, "classifier-command") {
+		flags.classifierCommand = cfg.Worker.ClassifierCommand
+	}
+	if cfg.Worker.Model != "" && !config.FlagSet(setFlags, "model") {
+		flags.model = cfg.Worker.Model
+	}
+}
+
+func (flags *workerFlags) applyDiscordConfig(cfg config.Config, setFlags map[string]bool) {
+	if cfg.Worker.DiscordChannelID != "" && !config.FlagSet(setFlags, "discord-channel-id") {
+		flags.discordChannelID = cfg.Worker.DiscordChannelID
+	}
+	if flags.discordChannelID == "" && cfg.Worker.DiscordChannelIDEnv != "" && !config.FlagSet(setFlags, "discord-channel-id") {
+		flags.discordChannelID = os.Getenv(cfg.Worker.DiscordChannelIDEnv)
+	}
+	if cfg.Worker.DiscordTokenEnv != "" && !config.FlagSet(setFlags, "discord-token-env") {
+		flags.discordTokenEnv = cfg.Worker.DiscordTokenEnv
+	}
+	if cfg.Worker.SendDiscord && !config.FlagSet(setFlags, "send-discord") {
+		flags.sendDiscord = cfg.Worker.SendDiscord
+	}
+	if cfg.Worker.DryRunDiscord && !config.FlagSet(setFlags, "dry-run-discord") {
+		flags.dryRunDiscord = cfg.Worker.DryRunDiscord
+	}
+	if cfg.Worker.SendPendingOnly && !config.FlagSet(setFlags, "send-pending-only") {
+		flags.sendPendingOnly = cfg.Worker.SendPendingOnly
+	}
 }

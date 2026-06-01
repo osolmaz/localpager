@@ -94,21 +94,7 @@ func Ingest(ctx context.Context, pool *Pool, item IngestItem, opts IngestOptions
 	if err != nil {
 		return IngestResult{}, err
 	}
-	if opts.ProcessorName == "" {
-		opts.ProcessorName = DefaultProcessorName
-	}
-	if opts.ProcessorVersion == "" {
-		opts.ProcessorVersion = DefaultProcessorVer
-	}
-	if opts.JobType == "" {
-		opts.JobType = "classify_" + normalized.Type
-	}
-	if opts.InitialHydration && opts.NotificationSuppressionReason == "" {
-		opts.NotificationSuppressionReason = "initial_hydration"
-	}
-	if opts.Priority == 0 {
-		opts.Priority = 100
-	}
+	opts = normalizeIngestOptions(opts, normalized)
 
 	var result IngestResult
 	err = pool.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -146,6 +132,25 @@ func Ingest(ctx context.Context, pool *Pool, item IngestItem, opts IngestOptions
 		return nil
 	})
 	return result, err
+}
+
+func normalizeIngestOptions(opts IngestOptions, item IngestItem) IngestOptions {
+	if opts.ProcessorName == "" {
+		opts.ProcessorName = DefaultProcessorName
+	}
+	if opts.ProcessorVersion == "" {
+		opts.ProcessorVersion = DefaultProcessorVer
+	}
+	if opts.JobType == "" {
+		opts.JobType = "classify_" + item.Type
+	}
+	if opts.InitialHydration && opts.NotificationSuppressionReason == "" {
+		opts.NotificationSuppressionReason = "initial_hydration"
+	}
+	if opts.Priority == 0 {
+		opts.Priority = 100
+	}
+	return opts
 }
 
 func storedItemHasContentHash(stored Item, contentHash string) bool {

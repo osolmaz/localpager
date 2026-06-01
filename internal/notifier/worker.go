@@ -1,19 +1,16 @@
 package notifier
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
-	"regexp"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
+	"github.com/osolmaz/localpager/internal/timing"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -101,8 +98,8 @@ func RunWorker(ctx context.Context, pool *Pool, opts WorkerOptions) (WorkerStats
 	}
 	wg.Wait()
 
-	stats := state.statsSnapshot()
-	if err := state.errSnapshot(); err != nil {
+	stats, err := state.snapshot()
+	if err != nil {
 		return stats, err
 	}
 	return stats, nil
@@ -174,16 +171,10 @@ func (state *workerRunState) reserveSupersededSweep(now time.Time) bool {
 	return true
 }
 
-func (state *workerRunState) statsSnapshot() WorkerStats {
+func (state *workerRunState) snapshot() (WorkerStats, error) {
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	return state.stats
-}
-
-func (state *workerRunState) errSnapshot() error {
-	state.mu.Lock()
-	defer state.mu.Unlock()
-	return state.firstError
+	return state.stats, state.firstError
 }
 
 func runWorkerSlot(ctx context.Context, cancel context.CancelFunc, pool *Pool, opts WorkerOptions, state *workerRunState) {
@@ -224,7 +215,7 @@ func runWorkerSlot(ctx context.Context, cancel context.CancelFunc, pool *Pool, o
 			if opts.Once || opts.Limit > 0 {
 				return
 			}
-			if err := sleepContext(ctx, opts.PollInterval); err != nil {
+			if err := timing.SleepContext(ctx, opts.PollInterval); err != nil {
 				if !errors.Is(err, context.Canceled) {
 					state.setError(err)
 				}
@@ -241,17 +232,6 @@ func DefaultClassifierModel() string {
 		return value
 	}
 	return fallbackClassifierModel
-}
-
-func sleepContext(ctx context.Context, interval time.Duration) error {
-	timer := time.NewTimer(interval)
-	defer timer.Stop()
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-timer.C:
-		return nil
-	}
 }
 
 func claimJobs(ctx context.Context, db *gorm.DB, max int, leaseTTL time.Duration, maxAttempts int, remaining int, sweepSuperseded bool) ([]ClaimedJob, error) {
@@ -345,21 +325,40 @@ WHERE status = 'pending'
 func processJob(ctx context.Context, pool *Pool, job ClaimedJob, opts WorkerOptions) WorkerStats {
 	var stats WorkerStats
 	if !supportedJobTypes[job.JobKind] {
-		if err := markClaimedJobFailed(ctx, pool.GORM(), job, fmt.Sprintf("unsupported job type %s", job.JobKind), opts.MaxAttempts); err == nil {
-			stats.Failed++
-		}
-		return stats
+		return failClaimedJob(ctx, pool, job, fmt.Sprintf("unsupported job type %s", job.JobKind), opts.MaxAttempts)
 	}
 
 	output, outputJSON, promptPath, sessionPath, err := runClassifier(ctx, job, opts)
 	if err != nil {
-		if err := markClaimedJobFailed(ctx, pool.GORM(), job, err.Error(), opts.MaxAttempts); err == nil {
-			stats.Failed++
-		}
+		return failClaimedJob(ctx, pool, job, err.Error(), opts.MaxAttempts)
+	}
+	result := classifierResult(job, opts, output, outputJSON, promptPath, sessionPath)
+	notificationInserted, finalized, err := persistJobResult(ctx, pool, job, opts, output, &result)
+	if err != nil {
+		return failPersistedJob(ctx, pool, job, err, opts.MaxAttempts)
+	}
+	if !finalized {
 		return stats
 	}
+	stats.Sent = sendPendingAfterFinalize(ctx, pool, opts)
+	if notificationInserted {
+		stats.Notifications++
+	}
+	stats.Succeeded++
+	return stats
+}
+
+func failClaimedJob(ctx context.Context, pool *Pool, job ClaimedJob, reason string, maxAttempts int) WorkerStats {
+	var stats WorkerStats
+	if err := markClaimedJobFailed(ctx, pool.GORM(), job, reason, maxAttempts); err == nil {
+		stats.Failed++
+	}
+	return stats
+}
+
+func classifierResult(job ClaimedJob, opts WorkerOptions, output ClassifierOutput, outputJSON, promptPath, sessionPath string) Result {
 	topicsJSON, _ := json.Marshal(output.TopicsOfInterest)
-	result := Result{
+	return Result{
 		ItemID:      job.ItemID,
 		JobID:       job.ID,
 		JobKind:     job.JobKind,
@@ -371,151 +370,126 @@ func processJob(ctx context.Context, pool *Pool, job ClaimedJob, opts WorkerOpti
 		Model:       stringPtrOrNil(opts.Model),
 		CreatedAt:   time.Now().UTC(),
 	}
+}
+
+func persistJobResult(ctx context.Context, pool *Pool, job ClaimedJob, opts WorkerOptions, output ClassifierOutput, result *Result) (bool, bool, error) {
 	notificationInserted := false
 	finalized := false
-	err = retrySQLiteBusy(ctx, func() error {
+	err := retrySQLiteBusy(ctx, func() error {
 		return pool.GORM().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-			superseded, err := skipClaimedJobIfSuperseded(ctx, tx, job)
+			created, err := createResultAndNotification(ctx, tx, job, opts, output, result)
 			if err != nil {
 				return err
 			}
-			if superseded {
+			if result.ID == 0 {
 				return nil
 			}
-			if err := tx.Create(&result).Error; err != nil {
+			notificationInserted = created
+			if err := markClaimedJobSucceeded(ctx, tx, job); err != nil {
 				return err
-			}
-			if shouldNotify(output, opts) {
-				status := "pending"
-				var sentAt *time.Time
-				var suppression *string
-				if job.NotificationSuppressionReason != nil && *job.NotificationSuppressionReason != "" {
-					status = "sent"
-					now := time.Now().UTC()
-					sentAt = &now
-					suppression = job.NotificationSuppressionReason
-				}
-				notification := Notification{
-					ItemID:            job.ItemID,
-					ResultID:          result.ID,
-					JobID:             job.ID,
-					NotificationKind:  "github_interest",
-					DestinationKind:   "discord_channel",
-					DestinationRef:    opts.DestinationRef,
-					MessageKey:        fmt.Sprintf("%d:%d:github_interest", job.ItemID, result.ID),
-					MessageBody:       buildNotificationMessage(job, output),
-					Status:            status,
-					SuppressionReason: suppression,
-					SentAt:            sentAt,
-					CreatedAt:         time.Now().UTC(),
-					UpdatedAt:         time.Now().UTC(),
-				}
-				created := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&notification)
-				if created.Error != nil {
-					return created.Error
-				}
-				notificationInserted = created.RowsAffected > 0
-			}
-			update := tx.Model(&Job{}).
-				Where("id = ? AND status = ? AND leased_until = ?", job.ID, "running", job.LeasedUntil).
-				Where(`EXISTS (
-				SELECT 1
-				FROM notifier_items
-				WHERE notifier_items.id = notifier_jobs.item_id
-				  AND (notifier_items.latest_content_hash IS NULL OR notifier_items.latest_content_hash = notifier_jobs.content_hash)
-			)`).
-				Updates(map[string]any{
-					"status":       "succeeded",
-					"leased_until": nil,
-					"updated_at":   time.Now().UTC(),
-				})
-			if update.Error != nil {
-				return update.Error
-			}
-			if update.RowsAffected == 0 {
-				return errStaleJobLease
 			}
 			finalized = true
 			return nil
 		})
 	})
-	if err != nil {
-		if errors.Is(err, errStaleJobLease) {
-			return stats
-		}
-		_ = markJobFailed(ctx, pool.GORM(), job.ID, err.Error(), opts.MaxAttempts)
-		stats.Failed++
+	return notificationInserted, finalized, err
+}
+
+func createResultAndNotification(ctx context.Context, tx *gorm.DB, job ClaimedJob, opts WorkerOptions, output ClassifierOutput, result *Result) (bool, error) {
+	superseded, err := skipClaimedJobIfSuperseded(ctx, tx, job)
+	if err != nil || superseded {
+		return false, err
+	}
+	if err := tx.Create(result).Error; err != nil {
+		return false, err
+	}
+	return insertNotificationIfNeeded(tx, job, opts, output, result.ID)
+}
+
+func insertNotificationIfNeeded(tx *gorm.DB, job ClaimedJob, opts WorkerOptions, output ClassifierOutput, resultID int64) (bool, error) {
+	if !shouldNotify(output, opts) {
+		return false, nil
+	}
+	notification := buildNotification(job, opts, output, resultID)
+	created := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&notification)
+	if created.Error != nil {
+		return false, created.Error
+	}
+	return created.RowsAffected > 0, nil
+}
+
+func buildNotification(job ClaimedJob, opts WorkerOptions, output ClassifierOutput, resultID int64) Notification {
+	status, sentAt, suppression := notificationInitialState(job)
+	now := time.Now().UTC()
+	return Notification{
+		ItemID:            job.ItemID,
+		ResultID:          resultID,
+		JobID:             job.ID,
+		NotificationKind:  "github_interest",
+		DestinationKind:   "discord_channel",
+		DestinationRef:    opts.DestinationRef,
+		MessageKey:        fmt.Sprintf("%d:%d:github_interest", job.ItemID, resultID),
+		MessageBody:       buildNotificationMessage(job, output),
+		Status:            status,
+		SuppressionReason: suppression,
+		SentAt:            sentAt,
+		CreatedAt:         now,
+		UpdatedAt:         now,
+	}
+}
+
+func notificationInitialState(job ClaimedJob) (string, *time.Time, *string) {
+	if job.NotificationSuppressionReason == nil || *job.NotificationSuppressionReason == "" {
+		return "pending", nil, nil
+	}
+	now := time.Now().UTC()
+	return "sent", &now, job.NotificationSuppressionReason
+}
+
+func markClaimedJobSucceeded(ctx context.Context, tx *gorm.DB, job ClaimedJob) error {
+	update := tx.Model(&Job{}).
+		Where("id = ? AND status = ? AND leased_until = ?", job.ID, "running", job.LeasedUntil).
+		Where(`EXISTS (
+			SELECT 1
+			FROM notifier_items
+			WHERE notifier_items.id = notifier_jobs.item_id
+			  AND (notifier_items.latest_content_hash IS NULL OR notifier_items.latest_content_hash = notifier_jobs.content_hash)
+		)`).
+		Updates(map[string]any{
+			"status":       "succeeded",
+			"leased_until": nil,
+			"updated_at":   time.Now().UTC(),
+		})
+	if update.Error != nil {
+		return update.Error
+	}
+	if update.RowsAffected == 0 {
+		return errStaleJobLease
+	}
+	return nil
+}
+
+func failPersistedJob(ctx context.Context, pool *Pool, job ClaimedJob, err error, maxAttempts int) WorkerStats {
+	var stats WorkerStats
+	if errors.Is(err, errStaleJobLease) {
 		return stats
 	}
-	if !finalized {
-		return stats
-	}
+	_ = markJobFailed(ctx, pool.GORM(), job.ID, err.Error(), maxAttempts)
+	stats.Failed++
+	return stats
+}
+
+func sendPendingAfterFinalize(ctx context.Context, pool *Pool, opts WorkerOptions) int {
 	var sent int
-	err = retrySQLiteBusy(ctx, func() error {
+	err := retrySQLiteBusy(ctx, func() error {
 		var sendErr error
 		sent, sendErr = SendPendingDiscord(ctx, pool, opts)
 		return sendErr
 	})
-	if err == nil {
-		stats.Sent += sent
-	}
-	if notificationInserted {
-		stats.Notifications++
-	}
-	stats.Succeeded++
-	return stats
-}
-
-func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (ClassifierOutput, string, string, string, error) {
-	commandPath, err := ExpandPath(opts.ClassifierCommand)
 	if err != nil {
-		return ClassifierOutput{}, "", "", "", err
+		return 0
 	}
-	target := deref(job.Item.SourceURL)
-	if target == "" {
-		target = deref(job.Item.Ref)
-	}
-	if target == "" {
-		target = job.Item.SourceRef
-	}
-	args := []string{target}
-	if opts.Model != "" {
-		args = append(args, "--model", opts.Model)
-	}
-	jobCtx := ctx
-	cancel := func() {}
-	if job.LeasedUntil != nil {
-		timeout := time.Until(*job.LeasedUntil)
-		if timeout <= 0 {
-			return ClassifierOutput{}, "", "", "", fmt.Errorf("classifier lease already expired")
-		}
-		jobCtx, cancel = context.WithTimeout(ctx, timeout)
-	}
-	defer cancel()
-	cmd := exec.CommandContext(jobCtx, commandPath, args...)
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	cmd.Cancel = func() error {
-		if cmd.Process == nil {
-			return nil
-		}
-		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
-	}
-	if err := cmd.Run(); err != nil {
-		if errors.Is(jobCtx.Err(), context.DeadlineExceeded) {
-			return ClassifierOutput{}, "", "", "", fmt.Errorf("classifier timed out before lease expiry")
-		}
-		return ClassifierOutput{}, "", "", "", fmt.Errorf("classifier failed: %w stderr=%s", err, strings.TrimSpace(stderr.String()))
-	}
-	outputJSON := strings.TrimSpace(stdout.String())
-	var output ClassifierOutput
-	if err := json.Unmarshal([]byte(outputJSON), &output); err != nil {
-		return ClassifierOutput{}, "", "", "", fmt.Errorf("classifier returned invalid JSON: %w stdout=%s stderr=%s", err, outputJSON, strings.TrimSpace(stderr.String()))
-	}
-	return output, outputJSON, parsePromptPath(stderr.String()), parseSessionPath(stderr.String()), nil
+	return sent
 }
 
 func skipClaimedJobIfSuperseded(ctx context.Context, tx *gorm.DB, job ClaimedJob) (bool, error) {
@@ -540,76 +514,6 @@ func skipClaimedJobIfSuperseded(ctx context.Context, tx *gorm.DB, job ClaimedJob
 		return false, result.Error
 	}
 	return result.RowsAffected > 0, nil
-}
-
-func shouldNotify(output ClassifierOutput, opts WorkerOptions) bool {
-	if opts.NotifyConfidenceMin > 0 && output.Confidence < opts.NotifyConfidenceMin {
-		return false
-	}
-	if interestBlocked(output.Interest, opts.NotifyInterestNot) {
-		return false
-	}
-	if len(opts.NotifyTopicsAny) > 0 {
-		allowed := map[string]bool{}
-		for _, topic := range opts.NotifyTopicsAny {
-			normalized := normalizeTopic(topic)
-			if normalized != "" {
-				allowed[normalized] = true
-			}
-		}
-		for _, topic := range output.TopicsOfInterest {
-			if allowed[normalizeTopic(topic)] {
-				return true
-			}
-		}
-		return false
-	}
-
-	interest := strings.ToLower(strings.TrimSpace(output.Interest))
-	switch interest {
-	case "", "none", "no", "low", "irrelevant", "i0", "false":
-		return false
-	default:
-		return true
-	}
-}
-
-func interestBlocked(interest string, blocked []string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(interest))
-	if len(blocked) == 0 {
-		switch normalized {
-		case "", "none", "no", "low", "irrelevant", "i0", "false":
-			return true
-		default:
-			return false
-		}
-	}
-	for _, value := range blocked {
-		if normalized == strings.ToLower(strings.TrimSpace(value)) {
-			return true
-		}
-	}
-	return false
-}
-
-func normalizeTopic(topic string) string {
-	return strings.ToLower(strings.TrimSpace(topic))
-}
-
-func buildNotificationMessage(job ClaimedJob, output ClassifierOutput) string {
-	title := deref(job.Item.Title)
-	if title == "" {
-		title = job.Item.SourceRef
-	}
-	topics := "none"
-	if len(output.TopicsOfInterest) > 0 {
-		topics = strings.Join(output.TopicsOfInterest, ", ")
-	}
-	message := fmt.Sprintf("%s\n%s\nInterest: %s\nTopics: %s\n%s", title, deref(job.Item.SourceURL), output.Interest, topics, output.Description)
-	if len(message) > 1900 {
-		return message[:1900] + "\n..."
-	}
-	return message
 }
 
 func markJobFailed(ctx context.Context, db *gorm.DB, jobID int64, reason string, maxAttempts int) error {
@@ -693,200 +597,6 @@ func isSQLiteBusy(err error) bool {
 	return strings.Contains(message, "database is locked") ||
 		strings.Contains(message, "sqlite_busy") ||
 		strings.Contains(message, "sql logic error: database is locked")
-}
-
-func parsePromptPath(stderr string) string {
-	re := regexp.MustCompile(`(?m)^prompt:\s*(.+)$`)
-	match := re.FindStringSubmatch(stderr)
-	if len(match) == 2 {
-		return strings.TrimSpace(match[1])
-	}
-	return ""
-}
-
-func parseSessionPath(stderr string) string {
-	re := regexp.MustCompile(`(?m)^session:\s*(.+)$`)
-	match := re.FindStringSubmatch(stderr)
-	if len(match) == 2 {
-		return strings.TrimSpace(match[1])
-	}
-	return ""
-}
-
-func SendPendingDiscord(ctx context.Context, pool *Pool, opts WorkerOptions) (int, error) {
-	if !opts.SendDiscord {
-		return 0, nil
-	}
-	if opts.DiscordToken == "" && !opts.DryRunDiscord {
-		return 0, nil
-	}
-	totalSent := 0
-	for {
-		notifications, err := claimPendingNotifications(ctx, pool.GORM(), pendingDiscordBatchSize)
-		if err != nil {
-			return totalSent, err
-		}
-		if len(notifications) == 0 {
-			return totalSent, nil
-		}
-		sent, err := sendClaimedDiscordNotifications(ctx, pool, opts, notifications)
-		totalSent += sent
-		if err != nil {
-			return totalSent, err
-		}
-		if sent == 0 {
-			return totalSent, nil
-		}
-	}
-}
-
-func sendClaimedDiscordNotifications(ctx context.Context, pool *Pool, opts WorkerOptions, notifications []Notification) (int, error) {
-	sent := 0
-	for i, notification := range notifications {
-		current, stillSending, err := sendingNotification(ctx, pool.GORM(), notification.ID)
-		if err != nil {
-			return sent, err
-		}
-		if !stillSending {
-			continue
-		}
-		notification = current
-		externalID := "dry-run"
-		if !opts.DryRunDiscord {
-			var err error
-			externalID, err = sendDiscordMessageFunc(ctx, opts.DiscordToken, notification.DestinationRef, notification.MessageBody)
-			if err != nil {
-				if isPermanentDiscordSendError(err) {
-					if markErr := markNotificationSendFailed(ctx, pool.GORM(), notification.ID, err); markErr != nil {
-						return sent, markErr
-					}
-					continue
-				}
-				_ = resetUnsentNotifications(ctx, pool.GORM(), notifications[i:], err)
-				return sent, err
-			}
-		}
-		now := time.Now().UTC()
-		result := pool.GORM().WithContext(ctx).Model(&Notification{}).Where("id = ? AND status = ?", notification.ID, "sending").Updates(map[string]any{
-			"status":              "sent",
-			"sent_at":             &now,
-			"external_message_id": externalID,
-			"last_error":          nil,
-			"updated_at":          now,
-		})
-		if result.Error != nil {
-			return sent, result.Error
-		}
-		if result.RowsAffected == 0 {
-			continue
-		}
-		sent++
-	}
-	return sent, nil
-}
-
-func sendingNotification(ctx context.Context, db *gorm.DB, id int64) (Notification, bool, error) {
-	var notification Notification
-	err := db.WithContext(ctx).Where("id = ? AND status = ?", id, "sending").First(&notification).Error
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return Notification{}, false, nil
-	}
-	if err != nil {
-		return Notification{}, false, err
-	}
-	return notification, true, nil
-}
-
-func resetUnsentNotifications(ctx context.Context, db *gorm.DB, notifications []Notification, sendErr error) error {
-	if len(notifications) == 0 {
-		return nil
-	}
-	ids := make([]int64, 0, len(notifications))
-	for _, notification := range notifications {
-		ids = append(ids, notification.ID)
-	}
-	return db.WithContext(ctx).Model(&Notification{}).Where("id IN ? AND status = ?", ids, "sending").Updates(map[string]any{
-		"status":     "pending",
-		"last_error": sendErr.Error(),
-		"updated_at": time.Now().UTC(),
-	}).Error
-}
-
-func markNotificationSendFailed(ctx context.Context, db *gorm.DB, notificationID int64, sendErr error) error {
-	return db.WithContext(ctx).Model(&Notification{}).Where("id = ? AND status = ?", notificationID, "sending").Updates(map[string]any{
-		"status":     "failed",
-		"last_error": sendErr.Error(),
-		"updated_at": time.Now().UTC(),
-	}).Error
-}
-
-func claimPendingNotifications(ctx context.Context, db *gorm.DB, limit int) ([]Notification, error) {
-	now := time.Now().UTC()
-	if err := suppressSupersededPendingNotifications(ctx, db, now); err != nil {
-		return nil, err
-	}
-	if err := db.WithContext(ctx).Model(&Notification{}).
-		Where("status = ? AND updated_at < ?", "sending", now.Add(-10*time.Minute)).
-		Updates(map[string]any{"status": "pending", "updated_at": now}).Error; err != nil {
-		return nil, err
-	}
-	var claimed []Notification
-	err := db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		var notifications []Notification
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).
-			Where("status = ? AND destination_kind = ?", "pending", "discord_channel").
-			Where(`EXISTS (
-				SELECT 1
-				FROM notifier_jobs
-				JOIN notifier_items ON notifier_items.id = notifier_jobs.item_id
-				WHERE notifier_jobs.id = notifier_notifications.job_id
-				  AND (notifier_items.latest_content_hash IS NULL OR notifier_items.latest_content_hash = notifier_jobs.content_hash)
-			)`).
-			Order("created_at ASC").
-			Limit(limit).
-			Find(&notifications).Error; err != nil {
-			return err
-		}
-		for _, notification := range notifications {
-			result := tx.Model(&Notification{}).Where("id = ? AND status = ?", notification.ID, "pending").Updates(map[string]any{
-				"status":     "sending",
-				"attempts":   gorm.Expr("attempts + 1"),
-				"updated_at": now,
-			})
-			if result.Error != nil {
-				return result.Error
-			}
-			if result.RowsAffected == 0 {
-				continue
-			}
-			notification.Status = "sending"
-			notification.Attempts++
-			claimed = append(claimed, notification)
-		}
-		return nil
-	})
-	return claimed, err
-}
-
-func suppressSupersededPendingNotifications(ctx context.Context, db *gorm.DB, now time.Time) error {
-	return db.WithContext(ctx).Model(&Notification{}).
-		Where("status IN ?", []string{"pending", "sending"}).
-		Where(`EXISTS (
-			SELECT 1
-			FROM notifier_jobs
-			JOIN notifier_items ON notifier_items.id = notifier_jobs.item_id
-			WHERE notifier_jobs.id = notifier_notifications.job_id
-			  AND notifier_items.latest_content_hash IS NOT NULL
-			  AND notifier_items.latest_content_hash != notifier_jobs.content_hash
-		)`).
-		Updates(map[string]any{
-			"status":              "sent",
-			"suppression_reason":  "superseded_content_hash",
-			"sent_at":             &now,
-			"external_message_id": nil,
-			"last_error":          nil,
-			"updated_at":          now,
-		}).Error
 }
 
 func RequireTokenFromEnv(name string) (string, error) {

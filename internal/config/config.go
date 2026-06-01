@@ -76,16 +76,36 @@ func FlagSet(flags map[string]bool, name string) bool {
 
 func (cfg Config) Validate() []string {
 	var warnings []string
-	if strings.TrimSpace(cfg.Repo) == "" || cfg.Repo == "owner/repo" {
-		warnings = append(warnings, "repo is unset or still owner/repo")
+	warnings = appendWarning(warnings, validateRepo(cfg.Repo))
+	warnings = appendWarning(warnings, validateDiscordTopics(cfg.Worker))
+	warnings = appendWarning(warnings, validateConfidence(cfg.Worker.NotifyConfidenceMin))
+	return append(warnings, validateWatchSources(cfg.Watch.Sources)...)
+}
+
+func validateRepo(repo string) string {
+	if strings.TrimSpace(repo) == "" || repo == "owner/repo" {
+		return "repo is unset or still owner/repo"
 	}
-	if cfg.Worker.SendDiscord && !cfg.Worker.DryRunDiscord && len(cfg.Worker.NotifyTopicsAny) == 0 {
-		warnings = append(warnings, "send_discord is enabled without worker.notify_topics_any; all non-low classifier results may notify")
+	return ""
+}
+
+func validateDiscordTopics(worker Worker) string {
+	if worker.SendDiscord && !worker.DryRunDiscord && len(worker.NotifyTopicsAny) == 0 {
+		return "send_discord is enabled without worker.notify_topics_any; all non-low classifier results may notify"
 	}
-	if cfg.Worker.NotifyConfidenceMin < 0 || cfg.Worker.NotifyConfidenceMin > 1 {
-		warnings = append(warnings, "worker.notify_confidence_min must be between 0 and 1")
+	return ""
+}
+
+func validateConfidence(confidence float64) string {
+	if confidence < 0 || confidence > 1 {
+		return "worker.notify_confidence_min must be between 0 and 1"
 	}
-	for _, source := range cfg.Watch.Sources {
+	return ""
+}
+
+func validateWatchSources(sources []string) []string {
+	var warnings []string
+	for _, source := range sources {
 		switch strings.ToLower(strings.TrimSpace(source)) {
 		case "", "gitcrawl", "github":
 		default:
@@ -93,4 +113,11 @@ func (cfg Config) Validate() []string {
 		}
 	}
 	return warnings
+}
+
+func appendWarning(warnings []string, warning string) []string {
+	if warning == "" {
+		return warnings
+	}
+	return append(warnings, warning)
 }

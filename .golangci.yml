@@ -1,0 +1,36 @@
+version: "2"
+
+run:
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - cyclop
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+  settings:
+    errcheck:
+      exclude-functions:
+        - "(*github.com/osolmaz/localpager/internal/notifier.Pool).Close"
+        - "(*database/sql.DB).Close"
+        - fmt.Fprintf
+        - fmt.Fprintln
+    cyclop:
+      max-complexity: 15
+      package-average: 0
+  exclusions:
+    paths:
+      - localpager-agent/.*
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+
+formatters:
+  enable:
+    - gofmt
