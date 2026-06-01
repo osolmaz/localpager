@@ -1,0 +1,44 @@
+{
+  "topics": [
+    {
+      "id": "local_models",
+      "description": "Local model runtimes, local inference, model loading, context limits, or model-specific behavior."
+    },
+    {
+      "id": "model_serving",
+      "description": "OpenAI-compatible servers, API serving, inference endpoints, routing, batching, or model gateway behavior."
+    },
+    {
+      "id": "runtime_reliability",
+      "description": "Crashes, hangs, timeouts, retries, data loss, degraded service, or other reliability behavior."
+    },
+    {
+      "id": "repo_infrastructure",
+      "description": "Build systems, packaging, release flows, dependency management, deployment, or repository automation."
+    },
+    {
+      "id": "developer_tools",
+      "description": "Developer-facing CLIs, scripts, debuggability, local setup, test fixtures, or maintainer workflow tools."
+    },
+    {
+      "id": "tests_ci",
+      "description": "Tests, CI jobs, coverage, quality gates, linting, or automated validation."
+    },
+    {
+      "id": "api_surface",
+      "description": "Public APIs, CLI flags, configuration contracts, schemas, or compatibility behavior."
+    },
+    {
+      "id": "integrations",
+      "description": "External service integrations, webhooks, messaging destinations, or third-party platform behavior."
+    },
+    {
+      "id": "security",
+      "description": "Authentication, authorization, permissions, sandboxing, secrets, vulnerability handling, or supply-chain trust."
+    },
+    {
+      "id": "docs",
+      "description": "User documentation, examples, guides, reference material, or explanatory content."
+    }
+  ]
+}

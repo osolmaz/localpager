@@ -191,12 +191,7 @@ func (flags *workerFlags) applyDiscordConfig(cfg config.Config, setFlags map[str
 }
 
 func (flags *workerFlags) applyGitHubConfig(cfg config.Config, setFlags map[string]bool) {
-	if cfg.GitHubBaseURL != "" && !config.FlagSet(setFlags, "github-base-url") {
-		flags.githubBaseURL = cfg.GitHubBaseURL
-	}
-	if cfg.GitHubTokenEnv != "" && !config.FlagSet(setFlags, "github-token-env") {
-		flags.githubTokenEnv = cfg.GitHubTokenEnv
-	}
+	app.ApplyGitHubConfig(&flags.githubBaseURL, &flags.githubTokenEnv, cfg, setFlags)
 }
 
 func classifierContextOptions(cfg config.Config, githubBaseURL string, githubTokenEnv string) localpager.ClassifierContextOptions {

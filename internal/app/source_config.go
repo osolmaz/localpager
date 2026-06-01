@@ -38,14 +38,18 @@ func RegisterSourceCLIFlags(fs *flag.FlagSet, fields SourceCLIFields, typeUsage 
 func ApplySourceConfig(fields SourceCLIFields, cfg config.Config, setFlags map[string]bool, typeAliases ...string) {
 	applyStringConfig(fields.DBPath, cfg.DBPath, setFlags, "db")
 	applyStringConfig(fields.GitcrawlDBPath, cfg.GitcrawlDBPath, setFlags, "gitcrawl-db")
-	applyStringConfig(fields.GitHubBaseURL, cfg.GitHubBaseURL, setFlags, "github-base-url")
-	applyStringConfig(fields.GitHubTokenEnv, cfg.GitHubTokenEnv, setFlags, "github-token-env")
+	ApplyGitHubConfig(fields.GitHubBaseURL, fields.GitHubTokenEnv, cfg, setFlags)
 	applyStringConfig(fields.Repo, cfg.Repo, setFlags, "repo")
 	applyStringConfigWithAliases(fields.Type, cfg.SourceType, setFlags, append([]string{"type"}, typeAliases...)...)
 	applyStringConfig(fields.ProcessorName, cfg.ProcessorName, setFlags, "processor-name")
 	applyStringConfig(fields.ProcessorVersion, cfg.ProcessorVersion, setFlags, "processor-version")
 	applyStringConfig(fields.RecentWindow, cfg.RecentWindow, setFlags, "recent-window")
 	applyStringConfig(fields.CutoverAt, cfg.CutoverAt, setFlags, "cutover-at")
+}
+
+func ApplyGitHubConfig(baseURL *string, tokenEnv *string, cfg config.Config, setFlags map[string]bool) {
+	applyStringConfig(baseURL, cfg.GitHubBaseURL, setFlags, "github-base-url")
+	applyStringConfig(tokenEnv, cfg.GitHubTokenEnv, setFlags, "github-token-env")
 }
 
 func applyStringConfig(target *string, value string, setFlags map[string]bool, flagName string) {

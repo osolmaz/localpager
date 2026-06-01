@@ -203,9 +203,7 @@ func parseRepoNumber(ref string) (string, int) {
 	if ref == "" {
 		return "", 0
 	}
-	if strings.HasPrefix(ref, "gitcrawl:") {
-		ref = strings.TrimPrefix(ref, "gitcrawl:")
-	}
+	ref = strings.TrimPrefix(ref, "gitcrawl:")
 	repo, numberText, ok := strings.Cut(ref, "#")
 	if !ok {
 		return "", 0

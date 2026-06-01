@@ -73,6 +73,11 @@ The taxonomy should be data, not prose embedded in code:
 The classifier wrapper should load this file and generate or validate the schema
 so `topics_of_interest.items.enum` is exactly the taxonomy topic IDs.
 
+A generic starter taxonomy lives at
+`examples/profiles/repo-routing-topics.json`. Its matching prompt template is
+`examples/profiles/repo-routing.prompt.md`, and its fully expanded example
+schema is `examples/profiles/repo-routing.schema.json`.
+
 ## Schema Contract
 
 For the current no-interest-score contract, the deployment schema should require:
