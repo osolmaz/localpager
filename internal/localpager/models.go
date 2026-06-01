@@ -51,7 +51,6 @@ type Result struct {
 	JobID       int64     `gorm:"column:job_id;not null"`
 	JobKind     string    `gorm:"column:job_kind;type:text;not null"`
 	OutputJSON  string    `gorm:"column:output_json;type:text;not null"`
-	Interest    *string   `gorm:"column:interest;type:text"`
 	TopicsJSON  *string   `gorm:"column:topics_json;type:text"`
 	SessionPath *string   `gorm:"column:session_path;type:text"`
 	PromptPath  *string   `gorm:"column:prompt_path;type:text"`

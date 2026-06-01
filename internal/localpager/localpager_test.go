@@ -68,6 +68,92 @@ func TestSQLitePoolWaitsForConcurrentWriter(t *testing.T) {
 	}
 }
 
+func TestNewPoolCreatesResultsWithoutLegacyInterestColumn(t *testing.T) {
+	ctx := context.Background()
+	pool, err := NewPool(ctx, filepath.Join(t.TempDir(), "localpager.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	hasInterest, err := pool.hasColumn(ctx, "localpager_results", "interest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasInterest {
+		t.Fatal("localpager_results has legacy interest column")
+	}
+}
+
+func TestNewPoolDropsLegacyInterestColumn(t *testing.T) {
+	ctx := context.Background()
+	dbPath := filepath.Join(t.TempDir(), "localpager.sqlite")
+	pool, err := NewPool(ctx, dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	item := Item{SourceKind: "github_pr", SourceRef: "example/repo#1"}
+	if err := pool.GORM().Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	job := Job{
+		ItemID:           item.ID,
+		JobKind:          "classify_github_pr",
+		ProcessorName:    "test",
+		ProcessorVersion: "v1",
+		ContentHash:      "hash",
+		Status:           "succeeded",
+	}
+	if err := pool.GORM().Create(&job).Error; err != nil {
+		t.Fatal(err)
+	}
+	result := Result{
+		ItemID:     item.ID,
+		JobID:      job.ID,
+		JobKind:    job.JobKind,
+		OutputJSON: `{"interest":"high","confidence":0.9,"topics_of_interest":["local_models"]}`,
+	}
+	if err := pool.GORM().Create(&result).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.GORM().Exec("ALTER TABLE localpager_results ADD COLUMN interest TEXT").Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := pool.GORM().Exec("UPDATE localpager_results SET interest = ?", "high").Error; err != nil {
+		t.Fatal(err)
+	}
+	hasInterest, err := pool.hasColumn(ctx, "localpager_results", "interest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasInterest {
+		t.Fatal("legacy interest column was not added")
+	}
+	if err := pool.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	pool, err = NewPool(ctx, dbPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	hasInterest, err = pool.hasColumn(ctx, "localpager_results", "interest")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if hasInterest {
+		t.Fatal("legacy interest column was not dropped")
+	}
+	var got Result
+	if err := pool.GORM().First(&got, result.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if got.OutputJSON != result.OutputJSON {
+		t.Fatalf("OutputJSON = %q, want %q", got.OutputJSON, result.OutputJSON)
+	}
+}
+
 func TestInitialHydrationSkipsClassification(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell script fixture is POSIX-only")

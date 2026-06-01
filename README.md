@@ -165,4 +165,6 @@ The default SQLite state path is:
 ~/.local/state/localpager/localpager.sqlite
 ```
 
+Localpager creates and updates SQLite tables from its GORM models at startup.
+
 Override it with `--db`.

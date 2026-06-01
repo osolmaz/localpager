@@ -77,6 +77,10 @@ func NewPool(ctx context.Context, path string) (*Pool, error) {
 		_ = sqlDB.Close()
 		return nil, err
 	}
+	if err := pool.CleanupLegacySchema(ctx); err != nil {
+		_ = sqlDB.Close()
+		return nil, err
+	}
 	if err := pool.BackfillGenericIdentity(ctx); err != nil {
 		_ = sqlDB.Close()
 		return nil, err
@@ -106,6 +110,32 @@ func (p *Pool) AutoMigrate(ctx context.Context) error {
 		return fmt.Errorf("gorm auto-migrate models: %w", err)
 	}
 	return nil
+}
+
+func (p *Pool) CleanupLegacySchema(ctx context.Context) error {
+	if p == nil || p.gdb == nil {
+		return fmt.Errorf("database pool is not initialized")
+	}
+	hasInterest, err := p.hasColumn(ctx, "localpager_results", "interest")
+	if err != nil {
+		return err
+	}
+	if !hasInterest {
+		return nil
+	}
+	if err := p.gdb.WithContext(ctx).Exec("ALTER TABLE localpager_results DROP COLUMN interest").Error; err != nil {
+		return fmt.Errorf("drop legacy localpager_results.interest column: %w", err)
+	}
+	return nil
+}
+
+func (p *Pool) hasColumn(ctx context.Context, table, column string) (bool, error) {
+	var count int
+	err := p.gdb.WithContext(ctx).Raw("SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?", table, column).Scan(&count).Error
+	if err != nil {
+		return false, fmt.Errorf("inspect table %s columns: %w", table, err)
+	}
+	return count > 0, nil
 }
 
 func (p *Pool) BackfillGenericIdentity(ctx context.Context) error {
