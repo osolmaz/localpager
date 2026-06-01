@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { spawn } from "node:child_process";
 
 const startedAt = new Date();
 const options = parseArgs(process.argv.slice(2));
@@ -40,11 +41,12 @@ async function main() {
     const safeName = `${String(index + 1).padStart(3, "0")}-${item.kind}-${item.number}`;
     const context = renderContext(item, options);
     const prompt = renderPrompt(promptTemplate, item.url, topics, context);
-    writeFileSync(path.join(outputDir, "contexts", `${safeName}.md`), context);
+    const contextPath = path.join(outputDir, "contexts", `${safeName}.md`);
+    writeFileSync(contextPath, context);
     writeFileSync(path.join(outputDir, "prompts", `${safeName}.md`), prompt);
 
-    const reference = await classify("reference", prompt, runtimeSchema, topics, item, options);
-    const target = await classify("target", prompt, runtimeSchema, topics, item, options);
+    const reference = await classify("reference", contextPath, topics, item, options);
+    const target = await classify("target", contextPath, topics, item, options);
     const comparison = compareOutputs(reference.output, target.output);
 
     referenceRows.push({ item: itemSummary(item), ...reference });
@@ -79,6 +81,8 @@ function parseArgs(args) {
     referenceModel: "mock",
     targetBaseUrl: "",
     targetModel: "mock",
+    classifierCommand: "scripts/localpager-classifier",
+    contextWindow: 0,
     maxTokens: 512,
     timeoutMs: 120000,
     maxBodyChars: 5000,
@@ -118,6 +122,10 @@ function parseArgs(args) {
       parsed.targetBaseUrl = requiredValue(args, ++index, arg).replace(/\/$/u, "");
     } else if (arg === "--target-model") {
       parsed.targetModel = requiredValue(args, ++index, arg);
+    } else if (arg === "--classifier-command") {
+      parsed.classifierCommand = requiredValue(args, ++index, arg);
+    } else if (arg === "--context-window") {
+      parsed.contextWindow = parsePositiveInt(requiredValue(args, ++index, arg), arg);
     } else if (arg === "--max-tokens") {
       parsed.maxTokens = parsePositiveInt(requiredValue(args, ++index, arg), arg);
     } else if (arg === "--timeout-ms") {
@@ -163,6 +171,7 @@ function usage(status) {
       "usage: localpager-experiment --repo OWNER/REPO [--limit N] [--item-type both|issues|prs]",
       "       [--output-dir DIR] [--overwrite] [--reference-model mock] [--target-model mock]",
       "       [--target-base-url http://127.0.0.1:1234/v1 --target-model MODEL]",
+      "       [--classifier-command scripts/localpager-classifier]",
       "",
     ].join("\n"),
   );
@@ -361,12 +370,12 @@ function oneLine(value) {
   return String(value).replace(/\s+/gu, " ").trim();
 }
 
-async function classify(side, prompt, schema, topics, item, opts) {
+async function classify(side, contextPath, topics, item, opts) {
   const model = side === "reference" ? opts.referenceModel : opts.targetModel;
   const baseUrl = side === "reference" ? opts.referenceBaseUrl : opts.targetBaseUrl;
   const started = Date.now();
   try {
-    const output = model === "mock" ? mockOutput(topics, item) : await callOpenAI(baseUrl, model, prompt, schema, opts);
+    const output = model === "mock" ? mockOutput(topics, item) : await callLocalpagerClassifier(baseUrl, model, contextPath, item, opts);
     const validation = validateOutput(output, topics);
     return {
       model,
@@ -399,44 +408,76 @@ function mockOutput(topics, item) {
   };
 }
 
-async function callOpenAI(baseUrl, model, prompt, schema, opts) {
-  if (!baseUrl) {
-    throw new Error(`base URL is required for non-mock model ${model}`);
+async function callLocalpagerClassifier(baseUrl, model, contextPath, item, opts) {
+  const command = resolveCommand(opts.classifierCommand);
+  const args = [
+    item.url,
+    "--model",
+    model,
+    "--schema",
+    resolvePath(opts.schema),
+    "--prompt-template",
+    resolvePath(opts.promptTemplate),
+    "--github-context-file",
+    contextPath,
+  ];
+  if (opts.topicTaxonomy) {
+    args.push("--topic-taxonomy", resolvePath(opts.topicTaxonomy));
   }
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
+
+  const env = {
+    ...process.env,
+    LOCALPAGER_AGENT_MAX_TOKENS: String(opts.maxTokens),
+    LOCALPAGER_AGENT_TIMEOUT_MS: String(opts.timeoutMs),
+  };
+  if (baseUrl) {
+    env.LOCALPAGER_AGENT_BASE_URL = baseUrl;
+  }
+  if (opts.contextWindow > 0) {
+    env.LOCALPAGER_AGENT_CONTEXT_WINDOW = String(opts.contextWindow);
+  }
+
+  const { stdout, stderr, status, signal } = await runCommand(command, args, env, opts.timeoutMs);
+  if (status !== 0) {
+    const suffix = signal ? `signal ${signal}` : `exit ${status}`;
+    throw new Error(`classifier ${suffix}: ${stderr || stdout}`.slice(0, 1000));
+  }
   try {
-    const response = await fetch(`${baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: process.env.OPENAI_API_KEY ? `Bearer ${process.env.OPENAI_API_KEY}` : "Bearer local",
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        max_tokens: opts.maxTokens,
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "localpager_classification",
-            strict: true,
-            schema,
-          },
-        },
-        messages: [{ role: "user", content: prompt }],
-      }),
-      signal: controller.signal,
-    });
-    const body = await response.text();
-    if (!response.ok) {
-      throw new Error(`model ${response.status} ${response.statusText}: ${body.slice(0, 500)}`);
-    }
-    const json = JSON.parse(body);
-    return JSON.parse(json.choices?.[0]?.message?.content || "{}");
-  } finally {
-    clearTimeout(timer);
+    return JSON.parse(stdout.trim());
+  } catch (error) {
+    throw new Error(`classifier returned non-JSON stdout: ${stdout.slice(0, 500)} (${error.message})`);
   }
+}
+
+function runCommand(command, args, env, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, {
+      cwd: process.cwd(),
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stdout = "";
+    let stderr = "";
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+    }, timeoutMs);
+    child.stdout.setEncoding("utf8");
+    child.stderr.setEncoding("utf8");
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk;
+    });
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk;
+    });
+    child.on("error", (error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+    child.on("close", (status, signal) => {
+      clearTimeout(timer);
+      resolve({ stdout, stderr, status, signal });
+    });
+  });
 }
 
 function compareOutputs(reference, target) {
@@ -684,6 +725,10 @@ function redactedConfig(opts, outputDir) {
 
 function resolvePath(filePath) {
   return path.resolve(process.cwd(), filePath);
+}
+
+function resolveCommand(command) {
+  return command.includes("/") ? resolvePath(command) : command;
 }
 
 function timestamp(date) {

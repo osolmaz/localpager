@@ -6,13 +6,14 @@ date: 2026-06-01
 
 # Classifier Experiment Runner
 
-Localpager includes a dependency-free experiment runner for checking a prompt
-profile against live GitHub issues and pull requests.
+Localpager includes an experiment runner for checking a prompt profile against
+live GitHub issues and pull requests.
 
-The runner is intentionally generic. It takes a repo, a prompt template, a topic
-taxonomy, and a schema. It fetches a small GitHub sample, renders the same kind
-of context Localpager sends to the classifier, runs a reference model and a
-target model, validates the outputs, then writes a benchmark bundle.
+The runner takes a repo, a prompt template, a topic taxonomy, and a schema. It
+fetches a small GitHub sample, renders the same kind of context Localpager sends
+to the classifier, runs a reference model and a target model through
+`scripts/localpager-classifier`, validates the outputs, then writes a benchmark
+bundle.
 
 ## Command
 
@@ -30,7 +31,9 @@ node scripts/localpager-experiment.mjs \
   --target-model mock
 ```
 
-Use a real local OpenAI-compatible endpoint by setting the model side:
+Use a real local OpenAI-compatible endpoint by setting the model side. Non-mock
+models are routed through the normal Localpager classifier wrapper and
+`localpager-agent --final-schema`:
 
 ```bash
 node scripts/localpager-experiment.mjs \
@@ -52,6 +55,8 @@ to the output directory.
   `examples/profiles/repo-routing.prompt.md`.
 - `--topic-taxonomy`: allowed topic list. The default is
   `examples/profiles/repo-routing-topics.json`.
+- `--classifier-command`: classifier wrapper to run for non-mock models. The
+  default is `scripts/localpager-classifier`.
 - `--repo`: GitHub repo in `owner/repo` form.
 - `--limit`: total item count after sorting recent issues and PRs together.
 
@@ -105,7 +110,7 @@ That smoke test verifies GitHub fetch, issue/PR hydration, prompt rendering,
 runtime schema generation, output validation, metric calculation, and artifact
 writing without needing a local model server.
 
-A one-row LM Studio smoke test was also run against the local Gemma endpoint:
+A one-row LM Studio smoke test can be run against the local Gemma endpoint:
 
 ```bash
 node scripts/localpager-experiment.mjs \
@@ -119,9 +124,9 @@ node scripts/localpager-experiment.mjs \
   --target-model gemma-4-e4b-it
 ```
 
-That produced a valid target output for one live PR. The comparison score was
-not meaningful because the reference side was the mock classifier, but the model
-call, structured JSON parse, runtime topic enum, and validator path all worked.
+The comparison score is not meaningful when the reference side is the mock
+classifier, but the model call, final-schema parse, runtime topic enum, and
+validator path are exercised.
 
 ## DS4 Final-Schema Verification
 
@@ -135,36 +140,40 @@ lms server stop
 nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
 ```
 
-The direct experiment runner uses OpenAI `response_format`. The local DS4 server
-can still return incomplete or prose-prefixed content on that route, so the
-production-style DS4 verification should use `localpager-classifier`, which goes
-through `localpager-agent` and the final-schema path.
+The experiment runner now uses `localpager-classifier` for non-mock models, so
+DS4 verification goes through the same `localpager-agent` final-schema path as
+the production classifier setup.
 
 Verified command shape:
 
 ```bash
 LOCALPAGER_AGENT_BASE_URL=http://127.0.0.1:8000/v1 \
-LOCALPAGER_AGENT_MODEL=deepseek-v4-pro \
-LOCALPAGER_AGENT_CONTEXT_WINDOW=32768 \
-LOCALPAGER_AGENT_MAX_TOKENS=768 \
-LOCALPAGER_AGENT_TIMEOUT_MS=10000 \
-scripts/localpager-classifier https://github.com/openclaw/openclaw/pull/88504 \
-  --model deepseek-v4-pro \
+node scripts/localpager-experiment.mjs \
+  --repo openclaw/openclaw \
+  --limit 1 \
+  --item-type prs \
+  --output-dir /tmp/localpager-experiment-ds4-smoke \
+  --overwrite \
+  --reference-model mock \
+  --target-base-url http://127.0.0.1:8000/v1 \
+  --target-model deepseek-v4-pro \
+  --context-window 32768 \
+  --max-tokens 768 \
+  --timeout-ms 600000 \
   --schema schemas/classification.schema.json \
   --prompt-template examples/profiles/repo-routing.prompt.md \
-  --topic-taxonomy examples/profiles/repo-routing-topics.json \
-  --github-context-file /tmp/localpager-experiment-ds4-smoke/contexts/001-pull_request-88504.md
+  --topic-taxonomy examples/profiles/repo-routing-topics.json
 ```
 
 Result:
 
 ```json
 {
-  "topics_of_interest": ["api_surface"],
-  "description": "This PR adds a multi-slot memory role config/plugin API contract and wiring through schema, types, validation, plugin activation, and runtime resolution.",
+  "topics_of_interest": ["docs"],
+  "description": "PR 88875 is a comment-only maintainability pass adding public/API docs and inline comments across markdown, shared helpers, channel, gateway, plugin SDK, CLI, and security-adjacent contracts.",
   "caveats": [
-    "The PR body proof is stale.",
-    "The memory role-slot taxonomy and migration semantics need explicit maintainer approval before merge."
+    "GitHub diff was unavailable because the PR exceeded GitHub's 300-file diff limit.",
+    "The PR body reports local test results but lacks attached proof."
   ]
 }
 ```
