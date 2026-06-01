@@ -1,0 +1,31 @@
+{
+  "repo": "owner/repo",
+  "db": "~/.local/state/localpager/notifier.sqlite",
+  "gitcrawl_db": "~/.config/gitcrawl/gitcrawl.db",
+  "source_type": "both",
+  "processor_name": "github_interest_classifier",
+  "processor_version": "v1",
+  "recent_window": "48h",
+  "enqueue": {
+    "limit": 0,
+    "initial_hydration": false
+  },
+  "watch": {
+    "sources": ["gitcrawl"],
+    "interval": "1m",
+    "limit": 100
+  },
+  "worker": {
+    "max_concurrency": 2,
+    "lease_ttl": "30m",
+    "max_attempts": 3,
+    "classifier_command": "./scripts/localpager-classifier",
+    "model": "gemma-4-e4b-it",
+    "discord_channel_id_env": "DISCORD_CHANNEL_ID",
+    "discord_token_env": "DISCORD_BOT_TOKEN",
+    "send_discord": false,
+    "dry_run_discord": true,
+    "poll_interval": "30s"
+  }
+}
+

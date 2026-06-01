@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osolmaz/localpager/internal/config"
 	"github.com/osolmaz/localpager/internal/notifier"
 	"github.com/osolmaz/localpager/internal/sources/gitcrawl"
 )
@@ -26,7 +27,9 @@ func main() {
 	var processorVersion string
 	var recentWindow string
 	var cutoverAt string
+	var configPath string
 
+	flag.StringVar(&configPath, "config", "", "JSON config file path")
 	flag.StringVar(&dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
 	flag.StringVar(&gitcrawlDBPath, "gitcrawl-db", gitcrawl.DefaultDBPath, "gitcrawl SQLite database path")
 	flag.Var(&sources, "source", "source watcher to run; currently supports gitcrawl")
@@ -40,6 +43,48 @@ func main() {
 	flag.StringVar(&recentWindow, "recent-window", "48h", "duration considered recent for priority")
 	flag.StringVar(&cutoverAt, "cutover-at", "", "RFC3339 timestamp; items updated before this are recorded as skipped")
 	flag.Parse()
+	setFlags := seenFlags()
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if cfg.DBPath != "" && !config.FlagSet(setFlags, "db") {
+		dbPath = cfg.DBPath
+	}
+	if cfg.GitcrawlDBPath != "" && !config.FlagSet(setFlags, "gitcrawl-db") {
+		gitcrawlDBPath = cfg.GitcrawlDBPath
+	}
+	if len(cfg.Watch.Sources) > 0 && !config.FlagSet(setFlags, "source") {
+		sources = append(sources[:0], cfg.Watch.Sources...)
+	}
+	if cfg.Repo != "" && !config.FlagSet(setFlags, "repo") {
+		repo = cfg.Repo
+	}
+	if cfg.SourceType != "" && !config.FlagSet(setFlags, "type") {
+		itemType = cfg.SourceType
+	}
+	if cfg.Watch.Interval != "" && !config.FlagSet(setFlags, "interval") {
+		interval = cfg.Watch.Interval
+	}
+	if cfg.Watch.Once && !config.FlagSet(setFlags, "once") {
+		once = cfg.Watch.Once
+	}
+	if cfg.Watch.Limit != 0 && !config.FlagSet(setFlags, "limit") {
+		limit = cfg.Watch.Limit
+	}
+	if cfg.ProcessorName != "" && !config.FlagSet(setFlags, "processor-name") {
+		processorName = cfg.ProcessorName
+	}
+	if cfg.ProcessorVersion != "" && !config.FlagSet(setFlags, "processor-version") {
+		processorVersion = cfg.ProcessorVersion
+	}
+	if cfg.RecentWindow != "" && !config.FlagSet(setFlags, "recent-window") {
+		recentWindow = cfg.RecentWindow
+	}
+	if cfg.CutoverAt != "" && !config.FlagSet(setFlags, "cutover-at") {
+		cutoverAt = cfg.CutoverAt
+	}
 
 	if len(sources) == 0 {
 		sources = append(sources, "gitcrawl")
@@ -150,4 +195,12 @@ func (values *multiFlag) String() string {
 func (values *multiFlag) Set(value string) error {
 	*values = append(*values, value)
 	return nil
+}
+
+func seenFlags() map[string]bool {
+	flags := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) {
+		flags[f.Name] = true
+	})
+	return flags
 }

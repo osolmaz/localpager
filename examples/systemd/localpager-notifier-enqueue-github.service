@@ -9,9 +9,8 @@ Environment=HOME=%h
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=%h/.config/localpager/localpager.env
 WorkingDirectory=%h/repos/localpager
-ExecStart=/usr/bin/env go run ./cmd/notifier-enqueue-github --repo ${LOCALPAGER_REPO} --type both
+ExecStart=/usr/bin/env go run ./cmd/notifier-enqueue-github --config %h/.config/localpager/config.json
 TimeoutStartSec=10m
 
 [Install]
 WantedBy=default.target
-

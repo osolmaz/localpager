@@ -66,7 +66,7 @@ function extensionSource(schema: unknown, outputPath: string): string {
     `const schema = ${JSON.stringify(schema, null, 2)} as const;`,
     `const outputPath = ${JSON.stringify(outputPath)};`,
     "",
-    "export default function localpager-agentFinalJsonExtension(pi: ExtensionAPI): void {",
+    "export default function localpagerAgentFinalJsonExtension(pi: ExtensionAPI): void {",
     "  pi.registerTool({",
     '    name: "final_json",',
     '    label: "Final JSON",',

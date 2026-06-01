@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/osolmaz/localpager/internal/config"
 	"github.com/osolmaz/localpager/internal/notifier"
 	"github.com/osolmaz/localpager/internal/sources/gitcrawl"
 )
@@ -23,7 +24,9 @@ func main() {
 	var processorVersion string
 	var recentWindow string
 	var cutoverAt string
+	var configPath string
 
+	flag.StringVar(&configPath, "config", "", "JSON config file path")
 	flag.StringVar(&dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
 	flag.StringVar(&gitcrawlDBPath, "gitcrawl-db", gitcrawl.DefaultDBPath, "gitcrawl SQLite database path")
 	flag.StringVar(&repo, "repo", notifier.DefaultRepo, "GitHub repo full name")
@@ -36,6 +39,42 @@ func main() {
 	flag.StringVar(&recentWindow, "recent-window", "48h", "duration considered recent for priority")
 	flag.StringVar(&cutoverAt, "cutover-at", "", "RFC3339 timestamp; items updated before this are recorded as skipped")
 	flag.Parse()
+	setFlags := seenFlags()
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if cfg.DBPath != "" && !config.FlagSet(setFlags, "db") {
+		dbPath = cfg.DBPath
+	}
+	if cfg.GitcrawlDBPath != "" && !config.FlagSet(setFlags, "gitcrawl-db") {
+		gitcrawlDBPath = cfg.GitcrawlDBPath
+	}
+	if cfg.Repo != "" && !config.FlagSet(setFlags, "repo") {
+		repo = cfg.Repo
+	}
+	if cfg.SourceType != "" && !config.FlagSet(setFlags, "type") && !config.FlagSet(setFlags, "kind") {
+		sourceType = cfg.SourceType
+	}
+	if cfg.Enqueue.Limit != 0 && !config.FlagSet(setFlags, "limit") {
+		limit = cfg.Enqueue.Limit
+	}
+	if cfg.Enqueue.InitialHydration && !config.FlagSet(setFlags, "initial-hydration") {
+		initialHydration = cfg.Enqueue.InitialHydration
+	}
+	if cfg.ProcessorName != "" && !config.FlagSet(setFlags, "processor-name") {
+		processorName = cfg.ProcessorName
+	}
+	if cfg.ProcessorVersion != "" && !config.FlagSet(setFlags, "processor-version") {
+		processorVersion = cfg.ProcessorVersion
+	}
+	if cfg.RecentWindow != "" && !config.FlagSet(setFlags, "recent-window") {
+		recentWindow = cfg.RecentWindow
+	}
+	if cfg.CutoverAt != "" && !config.FlagSet(setFlags, "cutover-at") {
+		cutoverAt = cfg.CutoverAt
+	}
 
 	window, err := time.ParseDuration(recentWindow)
 	if err != nil {
@@ -75,4 +114,12 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Fprintf(os.Stdout, "items_seen=%d items_upserted=%d jobs_inserted=%d jobs_skipped=%d jobs_existing=%d\n", stats.ItemsSeen, stats.ItemsUpserted, stats.JobsInserted, stats.JobsSkipped, stats.JobsExisting)
+}
+
+func seenFlags() map[string]bool {
+	flags := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) {
+		flags[f.Name] = true
+	})
+	return flags
 }

@@ -55,7 +55,43 @@ done <"$prompt_template" >"$prompt_path"
 
 echo "prompt: $prompt_path" >&2
 
+stderr_path="$(mktemp)"
+stdout_path="$(mktemp)"
+cleanup() {
+  rm -f "$stderr_path" "$stdout_path"
+}
+trap cleanup EXIT
+
+set +e
 npm --prefix "$agent_dir" run -s localpager-agent -- \
   --model "$model" \
   --final-schema "$schema" \
-  -p "$(cat "$prompt_path")"
+  -p "$(cat "$prompt_path")" >"$stdout_path" 2>"$stderr_path"
+status=$?
+set -e
+
+if [[ "$status" -eq 0 ]]; then
+  cat "$stderr_path" >&2
+  cat "$stdout_path"
+  exit 0
+fi
+
+if ! grep -q "final_json was not called" "$stderr_path"; then
+  cat "$stderr_path" >&2
+  cat "$stdout_path"
+  exit "$status"
+fi
+
+fallback_prompt_path="$state_dir/prompts/$(date -u +%Y%m%dT%H%M%SZ)-$$-retry.md"
+{
+  cat "$prompt_path"
+  printf '\n\n'
+  printf 'Retry instruction: the previous model response failed because it did not call the final_json tool. Do not explain anything in prose. Call final_json exactly once with a JSON object that matches the schema.\n'
+} >"$fallback_prompt_path"
+
+echo "prompt: $fallback_prompt_path" >&2
+
+npm --prefix "$agent_dir" run -s localpager-agent -- \
+  --model "$model" \
+  --final-schema "$schema" \
+  -p "$(cat "$fallback_prompt_path")"

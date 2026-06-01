@@ -62,7 +62,7 @@ session: /path/to/session.jsonl
 ```bash
 npm install --prefix localpager-agent
 go test ./...
-go run ./cmd/notifier-worker --once --dry-run-discord
+go run ./cmd/notifier-worker --config examples/config.example.json --once --dry-run-discord
 ```
 
 Check the bundled agent:
@@ -76,9 +76,9 @@ To send Discord messages, pass a channel ID and set a bot token:
 ```bash
 export DISCORD_BOT_TOKEN="<discord bot token>"
 go run ./cmd/notifier-worker \
-  --send-discord \
+  --config examples/config.example.json \
   --discord-channel-id "$DISCORD_CHANNEL_ID" \
-  --classifier-command ./scripts/your-classifier
+  --send-discord
 ```
 
 Do not commit tokens, `.env` files, SQLite databases, classifier sessions, or
@@ -110,9 +110,7 @@ The first source adapter reads from a local gitcrawl SQLite database:
 
 ```bash
 go run ./cmd/notifier-enqueue-github \
-  --repo owner/repo \
-  --type both \
-  --gitcrawl-db ~/.config/gitcrawl/gitcrawl.db
+  --config examples/config.example.json
 ```
 
 Direct GitHub API polling and webhook support should be added before treating
