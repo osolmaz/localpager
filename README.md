@@ -38,26 +38,18 @@ The classifier command receives one target argument, usually a GitHub URL or
 
 ```json
 {
-  "interest": "high",
-  "confidence": 0.92,
   "topics_of_interest": ["bug", "release"],
   "description": "Why this item matters.",
   "caveats": []
 }
 ```
 
-The worker stores the full JSON. By default it treats empty, `none`, `low`,
-`irrelevant`, `false`, or `i0` interest values as non-notifying. Other interest
-values create a notification.
-
 Notification policy is deployment config, not classifier logic:
 
 ```json
 {
   "worker": {
-    "notify_topics_any": ["local_models", "open_weight_models"],
-    "notify_interest_not": ["", "none", "no", "low", "irrelevant", "i0", "false"],
-    "notify_confidence_min": 0.7
+    "notify_topics_any": ["local_models", "open_weight_models"]
   }
 }
 ```

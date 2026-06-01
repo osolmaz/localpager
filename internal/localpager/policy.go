@@ -3,12 +3,6 @@ package localpager
 import "strings"
 
 func shouldNotify(output ClassifierOutput, opts WorkerOptions) bool {
-	if opts.NotifyConfidenceMin > 0 && output.Confidence < opts.NotifyConfidenceMin {
-		return false
-	}
-	if interestBlocked(output.Interest, opts.NotifyInterestNot) {
-		return false
-	}
 	if len(opts.NotifyTopicsAny) == 0 {
 		return true
 	}
@@ -29,28 +23,6 @@ func hasAllowedTopic(topics, allowedTopics []string) bool {
 		}
 	}
 	return false
-}
-
-func interestBlocked(interest string, blocked []string) bool {
-	normalized := strings.ToLower(strings.TrimSpace(interest))
-	if len(blocked) == 0 {
-		return defaultBlockedInterest(normalized)
-	}
-	for _, value := range blocked {
-		if normalized == strings.ToLower(strings.TrimSpace(value)) {
-			return true
-		}
-	}
-	return false
-}
-
-func defaultBlockedInterest(interest string) bool {
-	switch interest {
-	case "", "none", "no", "low", "irrelevant", "i0", "false":
-		return true
-	default:
-		return false
-	}
 }
 
 func normalizeTopic(topic string) string {

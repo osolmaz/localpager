@@ -2,17 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["interest", "confidence", "topics_of_interest", "description", "caveats"],
+  "required": ["topics_of_interest", "description", "caveats"],
   "properties": {
-    "interest": {
-      "type": "string",
-      "enum": ["high", "medium", "low", "none"]
-    },
-    "confidence": {
-      "type": "number",
-      "minimum": 0,
-      "maximum": 1
-    },
     "topics_of_interest": {
       "type": "array",
       "maxItems": 5,

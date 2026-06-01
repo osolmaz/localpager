@@ -20,7 +20,7 @@ func buildNotificationMessage(job ClaimedJob, output ClassifierOutput) string {
 	if len(output.TopicsOfInterest) > 0 {
 		topics = strings.Join(output.TopicsOfInterest, ", ")
 	}
-	message := fmt.Sprintf("%s\n%s\nInterest: %s\nTopics: %s\n%s", title, deref(job.Item.SourceURL), output.Interest, topics, output.Description)
+	message := fmt.Sprintf("%s\n%s\nTopics: %s\n%s", title, deref(job.Item.SourceURL), topics, output.Description)
 	if len(message) > 1900 {
 		return message[:1900] + "\n..."
 	}

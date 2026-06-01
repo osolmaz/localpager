@@ -51,8 +51,6 @@ type Worker struct {
 	SendPendingOnly     bool     `json:"send_pending_only"`
 	PollInterval        string   `json:"poll_interval"`
 	NotifyTopicsAny     []string `json:"notify_topics_any"`
-	NotifyInterestNot   []string `json:"notify_interest_not"`
-	NotifyConfidenceMin float64  `json:"notify_confidence_min"`
 }
 
 func Load(path string) (Config, error) {
@@ -78,7 +76,6 @@ func (cfg Config) Validate() []string {
 	var warnings []string
 	warnings = appendWarning(warnings, validateRepo(cfg.Repo))
 	warnings = appendWarning(warnings, validateDiscordTopics(cfg.Worker))
-	warnings = appendWarning(warnings, validateConfidence(cfg.Worker.NotifyConfidenceMin))
 	return append(warnings, validateWatchSources(cfg.Watch.Sources)...)
 }
 
@@ -91,14 +88,7 @@ func validateRepo(repo string) string {
 
 func validateDiscordTopics(worker Worker) string {
 	if worker.SendDiscord && !worker.DryRunDiscord && len(worker.NotifyTopicsAny) == 0 {
-		return "send_discord is enabled without worker.notify_topics_any; all non-low classifier results may notify"
-	}
-	return ""
-}
-
-func validateConfidence(confidence float64) string {
-	if confidence < 0 || confidence > 1 {
-		return "worker.notify_confidence_min must be between 0 and 1"
+		return "send_discord is enabled without worker.notify_topics_any; all classifier results may notify"
 	}
 	return ""
 }

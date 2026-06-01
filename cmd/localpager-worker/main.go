@@ -59,21 +59,19 @@ func main() {
 		}
 	}
 	opts := localpager.WorkerOptions{
-		MaxConcurrency:      flags.maxConcurrency,
-		LeaseTTL:            ttl,
-		MaxAttempts:         flags.maxAttempts,
-		Limit:               flags.limit,
-		Once:                flags.once,
-		ClassifierCommand:   flags.classifierCommand,
-		Model:               flags.model,
-		DestinationRef:      flags.discordChannelID,
-		DiscordToken:        token,
-		SendDiscord:         flags.sendDiscord,
-		DryRunDiscord:       flags.dryRunDiscord,
-		PollInterval:        pollEvery,
-		NotifyTopicsAny:     cfg.Worker.NotifyTopicsAny,
-		NotifyInterestNot:   cfg.Worker.NotifyInterestNot,
-		NotifyConfidenceMin: cfg.Worker.NotifyConfidenceMin,
+		MaxConcurrency:    flags.maxConcurrency,
+		LeaseTTL:          ttl,
+		MaxAttempts:       flags.maxAttempts,
+		Limit:             flags.limit,
+		Once:              flags.once,
+		ClassifierCommand: flags.classifierCommand,
+		Model:             flags.model,
+		DestinationRef:    flags.discordChannelID,
+		DiscordToken:      token,
+		SendDiscord:       flags.sendDiscord,
+		DryRunDiscord:     flags.dryRunDiscord,
+		PollInterval:      pollEvery,
+		NotifyTopicsAny:   cfg.Worker.NotifyTopicsAny,
 	}
 	if flags.sendPendingOnly {
 		sent, err := localpager.SendPendingDiscord(ctx, pool, opts)

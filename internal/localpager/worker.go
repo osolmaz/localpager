@@ -27,21 +27,19 @@ var supportedJobTypes = map[string]bool{
 }
 
 type WorkerOptions struct {
-	MaxConcurrency      int
-	LeaseTTL            time.Duration
-	MaxAttempts         int
-	Limit               int
-	Once                bool
-	ClassifierCommand   string
-	Model               string
-	DestinationRef      string
-	DiscordToken        string
-	SendDiscord         bool
-	DryRunDiscord       bool
-	PollInterval        time.Duration
-	NotifyTopicsAny     []string
-	NotifyInterestNot   []string
-	NotifyConfidenceMin float64
+	MaxConcurrency    int
+	LeaseTTL          time.Duration
+	MaxAttempts       int
+	Limit             int
+	Once              bool
+	ClassifierCommand string
+	Model             string
+	DestinationRef    string
+	DiscordToken      string
+	SendDiscord       bool
+	DryRunDiscord     bool
+	PollInterval      time.Duration
+	NotifyTopicsAny   []string
 }
 
 type WorkerStats struct {
@@ -59,8 +57,6 @@ type ClaimedJob struct {
 
 type ClassifierOutput struct {
 	Caveats          []string `json:"caveats"`
-	Confidence       float64  `json:"confidence"`
-	Interest         string   `json:"interest"`
 	TopicsOfInterest []string `json:"topics_of_interest"`
 	Description      string   `json:"description"`
 }
@@ -363,7 +359,6 @@ func classifierResult(job ClaimedJob, opts WorkerOptions, output ClassifierOutpu
 		JobID:       job.ID,
 		JobKind:     job.JobKind,
 		OutputJSON:  outputJSON,
-		Interest:    stringPtrOrNil(output.Interest),
 		TopicsJSON:  stringPtrOrNil(string(topicsJSON)),
 		SessionPath: stringPtrOrNil(sessionPath),
 		PromptPath:  stringPtrOrNil(promptPath),

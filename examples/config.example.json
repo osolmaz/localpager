@@ -28,8 +28,6 @@
     "send_discord": false,
     "dry_run_discord": true,
     "notify_topics_any": [],
-    "notify_interest_not": ["", "none", "no", "low", "irrelevant", "i0", "false"],
-    "notify_confidence_min": 0,
     "poll_interval": "30s"
   }
 }

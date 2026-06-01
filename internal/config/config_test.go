@@ -79,16 +79,6 @@ func TestValidateWarnsWhenRepoIsPlaceholder(t *testing.T) {
 	}
 }
 
-func TestValidateWarnsWhenConfidenceIsOutOfRange(t *testing.T) {
-	for _, confidence := range []float64{-0.1, 1.1} {
-		cfg := Config{Repo: "example/repo", Worker: Worker{NotifyConfidenceMin: confidence}}
-		warnings := cfg.Validate()
-		if len(warnings) == 0 {
-			t.Fatalf("Validate() returned no warnings for confidence %v", confidence)
-		}
-	}
-}
-
 func TestValidateWarnsOnUnsupportedWatchSource(t *testing.T) {
 	cfg := Config{Repo: "example/repo", Watch: Watch{Sources: []string{"gitcrawl", "unknown"}}}
 	warnings := cfg.Validate()

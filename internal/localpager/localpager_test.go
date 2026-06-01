@@ -749,7 +749,7 @@ func TestLiveLocalModelResultCreatesDryRunNotification(t *testing.T) {
 set -euo pipefail
 echo 'prompt: /tmp/test.prompt.txt' >&2
 cat <<'JSON'
-{"caveats":[],"confidence":0.99,"interest":"i1","topics_of_interest":["local_models"],"description":"Local model related change."}
+{"caveats":[],"topics_of_interest":["local_models"],"description":"Local model related change."}
 JSON
 `), 0o755); err != nil {
 		t.Fatal(err)
@@ -811,7 +811,7 @@ func TestSourceSuppressionSuppressesPendingNotification(t *testing.T) {
 	if err := os.WriteFile(classifier, []byte(`#!/usr/bin/env bash
 set -euo pipefail
 cat <<'JSON'
-{"caveats":[],"confidence":0.99,"interest":"i1","topics_of_interest":["local_models"],"description":"Local model related change."}
+{"caveats":[],"topics_of_interest":["local_models"],"description":"Local model related change."}
 JSON
 `), 0o755); err != nil {
 		t.Fatal(err)
@@ -894,7 +894,7 @@ case "$1" in
     ;;
 esac
 cat <<'JSON'
-{"caveats":[],"confidence":0.99,"interest":"i4","topics_of_interest":[],"description":"not interesting"}
+{"caveats":[],"topics_of_interest":[],"description":"not interesting"}
 JSON
 `, "__LOG__", logPath)
 	if err := os.WriteFile(classifier, []byte(script), 0o755); err != nil {
@@ -1240,26 +1240,21 @@ func TestSendPendingDiscordDrainsMultipleBatches(t *testing.T) {
 	}
 }
 
-func TestShouldNotifyDefaultsToInterestGate(t *testing.T) {
+func TestShouldNotifyDefaultsToNotifyWithoutTopicGate(t *testing.T) {
 	cases := []struct {
 		name string
 		out  ClassifierOutput
 		want bool
 	}{
 		{
-			name: "high interest notifies",
-			out:  ClassifierOutput{Interest: "high", TopicsOfInterest: []string{"bug"}},
+			name: "topic notifies",
+			out:  ClassifierOutput{TopicsOfInterest: []string{"bug"}},
 			want: true,
 		},
 		{
-			name: "low interest does not notify",
-			out:  ClassifierOutput{Interest: "low", TopicsOfInterest: []string{"bug"}},
-			want: false,
-		},
-		{
-			name: "empty interest does not notify",
-			out:  ClassifierOutput{Interest: "", TopicsOfInterest: []string{"bug"}},
-			want: false,
+			name: "empty topics still notify without topic gate",
+			out:  ClassifierOutput{TopicsOfInterest: []string{}},
+			want: true,
 		},
 	}
 	for _, tc := range cases {
@@ -1286,32 +1281,32 @@ func TestShouldNotifyCanRequireConfiguredTopics(t *testing.T) {
 	}{
 		{
 			name: "local model topic",
-			out:  ClassifierOutput{Interest: "i4", TopicsOfInterest: []string{"local_models"}},
+			out:  ClassifierOutput{TopicsOfInterest: []string{"local_models"}},
 			want: true,
 		},
 		{
 			name: "acpx topic",
-			out:  ClassifierOutput{Interest: "i4", TopicsOfInterest: []string{"acpx"}},
+			out:  ClassifierOutput{TopicsOfInterest: []string{"acpx"}},
 			want: true,
 		},
 		{
 			name: "model serving alone is not enough",
-			out:  ClassifierOutput{Interest: "i0", TopicsOfInterest: []string{"model_serving", "codex", "auth_identity"}},
+			out:  ClassifierOutput{TopicsOfInterest: []string{"model_serving", "codex", "auth_identity"}},
 			want: false,
 		},
 		{
 			name: "model serving with local model topic notifies",
-			out:  ClassifierOutput{Interest: "i1", TopicsOfInterest: []string{"model_serving", "local_models"}},
+			out:  ClassifierOutput{TopicsOfInterest: []string{"model_serving", "local_models"}},
 			want: true,
 		},
 		{
-			name: "i0 coding agent topic is not enough",
-			out:  ClassifierOutput{Interest: "i0", TopicsOfInterest: []string{"coding_agents", "codex"}},
+			name: "coding agent topic is not enough",
+			out:  ClassifierOutput{TopicsOfInterest: []string{"coding_agents", "codex"}},
 			want: false,
 		},
 		{
-			name: "i0 without matching topics is not enough",
-			out:  ClassifierOutput{Interest: "i0", TopicsOfInterest: []string{}},
+			name: "empty topics is not enough",
+			out:  ClassifierOutput{TopicsOfInterest: []string{}},
 			want: false,
 		},
 	}
@@ -1324,11 +1319,9 @@ func TestShouldNotifyCanRequireConfiguredTopics(t *testing.T) {
 	}
 }
 
-func TestShouldNotifyHonorsConfidenceAndInterestPolicy(t *testing.T) {
+func TestShouldNotifyHonorsTopicPolicy(t *testing.T) {
 	opts := WorkerOptions{
-		NotifyTopicsAny:     []string{"local_models"},
-		NotifyInterestNot:   []string{"none", "low"},
-		NotifyConfidenceMin: 0.75,
+		NotifyTopicsAny: []string{"local_models"},
 	}
 	cases := []struct {
 		name string
@@ -1336,18 +1329,13 @@ func TestShouldNotifyHonorsConfidenceAndInterestPolicy(t *testing.T) {
 		want bool
 	}{
 		{
-			name: "matching topic and confidence notifies",
-			out:  ClassifierOutput{Interest: "high", Confidence: 0.9, TopicsOfInterest: []string{"local_models"}},
+			name: "matching topic notifies",
+			out:  ClassifierOutput{TopicsOfInterest: []string{"local_models"}},
 			want: true,
 		},
 		{
-			name: "low confidence suppresses",
-			out:  ClassifierOutput{Interest: "high", Confidence: 0.5, TopicsOfInterest: []string{"local_models"}},
-			want: false,
-		},
-		{
-			name: "blocked interest suppresses",
-			out:  ClassifierOutput{Interest: "none", Confidence: 0.9, TopicsOfInterest: []string{"local_models"}},
+			name: "non-matching topic suppresses",
+			out:  ClassifierOutput{TopicsOfInterest: []string{"agent_runtime"}},
 			want: false,
 		},
 	}
@@ -1450,7 +1438,7 @@ if [[ "$1" != "example/repo#80568" ]]; then
   exit 7
 fi
 cat <<'JSON'
-{"caveats":[],"confidence":0.99,"interest":"i1","topics_of_interest":["local_models"],"description":"Local model related change."}
+{"caveats":[],"topics_of_interest":["local_models"],"description":"Local model related change."}
 JSON
 `), 0o755); err != nil {
 		t.Fatal(err)
@@ -1479,7 +1467,7 @@ set -euo pipefail
 echo "prompt: %s" >&2
 echo "session: %s" >&2
 cat <<'JSON'
-{"caveats":[],"confidence":0.99,"interest":"i1","topics_of_interest":["local_models"],"description":"Local model related change."}
+{"caveats":[],"topics_of_interest":["local_models"],"description":"Local model related change."}
 JSON
 `, filepath.Join(dir, "prompt.txt"), sessionPath)), 0o755); err != nil {
 		t.Fatal(err)
@@ -1539,7 +1527,7 @@ func TestStaleLeaseDoesNotFinalizeResult(t *testing.T) {
 	classifier := filepath.Join(dir, "classifier.sh")
 	if err := os.WriteFile(classifier, []byte(`#!/usr/bin/env bash
 cat <<'JSON'
-{"caveats":[],"confidence":0.99,"interest":"i1","topics_of_interest":["local_models"],"description":"Local model related change."}
+{"caveats":[],"topics_of_interest":["local_models"],"description":"Local model related change."}
 JSON
 `), 0o755); err != nil {
 		t.Fatal(err)
@@ -1621,7 +1609,7 @@ func TestSupersededRunningJobDoesNotFinalizeResult(t *testing.T) {
 	classifier := filepath.Join(dir, "classifier.sh")
 	if err := os.WriteFile(classifier, []byte(`#!/usr/bin/env bash
 cat <<'JSON'
-{"caveats":[],"confidence":0.99,"interest":"i1","topics_of_interest":["local_models"],"description":"Local model related change."}
+{"caveats":[],"topics_of_interest":["local_models"],"description":"Local model related change."}
 JSON
 `), 0o755); err != nil {
 		t.Fatal(err)
