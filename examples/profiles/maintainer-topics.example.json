@@ -1,0 +1,20 @@
+{
+  "topics": [
+    {
+      "id": "build_system",
+      "description": "Build, packaging, release, or deployment workflow changes."
+    },
+    {
+      "id": "runtime_reliability",
+      "description": "Crashes, hangs, timeouts, retries, or reliability behavior."
+    },
+    {
+      "id": "security",
+      "description": "Authentication, authorization, sandboxing, secrets, or trust boundaries."
+    },
+    {
+      "id": "docs",
+      "description": "User documentation, reference material, or examples."
+    }
+  ]
+}

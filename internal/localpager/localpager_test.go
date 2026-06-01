@@ -1540,6 +1540,60 @@ JSON
 	}
 }
 
+func TestClassifierPassesProfileArguments(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fixture is POSIX-only")
+	}
+	ctx := context.Background()
+	dir := t.TempDir()
+	argsPath := filepath.Join(dir, "args.txt")
+	classifier := filepath.Join(dir, "classifier.sh")
+	script := strings.ReplaceAll(`#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$@" > __ARGS__
+cat <<'JSON'
+{"caveats":[],"topics_of_interest":["local_models"],"description":"Local model related change."}
+JSON
+`, "__ARGS__", argsPath)
+	if err := os.WriteFile(classifier, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, _, err := runClassifier(ctx, ClaimedJob{
+		Item: Item{
+			SourceURL: stringPtr("https://github.com/example/repo/pull/1"),
+			SourceRef: "example/repo#1",
+		},
+	}, WorkerOptions{
+		ClassifierCommand:        classifier,
+		ClassifierSchema:         "/tmp/schema.json",
+		ClassifierPromptTemplate: "/tmp/prompt.md",
+		ClassifierTopicTaxonomy:  "/tmp/topics.json",
+		Model:                    "test-model",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Join([]string{
+		"https://github.com/example/repo/pull/1",
+		"--model",
+		"test-model",
+		"--schema",
+		"/tmp/schema.json",
+		"--prompt-template",
+		"/tmp/prompt.md",
+		"--topic-taxonomy",
+		"/tmp/topics.json",
+		"",
+	}, "\n")
+	if string(args) != want {
+		t.Fatalf("args = %q, want %q", string(args), want)
+	}
+}
+
 func TestClassifierUsesEmittedSessionPath(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell script fixture is POSIX-only")

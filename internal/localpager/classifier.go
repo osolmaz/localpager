@@ -23,6 +23,15 @@ func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (Cla
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
 	}
+	if opts.ClassifierSchema != "" {
+		args = append(args, "--schema", opts.ClassifierSchema)
+	}
+	if opts.ClassifierPromptTemplate != "" {
+		args = append(args, "--prompt-template", opts.ClassifierPromptTemplate)
+	}
+	if opts.ClassifierTopicTaxonomy != "" {
+		args = append(args, "--topic-taxonomy", opts.ClassifierTopicTaxonomy)
+	}
 	jobCtx, cancel, err := classifierContext(ctx, job)
 	if err != nil {
 		return ClassifierOutput{}, "", "", "", err

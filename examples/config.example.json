@@ -17,6 +17,11 @@
     "interval": "1m",
     "limit": 100
   },
+  "classifier": {
+    "schema": "./schemas/classification.schema.json",
+    "prompt_template": "./prompts/github-relevance-classifier.md",
+    "topic_taxonomy": "./examples/profiles/maintainer-topics.example.json"
+  },
   "worker": {
     "max_concurrency": 2,
     "lease_ttl": "30m",

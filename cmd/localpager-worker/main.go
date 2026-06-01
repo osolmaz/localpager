@@ -22,6 +22,9 @@ func main() {
 	flag.IntVar(&flags.limit, "limit", 0, "maximum jobs to process")
 	flag.BoolVar(&flags.once, "once", false, "process current work and exit")
 	flag.StringVar(&flags.classifierCommand, "classifier-command", localpager.DefaultClassifierCommand, "classifier wrapper command")
+	flag.StringVar(&flags.classifierSchema, "classifier-schema", "", "classifier JSON schema path")
+	flag.StringVar(&flags.classifierPromptTemplate, "classifier-prompt-template", "", "classifier prompt template path")
+	flag.StringVar(&flags.classifierTopicTaxonomy, "classifier-topic-taxonomy", "", "classifier topic taxonomy path")
 	flag.StringVar(&flags.model, "model", "", "optional localpager-agent model override")
 	flag.StringVar(&flags.discordChannelID, "discord-channel-id", os.Getenv("DISCORD_CHANNEL_ID"), "Discord channel for notifications")
 	flag.StringVar(&flags.discordTokenEnv, "discord-token-env", "DISCORD_BOT_TOKEN", "environment variable containing Discord bot token")
@@ -59,19 +62,22 @@ func main() {
 		}
 	}
 	opts := localpager.WorkerOptions{
-		MaxConcurrency:    flags.maxConcurrency,
-		LeaseTTL:          ttl,
-		MaxAttempts:       flags.maxAttempts,
-		Limit:             flags.limit,
-		Once:              flags.once,
-		ClassifierCommand: flags.classifierCommand,
-		Model:             flags.model,
-		DestinationRef:    flags.discordChannelID,
-		DiscordToken:      token,
-		SendDiscord:       flags.sendDiscord,
-		DryRunDiscord:     flags.dryRunDiscord,
-		PollInterval:      pollEvery,
-		NotifyTopicsAny:   cfg.Worker.NotifyTopicsAny,
+		MaxConcurrency:           flags.maxConcurrency,
+		LeaseTTL:                 ttl,
+		MaxAttempts:              flags.maxAttempts,
+		Limit:                    flags.limit,
+		Once:                     flags.once,
+		ClassifierCommand:        flags.classifierCommand,
+		ClassifierSchema:         flags.classifierSchema,
+		ClassifierPromptTemplate: flags.classifierPromptTemplate,
+		ClassifierTopicTaxonomy:  flags.classifierTopicTaxonomy,
+		Model:                    flags.model,
+		DestinationRef:           flags.discordChannelID,
+		DiscordToken:             token,
+		SendDiscord:              flags.sendDiscord,
+		DryRunDiscord:            flags.dryRunDiscord,
+		PollInterval:             pollEvery,
+		NotifyTopicsAny:          cfg.Worker.NotifyTopicsAny,
 	}
 	if flags.sendPendingOnly {
 		sent, err := localpager.SendPendingDiscord(ctx, pool, opts)
@@ -89,21 +95,24 @@ func main() {
 }
 
 type workerFlags struct {
-	configPath        string
-	dbPath            string
-	maxConcurrency    int
-	leaseTTL          string
-	maxAttempts       int
-	limit             int
-	once              bool
-	classifierCommand string
-	model             string
-	discordChannelID  string
-	discordTokenEnv   string
-	sendDiscord       bool
-	dryRunDiscord     bool
-	sendPendingOnly   bool
-	pollInterval      string
+	configPath               string
+	dbPath                   string
+	maxConcurrency           int
+	leaseTTL                 string
+	maxAttempts              int
+	limit                    int
+	once                     bool
+	classifierCommand        string
+	classifierSchema         string
+	classifierPromptTemplate string
+	classifierTopicTaxonomy  string
+	model                    string
+	discordChannelID         string
+	discordTokenEnv          string
+	sendDiscord              bool
+	dryRunDiscord            bool
+	sendPendingOnly          bool
+	pollInterval             string
 }
 
 func (flags *workerFlags) applyConfig(cfg config.Config, setFlags map[string]bool) {
@@ -139,6 +148,15 @@ func (flags *workerFlags) applyCoreConfig(cfg config.Config, setFlags map[string
 func (flags *workerFlags) applyClassifierConfig(cfg config.Config, setFlags map[string]bool) {
 	if cfg.Worker.ClassifierCommand != "" && !config.FlagSet(setFlags, "classifier-command") {
 		flags.classifierCommand = cfg.Worker.ClassifierCommand
+	}
+	if cfg.Classifier.Schema != "" && !config.FlagSet(setFlags, "classifier-schema") {
+		flags.classifierSchema = cfg.Classifier.Schema
+	}
+	if cfg.Classifier.PromptTemplate != "" && !config.FlagSet(setFlags, "classifier-prompt-template") {
+		flags.classifierPromptTemplate = cfg.Classifier.PromptTemplate
+	}
+	if cfg.Classifier.TopicTaxonomy != "" && !config.FlagSet(setFlags, "classifier-topic-taxonomy") {
+		flags.classifierTopicTaxonomy = cfg.Classifier.TopicTaxonomy
 	}
 	if cfg.Worker.Model != "" && !config.FlagSet(setFlags, "model") {
 		flags.model = cfg.Worker.Model

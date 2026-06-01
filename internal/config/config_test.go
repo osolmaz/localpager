@@ -8,7 +8,7 @@ import (
 
 func TestLoadReadsConfigFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"repo":"example/repo","worker":{"send_discord":true,"notify_topics_any":["local_models"]}}`), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"repo":"example/repo","classifier":{"schema":"schema.json","prompt_template":"prompt.md","topic_taxonomy":"topics.json"},"worker":{"send_discord":true,"notify_topics_any":["local_models"]}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load(path)
@@ -20,6 +20,15 @@ func TestLoadReadsConfigFile(t *testing.T) {
 	}
 	if len(cfg.Worker.NotifyTopicsAny) != 1 || cfg.Worker.NotifyTopicsAny[0] != "local_models" {
 		t.Fatalf("NotifyTopicsAny = %v", cfg.Worker.NotifyTopicsAny)
+	}
+	if cfg.Classifier.Schema != "schema.json" {
+		t.Fatalf("Classifier.Schema = %q, want schema.json", cfg.Classifier.Schema)
+	}
+	if cfg.Classifier.PromptTemplate != "prompt.md" {
+		t.Fatalf("Classifier.PromptTemplate = %q, want prompt.md", cfg.Classifier.PromptTemplate)
+	}
+	if cfg.Classifier.TopicTaxonomy != "topics.json" {
+		t.Fatalf("Classifier.TopicTaxonomy = %q, want topics.json", cfg.Classifier.TopicTaxonomy)
 	}
 }
 

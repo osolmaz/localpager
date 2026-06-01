@@ -3,11 +3,12 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 agent_dir="$root/localpager-agent"
-schema="$root/schemas/classification.schema.json"
-prompt_template="$root/prompts/github-relevance-classifier.md"
+schema="${LOCALPAGER_CLASSIFIER_SCHEMA:-$root/schemas/classification.schema.json}"
+prompt_template="${LOCALPAGER_CLASSIFIER_PROMPT_TEMPLATE:-$root/prompts/github-relevance-classifier.md}"
+topic_taxonomy="${LOCALPAGER_CLASSIFIER_TOPIC_TAXONOMY:-}"
 
 if [[ $# -lt 1 ]]; then
-  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>]" >&2
+  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>] [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>]" >&2
   exit 2
 fi
 
@@ -25,12 +26,50 @@ while [[ $# -gt 0 ]]; do
       model="$2"
       shift 2
       ;;
+    --schema)
+      if [[ $# -lt 2 ]]; then
+        echo "--schema requires a value" >&2
+        exit 2
+      fi
+      schema="$2"
+      shift 2
+      ;;
+    --prompt-template)
+      if [[ $# -lt 2 ]]; then
+        echo "--prompt-template requires a value" >&2
+        exit 2
+      fi
+      prompt_template="$2"
+      shift 2
+      ;;
+    --topic-taxonomy)
+      if [[ $# -lt 2 ]]; then
+        echo "--topic-taxonomy requires a value" >&2
+        exit 2
+      fi
+      topic_taxonomy="$2"
+      shift 2
+      ;;
     *)
       echo "unsupported classifier argument: $1" >&2
       exit 2
       ;;
   esac
 done
+
+expand_path() {
+  case "$1" in
+    "~") printf '%s\n' "${HOME:-}" ;;
+    "~/"*) printf '%s/%s\n' "${HOME:-}" "${1#~/}" ;;
+    *) printf '%s\n' "$1" ;;
+  esac
+}
+
+schema="$(expand_path "$schema")"
+prompt_template="$(expand_path "$prompt_template")"
+if [[ -n "$topic_taxonomy" ]]; then
+  topic_taxonomy="$(expand_path "$topic_taxonomy")"
+fi
 
 if [[ ! -f "$prompt_template" ]]; then
   echo "missing prompt template: $prompt_template" >&2
@@ -46,14 +85,25 @@ if [[ ! -d "$agent_dir/node_modules" ]]; then
 fi
 
 state_dir="${LOCALPAGER_CLASSIFIER_STATE_DIR:-${HOME:-/tmp}/.local/state/localpager/classifier}"
-mkdir -p "$state_dir/prompts"
+mkdir -p "$state_dir/prompts" "$state_dir/schemas"
 prompt_path="$state_dir/prompts/$(date -u +%Y%m%dT%H%M%SZ)-$$.md"
+schema_path="$state_dir/schemas/$(date -u +%Y%m%dT%H%M%SZ)-$$.json"
 
-while IFS= read -r line || [[ -n "$line" ]]; do
-  printf '%s\n' "${line//__TARGET__/$target}"
-done <"$prompt_template" >"$prompt_path"
+render_args=(
+  "$root/scripts/localpager-render-profile.mjs"
+  --target "$target"
+  --schema "$schema"
+  --prompt-template "$prompt_template"
+  --output-schema "$schema_path"
+  --output-prompt "$prompt_path"
+)
+if [[ -n "$topic_taxonomy" ]]; then
+  render_args+=(--topic-taxonomy "$topic_taxonomy")
+fi
+node "${render_args[@]}"
 
 echo "prompt: $prompt_path" >&2
+echo "schema: $schema_path" >&2
 
 stderr_path="$(mktemp)"
 stdout_path="$(mktemp)"
@@ -65,7 +115,7 @@ trap cleanup EXIT
 set +e
 npm --prefix "$agent_dir" run -s localpager-agent -- \
   --model "$model" \
-  --final-schema "$schema" \
+  --final-schema "$schema_path" \
   -p "$(cat "$prompt_path")" >"$stdout_path" 2>"$stderr_path"
 status=$?
 set -e
@@ -90,8 +140,9 @@ fallback_prompt_path="$state_dir/prompts/$(date -u +%Y%m%dT%H%M%SZ)-$$-retry.md"
 } >"$fallback_prompt_path"
 
 echo "prompt: $fallback_prompt_path" >&2
+echo "schema: $schema_path" >&2
 
 npm --prefix "$agent_dir" run -s localpager-agent -- \
   --model "$model" \
-  --final-schema "$schema" \
+  --final-schema "$schema_path" \
   -p "$(cat "$fallback_prompt_path")"

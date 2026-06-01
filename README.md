@@ -48,6 +48,11 @@ Notification policy is deployment config, not classifier logic:
 
 ```json
 {
+  "classifier": {
+    "schema": "~/.config/localpager/classification.schema.json",
+    "prompt_template": "~/.config/localpager/classifier.prompt.md",
+    "topic_taxonomy": "~/.config/localpager/topics.json"
+  },
   "worker": {
     "notify_topics_any": ["local_models", "open_weight_models"]
   }
@@ -59,6 +64,8 @@ notification is created.
 
 Classifier prompts, topic taxonomies, and schemas should be configured as a
 deployment profile. See [Classifier Profiles](docs/2026-06-01-classifier-profiles.md).
+When `classifier.topic_taxonomy` is set, `localpager-classifier` generates a
+runtime schema that rejects topics outside that taxonomy.
 
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:

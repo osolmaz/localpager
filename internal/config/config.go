@@ -8,19 +8,20 @@ import (
 )
 
 type Config struct {
-	Repo             string  `json:"repo"`
-	DBPath           string  `json:"db"`
-	GitcrawlDBPath   string  `json:"gitcrawl_db"`
-	GitHubBaseURL    string  `json:"github_base_url"`
-	GitHubTokenEnv   string  `json:"github_token_env"`
-	SourceType       string  `json:"source_type"`
-	ProcessorName    string  `json:"processor_name"`
-	ProcessorVersion string  `json:"processor_version"`
-	RecentWindow     string  `json:"recent_window"`
-	CutoverAt        string  `json:"cutover_at"`
-	Enqueue          Enqueue `json:"enqueue"`
-	Watch            Watch   `json:"watch"`
-	Worker           Worker  `json:"worker"`
+	Repo             string     `json:"repo"`
+	DBPath           string     `json:"db"`
+	GitcrawlDBPath   string     `json:"gitcrawl_db"`
+	GitHubBaseURL    string     `json:"github_base_url"`
+	GitHubTokenEnv   string     `json:"github_token_env"`
+	SourceType       string     `json:"source_type"`
+	ProcessorName    string     `json:"processor_name"`
+	ProcessorVersion string     `json:"processor_version"`
+	RecentWindow     string     `json:"recent_window"`
+	CutoverAt        string     `json:"cutover_at"`
+	Enqueue          Enqueue    `json:"enqueue"`
+	Watch            Watch      `json:"watch"`
+	Classifier       Classifier `json:"classifier"`
+	Worker           Worker     `json:"worker"`
 }
 
 type Enqueue struct {
@@ -33,6 +34,12 @@ type Watch struct {
 	Interval string   `json:"interval"`
 	Once     bool     `json:"once"`
 	Limit    int      `json:"limit"`
+}
+
+type Classifier struct {
+	Schema         string `json:"schema"`
+	PromptTemplate string `json:"prompt_template"`
+	TopicTaxonomy  string `json:"topic_taxonomy"`
 }
 
 type Worker struct {

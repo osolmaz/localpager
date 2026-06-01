@@ -27,19 +27,22 @@ var supportedJobTypes = map[string]bool{
 }
 
 type WorkerOptions struct {
-	MaxConcurrency    int
-	LeaseTTL          time.Duration
-	MaxAttempts       int
-	Limit             int
-	Once              bool
-	ClassifierCommand string
-	Model             string
-	DestinationRef    string
-	DiscordToken      string
-	SendDiscord       bool
-	DryRunDiscord     bool
-	PollInterval      time.Duration
-	NotifyTopicsAny   []string
+	MaxConcurrency           int
+	LeaseTTL                 time.Duration
+	MaxAttempts              int
+	Limit                    int
+	Once                     bool
+	ClassifierCommand        string
+	ClassifierSchema         string
+	ClassifierPromptTemplate string
+	ClassifierTopicTaxonomy  string
+	Model                    string
+	DestinationRef           string
+	DiscordToken             string
+	SendDiscord              bool
+	DryRunDiscord            bool
+	PollInterval             time.Duration
+	NotifyTopicsAny          []string
 }
 
 type WorkerStats struct {
