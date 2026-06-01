@@ -18,7 +18,7 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-const DefaultClassifierCommand = "localpager-classifier"
+const DefaultClassifierCommand = "./scripts/localpager-classifier"
 const fallbackClassifierModel = "gemma-4-e4b-it"
 const pendingDiscordBatchSize = 10
 

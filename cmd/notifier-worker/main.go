@@ -34,7 +34,7 @@ func main() {
 	flag.IntVar(&limit, "limit", 0, "maximum jobs to process")
 	flag.BoolVar(&once, "once", false, "process current work and exit")
 	flag.StringVar(&classifierCommand, "classifier-command", notifier.DefaultClassifierCommand, "classifier wrapper command")
-	flag.StringVar(&model, "model", "", "optional localagent model override")
+	flag.StringVar(&model, "model", "", "optional localpager-agent model override")
 	flag.StringVar(&discordChannelID, "discord-channel-id", os.Getenv("DISCORD_CHANNEL_ID"), "Discord channel for notifications")
 	flag.StringVar(&discordTokenEnv, "discord-token-env", "DISCORD_BOT_TOKEN", "environment variable containing Discord bot token")
 	flag.BoolVar(&sendDiscord, "send-discord", false, "send pending Discord notifications")

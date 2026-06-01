@@ -7,9 +7,9 @@ structured result, and sends matching notifications to Discord.
 
 This repository is an early extraction of a working notifier prototype. The
 current code is still intentionally small: it provides the worker, queue,
-gitcrawl source adapter, classifier command boundary, SQLite state, and Discord
-delivery. The next step is a config-driven `localpager` CLI and direct GitHub API
-source support.
+gitcrawl source adapter, classifier command boundary, SQLite state, Discord
+delivery, and a bundled local model runner in `localpager-agent/`. The next step
+is a config-driven `localpager` CLI and direct GitHub API source support.
 
 ## Current Commands
 
@@ -22,9 +22,18 @@ cmd/notifier-worker          run classifier jobs and send notifications
 
 ## Classifier Contract
 
-The worker runs an external classifier command. The command receives one target
-argument, usually a GitHub URL or `owner/repo#number`, and must print one JSON
-object to stdout:
+The worker runs a classifier command. By default it uses:
+
+```text
+./scripts/localpager-classifier
+```
+
+That wrapper calls `localpager-agent`, which points Pi at a local
+OpenAI-compatible model endpoint and forces the final answer through
+`schemas/classification.schema.json`.
+
+The classifier command receives one target argument, usually a GitHub URL or
+`owner/repo#number`, and must print one JSON object to stdout:
 
 ```json
 {
@@ -51,8 +60,15 @@ session: /path/to/session.jsonl
 ## Local Run
 
 ```bash
+npm install --prefix localpager-agent
 go test ./...
 go run ./cmd/notifier-worker --once --dry-run-discord
+```
+
+Check the bundled agent:
+
+```bash
+npm --prefix localpager-agent run localpager-agent -- --status
 ```
 
 To send Discord messages, pass a channel ID and set a bot token:
@@ -67,6 +83,26 @@ go run ./cmd/notifier-worker \
 
 Do not commit tokens, `.env` files, SQLite databases, classifier sessions, or
 prompt logs.
+
+## Localpager Agent
+
+`localpager-agent/` is the absorbed local model runner formerly used as an
+external command. It defaults to LM Studio's OpenAI-compatible endpoint:
+
+```text
+http://127.0.0.1:1234/v1
+```
+
+The main environment variables are:
+
+```text
+LOCALPAGER_AGENT_BASE_URL
+LOCALPAGER_AGENT_MODEL
+LOCALPAGER_AGENT_STATE_DIR
+LOCALPAGER_AGENT_SESSION_DIR
+LOCALPAGER_AGENT_PI_CMD
+LOCALPAGER_AGENT_FINAL_SCHEMA
+```
 
 ## gitcrawl Source
 

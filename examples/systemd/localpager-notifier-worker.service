@@ -9,7 +9,7 @@ Environment=HOME=%h
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=%h/.config/localpager/localpager.env
 WorkingDirectory=%h/repos/localpager
-ExecStart=/usr/bin/env go run ./cmd/notifier-worker --max-concurrency 2 --classifier-command %h/.local/bin/localpager-classifier --send-discord
+ExecStart=/usr/bin/env go run ./cmd/notifier-worker --max-concurrency 2 --classifier-command ./scripts/localpager-classifier --send-discord
 Restart=always
 RestartSec=30s
 TimeoutStartSec=2m
@@ -20,4 +20,3 @@ MemoryHigh=4G
 
 [Install]
 WantedBy=default.target
-
