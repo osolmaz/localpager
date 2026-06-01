@@ -5,6 +5,18 @@ Classify one GitHub issue or pull request for a maintainer notification system.
 Return only the final structured JSON required by the configured schema. Do not
 write prose, markdown, analysis, or extra fields.
 
+The JSON object must always include exactly these top-level fields:
+
+```json
+{
+  "topics_of_interest": [],
+  "description": "One concise evidence-backed sentence.",
+  "caveats": []
+}
+```
+
+Do not omit `description` or `caveats`, even when there are no matching topics.
+
 ## Target
 
 `__TARGET__`

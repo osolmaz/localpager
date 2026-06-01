@@ -602,6 +602,36 @@ not. The current runtime fields are:
 }
 ```
 
+## Localpager DS4 Verification
+
+The Localpager translation was checked against DS4 without loading LM Studio at
+the same time. The machine guardrail is: stop LM Studio/Gemma first, then verify
+that only `ds4-server` remains in GPU compute apps.
+
+The direct `scripts/localpager-experiment.mjs` path reaches DS4, but DS4 may not
+honor OpenAI `response_format` strictly enough on that route. For DS4, the
+production-equivalent verification is the classifier wrapper path:
+
+```bash
+LOCALPAGER_AGENT_BASE_URL=http://127.0.0.1:8000/v1 \
+LOCALPAGER_AGENT_MODEL=deepseek-v4-pro \
+LOCALPAGER_AGENT_CONTEXT_WINDOW=32768 \
+LOCALPAGER_AGENT_MAX_TOKENS=768 \
+scripts/localpager-classifier <github-url> \
+  --model deepseek-v4-pro \
+  --schema schemas/classification.schema.json \
+  --prompt-template examples/profiles/repo-routing.prompt.md \
+  --topic-taxonomy examples/profiles/repo-routing-topics.json \
+  --github-context-file <rendered-context.md>
+```
+
+That path uses `localpager-agent` final-schema output, matching the original DS4
+dataset workflow more closely than a raw chat-completions call. A one-PR smoke
+run against `openclaw/openclaw#88504` returned valid JSON with
+`topics_of_interest`, `description`, and `caveats`, proving the Localpager
+profile can run through DS4 with injected GitHub context and a strict runtime
+topic enum.
+
 ## Reproduction Checklist
 
 To reproduce this style of local dataset creation for another repo:

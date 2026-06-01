@@ -122,3 +122,52 @@ node scripts/localpager-experiment.mjs \
 That produced a valid target output for one live PR. The comparison score was
 not meaningful because the reference side was the mock classifier, but the model
 call, structured JSON parse, runtime topic enum, and validator path all worked.
+
+## DS4 Final-Schema Verification
+
+Do not keep DS4 and LM Studio loaded at the same time on the local machine. DS4
+uses the large DeepSeek model on port `8000`; LM Studio commonly serves Gemma on
+port `1234`. Before DS4 verification, stop LM Studio and verify that only DS4 is
+resident:
+
+```bash
+lms server stop
+nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv,noheader
+```
+
+The direct experiment runner uses OpenAI `response_format`. The local DS4 server
+can still return incomplete or prose-prefixed content on that route, so the
+production-style DS4 verification should use `localpager-classifier`, which goes
+through `localpager-agent` and the final-schema path.
+
+Verified command shape:
+
+```bash
+LOCALPAGER_AGENT_BASE_URL=http://127.0.0.1:8000/v1 \
+LOCALPAGER_AGENT_MODEL=deepseek-v4-pro \
+LOCALPAGER_AGENT_CONTEXT_WINDOW=32768 \
+LOCALPAGER_AGENT_MAX_TOKENS=768 \
+LOCALPAGER_AGENT_TIMEOUT_MS=10000 \
+scripts/localpager-classifier https://github.com/openclaw/openclaw/pull/88504 \
+  --model deepseek-v4-pro \
+  --schema schemas/classification.schema.json \
+  --prompt-template examples/profiles/repo-routing.prompt.md \
+  --topic-taxonomy examples/profiles/repo-routing-topics.json \
+  --github-context-file /tmp/localpager-experiment-ds4-smoke/contexts/001-pull_request-88504.md
+```
+
+Result:
+
+```json
+{
+  "topics_of_interest": ["api_surface"],
+  "description": "This PR adds a multi-slot memory role config/plugin API contract and wiring through schema, types, validation, plugin activation, and runtime resolution.",
+  "caveats": [
+    "The PR body proof is stale.",
+    "The memory role-slot taxonomy and migration semantics need explicit maintainer approval before merge."
+  ]
+}
+```
+
+This verifies that Localpager can send a rendered GitHub context plus runtime
+topic enum to DS4 and receive schema-valid final JSON without loading Gemma.
