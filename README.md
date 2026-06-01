@@ -79,6 +79,8 @@ runtime schema that rejects topics outside that taxonomy.
 Before the classifier runs, Localpager renders GitHub context into the prompt:
 stored title/body/labels plus optional comments, changed files, and selected PR
 diff. Prompt templates can include that block with `__GITHUB_CONTEXT__`.
+For the local DS4 dataset and Gemma 4 prompt-optimization history that informed
+this design, see [DS4 Dataset and Gemma Prompt Optimization](docs/2026-06-01-ds4-dataset-gemma-prompt-optimization.md).
 
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:
