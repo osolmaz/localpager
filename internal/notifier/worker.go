@@ -30,19 +30,21 @@ var supportedJobTypes = map[string]bool{
 }
 
 type WorkerOptions struct {
-	MaxConcurrency    int
-	LeaseTTL          time.Duration
-	MaxAttempts       int
-	Limit             int
-	Once              bool
-	ClassifierCommand string
-	Model             string
-	DestinationRef    string
-	DiscordToken      string
-	SendDiscord       bool
-	DryRunDiscord     bool
-	PollInterval      time.Duration
-	NotifyTopicsAny   []string
+	MaxConcurrency      int
+	LeaseTTL            time.Duration
+	MaxAttempts         int
+	Limit               int
+	Once                bool
+	ClassifierCommand   string
+	Model               string
+	DestinationRef      string
+	DiscordToken        string
+	SendDiscord         bool
+	DryRunDiscord       bool
+	PollInterval        time.Duration
+	NotifyTopicsAny     []string
+	NotifyInterestNot   []string
+	NotifyConfidenceMin float64
 }
 
 type WorkerStats struct {
@@ -541,6 +543,12 @@ func skipClaimedJobIfSuperseded(ctx context.Context, tx *gorm.DB, job ClaimedJob
 }
 
 func shouldNotify(output ClassifierOutput, opts WorkerOptions) bool {
+	if opts.NotifyConfidenceMin > 0 && output.Confidence < opts.NotifyConfidenceMin {
+		return false
+	}
+	if interestBlocked(output.Interest, opts.NotifyInterestNot) {
+		return false
+	}
 	if len(opts.NotifyTopicsAny) > 0 {
 		allowed := map[string]bool{}
 		for _, topic := range opts.NotifyTopicsAny {
@@ -564,6 +572,24 @@ func shouldNotify(output ClassifierOutput, opts WorkerOptions) bool {
 	default:
 		return true
 	}
+}
+
+func interestBlocked(interest string, blocked []string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(interest))
+	if len(blocked) == 0 {
+		switch normalized {
+		case "", "none", "no", "low", "irrelevant", "i0", "false":
+			return true
+		default:
+			return false
+		}
+	}
+	for _, value := range blocked {
+		if normalized == strings.ToLower(strings.TrimSpace(value)) {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeTopic(topic string) string {

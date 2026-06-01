@@ -6,15 +6,16 @@ It watches repo activity, queues new items, runs a classifier command, stores th
 structured result, and sends matching notifications to Discord.
 
 This repository is an early extraction of a working notifier prototype. The
-current code is still intentionally small: it provides the worker, queue,
-gitcrawl source adapter, classifier command boundary, SQLite state, Discord
-delivery, and a bundled local model runner in `localpager-agent/`. The next step
-is a config-driven `localpager` CLI and direct GitHub API source support.
+current code is intentionally small: it provides the worker, queue, GitHub and
+gitcrawl source adapters, classifier command boundary, SQLite state, Discord
+delivery, a bundled local model runner in `localpager-agent/`, and a small
+`localpager` operations CLI.
 
 ## Current Commands
 
 ```text
-cmd/notifier-enqueue-github  enqueue GitHub issues and PRs from a gitcrawl DB
+cmd/localpager               validate config, show status, install services, test Discord
+cmd/notifier-enqueue-github  enqueue GitHub issues and PRs once
 cmd/notifier-ingest-json     ingest one normalized item from JSON
 cmd/notifier-watch           poll source adapters and enqueue items
 cmd/notifier-worker          run classifier jobs and send notifications
@@ -47,8 +48,22 @@ The classifier command receives one target argument, usually a GitHub URL or
 
 The worker stores the full JSON. By default it treats empty, `none`, `low`,
 `irrelevant`, `false`, or `i0` interest values as non-notifying. Other interest
-values create a notification. Set `worker.notify_topics_any` in config to require
-at least one matching `topics_of_interest` value instead.
+values create a notification.
+
+Notification policy is deployment config, not classifier logic:
+
+```json
+{
+  "worker": {
+    "notify_topics_any": ["local_models", "open_weight_models"],
+    "notify_interest_not": ["", "none", "no", "low", "irrelevant", "i0", "false"],
+    "notify_confidence_min": 0.7
+  }
+}
+```
+
+If `notify_topics_any` is set, at least one classifier topic must match before a
+notification is created.
 
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:
@@ -62,8 +77,10 @@ session: /path/to/session.jsonl
 
 ```bash
 npm install --prefix localpager-agent
-go test ./...
-go run ./cmd/notifier-worker --config examples/config.example.json --once --dry-run-discord
+make test
+make install
+localpager validate --config examples/config.example.json
+notifier-worker --config examples/config.example.json --once --dry-run-discord
 ```
 
 Check the bundled agent:
@@ -76,7 +93,7 @@ To send Discord messages, pass a channel ID and set a bot token:
 
 ```bash
 export DISCORD_BOT_TOKEN="<discord bot token>"
-go run ./cmd/notifier-worker \
+notifier-worker \
   --config examples/config.example.json \
   --discord-channel-id "$DISCORD_CHANNEL_ID" \
   --send-discord
@@ -105,17 +122,42 @@ LOCALPAGER_AGENT_PI_CMD
 LOCALPAGER_AGENT_FINAL_SCHEMA
 ```
 
-## gitcrawl Source
+## Sources
 
-The first source adapter reads from a local gitcrawl SQLite database:
+The default public source is the GitHub API:
 
 ```bash
-go run ./cmd/notifier-enqueue-github \
-  --config examples/config.example.json
+export GITHUB_TOKEN="<github token>"
+notifier-watch --config examples/config.example.json --source github --once
 ```
 
-Direct GitHub API polling and webhook support should be added before treating
-Localpager as broadly usable outside machines that already run gitcrawl.
+The gitcrawl source remains available for machines that already maintain a
+gitcrawl SQLite database:
+
+```bash
+notifier-watch --config examples/config.example.json --source gitcrawl --once
+```
+
+`notifier-watch` can run continuously under systemd. `notifier-enqueue-github`
+is the one-shot equivalent.
+
+## Services
+
+Install compiled binaries and write user systemd units:
+
+```bash
+make install
+localpager install-service --config ~/.config/localpager/config.json --work-dir "$PWD"
+systemctl --user daemon-reload
+systemctl --user enable --now localpager-notifier-worker.service localpager-notifier-watch.service
+```
+
+Check state:
+
+```bash
+localpager status --config ~/.config/localpager/config.json
+localpager test-discord --config ~/.config/localpager/config.json
+```
 
 ## Runtime State
 

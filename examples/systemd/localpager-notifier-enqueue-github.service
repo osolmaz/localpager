@@ -7,9 +7,10 @@ Wants=network-online.target
 Type=oneshot
 Environment=HOME=%h
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
-EnvironmentFile=%h/.config/localpager/localpager.env
+EnvironmentFile=-%h/.config/localpager/localpager.env
+EnvironmentFile=-%h/.config/localpager/secrets.env
 WorkingDirectory=%h/repos/localpager
-ExecStart=/usr/bin/env go run ./cmd/notifier-enqueue-github --config %h/.config/localpager/config.json
+ExecStart=%h/.local/bin/notifier-enqueue-github --config %h/.config/localpager/config.json
 TimeoutStartSec=10m
 
 [Install]

@@ -12,6 +12,10 @@ import (
 
 var sendDiscordMessageFunc = sendDiscordMessage
 
+func SendDiscordMessage(ctx context.Context, token, channelID, content string) (string, error) {
+	return sendDiscordMessage(ctx, token, channelID, content)
+}
+
 func sendDiscordMessage(ctx context.Context, token, channelID, content string) (string, error) {
 	payload, err := json.Marshal(discordMessagePayload{
 		Content: content,

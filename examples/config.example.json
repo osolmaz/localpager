@@ -2,6 +2,8 @@
   "repo": "owner/repo",
   "db": "~/.local/state/localpager/notifier.sqlite",
   "gitcrawl_db": "~/.config/gitcrawl/gitcrawl.db",
+  "github_base_url": "https://api.github.com",
+  "github_token_env": "GITHUB_TOKEN",
   "source_type": "both",
   "processor_name": "github_interest_classifier",
   "processor_version": "v1",
@@ -11,7 +13,7 @@
     "initial_hydration": false
   },
   "watch": {
-    "sources": ["gitcrawl"],
+    "sources": ["github"],
     "interval": "1m",
     "limit": 100
   },
@@ -26,6 +28,8 @@
     "send_discord": false,
     "dry_run_discord": true,
     "notify_topics_any": [],
+    "notify_interest_not": ["", "none", "no", "low", "irrelevant", "i0", "false"],
+    "notify_confidence_min": 0,
     "poll_interval": "30s"
   }
 }

@@ -12,11 +12,14 @@ import (
 	"github.com/osolmaz/localpager/internal/config"
 	"github.com/osolmaz/localpager/internal/notifier"
 	"github.com/osolmaz/localpager/internal/sources/gitcrawl"
+	githubsource "github.com/osolmaz/localpager/internal/sources/github"
 )
 
 func main() {
 	var dbPath string
 	var gitcrawlDBPath string
+	var githubBaseURL string
+	var githubTokenEnv string
 	var sources multiFlag
 	var repo string
 	var itemType string
@@ -32,9 +35,11 @@ func main() {
 	flag.StringVar(&configPath, "config", "", "JSON config file path")
 	flag.StringVar(&dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
 	flag.StringVar(&gitcrawlDBPath, "gitcrawl-db", gitcrawl.DefaultDBPath, "gitcrawl SQLite database path")
-	flag.Var(&sources, "source", "source watcher to run; currently supports gitcrawl")
-	flag.StringVar(&repo, "repo", notifier.DefaultRepo, "GitHub repo full name for gitcrawl watcher")
-	flag.StringVar(&itemType, "type", "both", "gitcrawl item type: prs, issues, or both")
+	flag.StringVar(&githubBaseURL, "github-base-url", githubsource.DefaultBaseURL, "GitHub API base URL")
+	flag.StringVar(&githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token")
+	flag.Var(&sources, "source", "source watcher to run; supports gitcrawl and github")
+	flag.StringVar(&repo, "repo", notifier.DefaultRepo, "GitHub repo full name")
+	flag.StringVar(&itemType, "type", "both", "source item type: prs, issues, or both")
 	flag.StringVar(&interval, "interval", "5s", "poll interval")
 	flag.BoolVar(&once, "once", false, "poll once and exit")
 	flag.IntVar(&limit, "limit", 0, "maximum source items per poll")
@@ -49,11 +54,22 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if configPath != "" {
+		for _, warning := range cfg.Validate() {
+			log.Printf("config warning: %s", warning)
+		}
+	}
 	if cfg.DBPath != "" && !config.FlagSet(setFlags, "db") {
 		dbPath = cfg.DBPath
 	}
 	if cfg.GitcrawlDBPath != "" && !config.FlagSet(setFlags, "gitcrawl-db") {
 		gitcrawlDBPath = cfg.GitcrawlDBPath
+	}
+	if cfg.GitHubBaseURL != "" && !config.FlagSet(setFlags, "github-base-url") {
+		githubBaseURL = cfg.GitHubBaseURL
+	}
+	if cfg.GitHubTokenEnv != "" && !config.FlagSet(setFlags, "github-token-env") {
+		githubTokenEnv = cfg.GitHubTokenEnv
 	}
 	if len(cfg.Watch.Sources) > 0 && !config.FlagSet(setFlags, "source") {
 		sources = append(sources[:0], cfg.Watch.Sources...)
@@ -120,6 +136,32 @@ func main() {
 			switch source {
 			case "gitcrawl":
 				stats, err := pollGitcrawl(ctx, ingestor, gitcrawlDBPath, repo, itemType, limit, processorName, processorVersion, window, cutover)
+				if err != nil {
+					log.Printf("source=%s error=%v", source, err)
+					_ = notifier.RecordWatcherError(ctx, pool, source, watcherName(repo), err)
+					if once {
+						os.Exit(1)
+					}
+					continue
+				}
+				_ = notifier.RecordWatcherSuccess(ctx, pool, source, watcherName(repo), time.Now().UTC().Format(time.RFC3339Nano))
+				total.ItemsSeen += stats.ItemsSeen
+				total.ItemsUpserted += stats.ItemsUpserted
+				total.JobsInserted += stats.JobsInserted
+				total.JobsSkipped += stats.JobsSkipped
+				total.JobsExisting += stats.JobsExisting
+			case "github":
+				stats, err := githubsource.Enqueue(ctx, ingestor, githubsource.EnqueueOptions{
+					Repo:             repo,
+					Type:             itemType,
+					Limit:            limit,
+					ProcessorName:    processorName,
+					ProcessorVersion: processorVersion,
+					RecentWindow:     window,
+					CutoverAt:        cutover,
+					BaseURL:          githubBaseURL,
+					Token:            os.Getenv(githubTokenEnv),
+				})
 				if err != nil {
 					log.Printf("source=%s error=%v", source, err)
 					_ = notifier.RecordWatcherError(ctx, pool, source, watcherName(repo), err)

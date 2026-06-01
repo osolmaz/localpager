@@ -1,5 +1,5 @@
 [Unit]
-Description=Localpager notifier worker
+Description=Localpager source watcher
 After=network-online.target
 Wants=network-online.target
 
@@ -10,14 +10,10 @@ Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-%h/.config/localpager/localpager.env
 EnvironmentFile=-%h/.config/localpager/secrets.env
 WorkingDirectory=%h/repos/localpager
-ExecStart=%h/.local/bin/notifier-worker --config %h/.config/localpager/config.json
+ExecStart=%h/.local/bin/notifier-watch --config %h/.config/localpager/config.json
 Restart=always
 RestartSec=30s
 TimeoutStartSec=2m
-Nice=10
-CPUWeight=25
-IOSchedulingClass=idle
-MemoryHigh=4G
 
 [Install]
 WantedBy=default.target

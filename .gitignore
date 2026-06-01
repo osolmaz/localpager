@@ -4,6 +4,7 @@
 *.sqlite
 *.sqlite-*
 *.log
+bin/
 dist/
 node_modules/
 tmp/

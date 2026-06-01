@@ -11,11 +11,15 @@ import (
 	"github.com/osolmaz/localpager/internal/config"
 	"github.com/osolmaz/localpager/internal/notifier"
 	"github.com/osolmaz/localpager/internal/sources/gitcrawl"
+	githubsource "github.com/osolmaz/localpager/internal/sources/github"
 )
 
 func main() {
 	var dbPath string
 	var gitcrawlDBPath string
+	var githubBaseURL string
+	var githubTokenEnv string
+	var source string
 	var repo string
 	var sourceType string
 	var limit int
@@ -29,6 +33,9 @@ func main() {
 	flag.StringVar(&configPath, "config", "", "JSON config file path")
 	flag.StringVar(&dbPath, "db", notifier.DefaultDBPath, "notifier SQLite database path")
 	flag.StringVar(&gitcrawlDBPath, "gitcrawl-db", gitcrawl.DefaultDBPath, "gitcrawl SQLite database path")
+	flag.StringVar(&githubBaseURL, "github-base-url", githubsource.DefaultBaseURL, "GitHub API base URL")
+	flag.StringVar(&githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token")
+	flag.StringVar(&source, "source", "gitcrawl", "source to enqueue from: gitcrawl or github")
 	flag.StringVar(&repo, "repo", notifier.DefaultRepo, "GitHub repo full name")
 	flag.StringVar(&sourceType, "type", "both", "source type: prs, issues, or both")
 	flag.StringVar(&sourceType, "kind", "both", "deprecated alias for --type")
@@ -45,11 +52,25 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if configPath != "" {
+		for _, warning := range cfg.Validate() {
+			log.Printf("config warning: %s", warning)
+		}
+	}
 	if cfg.DBPath != "" && !config.FlagSet(setFlags, "db") {
 		dbPath = cfg.DBPath
 	}
 	if cfg.GitcrawlDBPath != "" && !config.FlagSet(setFlags, "gitcrawl-db") {
 		gitcrawlDBPath = cfg.GitcrawlDBPath
+	}
+	if cfg.GitHubBaseURL != "" && !config.FlagSet(setFlags, "github-base-url") {
+		githubBaseURL = cfg.GitHubBaseURL
+	}
+	if cfg.GitHubTokenEnv != "" && !config.FlagSet(setFlags, "github-token-env") {
+		githubTokenEnv = cfg.GitHubTokenEnv
+	}
+	if len(cfg.Watch.Sources) == 1 && !config.FlagSet(setFlags, "source") {
+		source = cfg.Watch.Sources[0]
 	}
 	if cfg.Repo != "" && !config.FlagSet(setFlags, "repo") {
 		repo = cfg.Repo
@@ -94,24 +115,61 @@ func main() {
 		log.Fatal(err)
 	}
 	defer pool.Close()
-	gitcrawlDB, err := gitcrawl.OpenDB(ctx, gitcrawlDBPath)
-	if err != nil {
-		log.Fatal(err)
+	var stats struct {
+		ItemsSeen     int
+		ItemsUpserted int
+		JobsInserted  int
+		JobsSkipped   int
+		JobsExisting  int
 	}
-	defer gitcrawlDB.Close()
-
-	stats, err := gitcrawl.Enqueue(ctx, notifier.NewIngestor(pool), gitcrawlDB, gitcrawl.EnqueueOptions{
-		Repo:             repo,
-		Type:             sourceType,
-		Limit:            limit,
-		InitialHydration: initialHydration,
-		ProcessorName:    processorName,
-		ProcessorVersion: processorVersion,
-		RecentWindow:     window,
-		CutoverAt:        cutover,
-	})
-	if err != nil {
-		log.Fatal(err)
+	switch source {
+	case "gitcrawl":
+		gitcrawlDB, err := gitcrawl.OpenDB(ctx, gitcrawlDBPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer gitcrawlDB.Close()
+		sourceStats, err := gitcrawl.Enqueue(ctx, notifier.NewIngestor(pool), gitcrawlDB, gitcrawl.EnqueueOptions{
+			Repo:             repo,
+			Type:             sourceType,
+			Limit:            limit,
+			InitialHydration: initialHydration,
+			ProcessorName:    processorName,
+			ProcessorVersion: processorVersion,
+			RecentWindow:     window,
+			CutoverAt:        cutover,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		stats.ItemsSeen = sourceStats.ItemsSeen
+		stats.ItemsUpserted = sourceStats.ItemsUpserted
+		stats.JobsInserted = sourceStats.JobsInserted
+		stats.JobsSkipped = sourceStats.JobsSkipped
+		stats.JobsExisting = sourceStats.JobsExisting
+	case "github":
+		sourceStats, err := githubsource.Enqueue(ctx, notifier.NewIngestor(pool), githubsource.EnqueueOptions{
+			Repo:             repo,
+			Type:             sourceType,
+			Limit:            limit,
+			InitialHydration: initialHydration,
+			ProcessorName:    processorName,
+			ProcessorVersion: processorVersion,
+			RecentWindow:     window,
+			CutoverAt:        cutover,
+			BaseURL:          githubBaseURL,
+			Token:            os.Getenv(githubTokenEnv),
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		stats.ItemsSeen = sourceStats.ItemsSeen
+		stats.ItemsUpserted = sourceStats.ItemsUpserted
+		stats.JobsInserted = sourceStats.JobsInserted
+		stats.JobsSkipped = sourceStats.JobsSkipped
+		stats.JobsExisting = sourceStats.JobsExisting
+	default:
+		log.Fatalf("unsupported source %q", source)
 	}
 	fmt.Fprintf(os.Stdout, "items_seen=%d items_upserted=%d jobs_inserted=%d jobs_skipped=%d jobs_existing=%d\n", stats.ItemsSeen, stats.ItemsUpserted, stats.JobsInserted, stats.JobsSkipped, stats.JobsExisting)
 }

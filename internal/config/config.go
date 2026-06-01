@@ -4,12 +4,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Config struct {
 	Repo             string  `json:"repo"`
 	DBPath           string  `json:"db"`
 	GitcrawlDBPath   string  `json:"gitcrawl_db"`
+	GitHubBaseURL    string  `json:"github_base_url"`
+	GitHubTokenEnv   string  `json:"github_token_env"`
 	SourceType       string  `json:"source_type"`
 	ProcessorName    string  `json:"processor_name"`
 	ProcessorVersion string  `json:"processor_version"`
@@ -48,6 +51,8 @@ type Worker struct {
 	SendPendingOnly     bool     `json:"send_pending_only"`
 	PollInterval        string   `json:"poll_interval"`
 	NotifyTopicsAny     []string `json:"notify_topics_any"`
+	NotifyInterestNot   []string `json:"notify_interest_not"`
+	NotifyConfidenceMin float64  `json:"notify_confidence_min"`
 }
 
 func Load(path string) (Config, error) {
@@ -67,4 +72,25 @@ func Load(path string) (Config, error) {
 
 func FlagSet(flags map[string]bool, name string) bool {
 	return flags[name]
+}
+
+func (cfg Config) Validate() []string {
+	var warnings []string
+	if strings.TrimSpace(cfg.Repo) == "" || cfg.Repo == "owner/repo" {
+		warnings = append(warnings, "repo is unset or still owner/repo")
+	}
+	if cfg.Worker.SendDiscord && !cfg.Worker.DryRunDiscord && len(cfg.Worker.NotifyTopicsAny) == 0 {
+		warnings = append(warnings, "send_discord is enabled without worker.notify_topics_any; all non-low classifier results may notify")
+	}
+	if cfg.Worker.NotifyConfidenceMin < 0 || cfg.Worker.NotifyConfidenceMin > 1 {
+		warnings = append(warnings, "worker.notify_confidence_min must be between 0 and 1")
+	}
+	for _, source := range cfg.Watch.Sources {
+		switch strings.ToLower(strings.TrimSpace(source)) {
+		case "", "gitcrawl", "github":
+		default:
+			warnings = append(warnings, fmt.Sprintf("unsupported watch source %q", source))
+		}
+	}
+	return warnings
 }

@@ -51,6 +51,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	if configPath != "" {
+		for _, warning := range cfg.Validate() {
+			log.Printf("config warning: %s", warning)
+		}
+	}
 	if cfg.DBPath != "" && !config.FlagSet(setFlags, "db") {
 		dbPath = cfg.DBPath
 	}
@@ -123,19 +128,21 @@ func main() {
 		}
 	}
 	opts := notifier.WorkerOptions{
-		MaxConcurrency:    maxConcurrency,
-		LeaseTTL:          ttl,
-		MaxAttempts:       maxAttempts,
-		Limit:             limit,
-		Once:              once,
-		ClassifierCommand: classifierCommand,
-		Model:             model,
-		DestinationRef:    discordChannelID,
-		DiscordToken:      token,
-		SendDiscord:       sendDiscord,
-		DryRunDiscord:     dryRunDiscord,
-		PollInterval:      pollEvery,
-		NotifyTopicsAny:   cfg.Worker.NotifyTopicsAny,
+		MaxConcurrency:      maxConcurrency,
+		LeaseTTL:            ttl,
+		MaxAttempts:         maxAttempts,
+		Limit:               limit,
+		Once:                once,
+		ClassifierCommand:   classifierCommand,
+		Model:               model,
+		DestinationRef:      discordChannelID,
+		DiscordToken:        token,
+		SendDiscord:         sendDiscord,
+		DryRunDiscord:       dryRunDiscord,
+		PollInterval:        pollEvery,
+		NotifyTopicsAny:     cfg.Worker.NotifyTopicsAny,
+		NotifyInterestNot:   cfg.Worker.NotifyInterestNot,
+		NotifyConfidenceMin: cfg.Worker.NotifyConfidenceMin,
 	}
 	if sendPendingOnly {
 		sent, err := notifier.SendPendingDiscord(ctx, pool, opts)

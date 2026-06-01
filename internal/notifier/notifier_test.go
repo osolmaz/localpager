@@ -1324,6 +1324,42 @@ func TestShouldNotifyCanRequireConfiguredTopics(t *testing.T) {
 	}
 }
 
+func TestShouldNotifyHonorsConfidenceAndInterestPolicy(t *testing.T) {
+	opts := WorkerOptions{
+		NotifyTopicsAny:     []string{"local_models"},
+		NotifyInterestNot:   []string{"none", "low"},
+		NotifyConfidenceMin: 0.75,
+	}
+	cases := []struct {
+		name string
+		out  ClassifierOutput
+		want bool
+	}{
+		{
+			name: "matching topic and confidence notifies",
+			out:  ClassifierOutput{Interest: "high", Confidence: 0.9, TopicsOfInterest: []string{"local_models"}},
+			want: true,
+		},
+		{
+			name: "low confidence suppresses",
+			out:  ClassifierOutput{Interest: "high", Confidence: 0.5, TopicsOfInterest: []string{"local_models"}},
+			want: false,
+		},
+		{
+			name: "blocked interest suppresses",
+			out:  ClassifierOutput{Interest: "none", Confidence: 0.9, TopicsOfInterest: []string{"local_models"}},
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shouldNotify(tc.out, opts); got != tc.want {
+				t.Fatalf("shouldNotify() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestExpiredFinalAttemptJobIsMarkedDead(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
