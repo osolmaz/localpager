@@ -1240,7 +1240,45 @@ func TestSendPendingDiscordDrainsMultipleBatches(t *testing.T) {
 	}
 }
 
-func TestShouldNotifyOnlyLocalModelAndACPXTopics(t *testing.T) {
+func TestShouldNotifyDefaultsToInterestGate(t *testing.T) {
+	cases := []struct {
+		name string
+		out  ClassifierOutput
+		want bool
+	}{
+		{
+			name: "high interest notifies",
+			out:  ClassifierOutput{Interest: "high", TopicsOfInterest: []string{"bug"}},
+			want: true,
+		},
+		{
+			name: "low interest does not notify",
+			out:  ClassifierOutput{Interest: "low", TopicsOfInterest: []string{"bug"}},
+			want: false,
+		},
+		{
+			name: "empty interest does not notify",
+			out:  ClassifierOutput{Interest: "", TopicsOfInterest: []string{"bug"}},
+			want: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := shouldNotify(tc.out, WorkerOptions{}); got != tc.want {
+				t.Fatalf("shouldNotify() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestShouldNotifyCanRequireConfiguredTopics(t *testing.T) {
+	opts := WorkerOptions{NotifyTopicsAny: []string{
+		"local_models",
+		"self_hosted_inference",
+		"local_model_providers",
+		"open_weight_models",
+		"acpx",
+	}}
 	cases := []struct {
 		name string
 		out  ClassifierOutput
@@ -1279,7 +1317,7 @@ func TestShouldNotifyOnlyLocalModelAndACPXTopics(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := shouldNotify(tc.out); got != tc.want {
+			if got := shouldNotify(tc.out, opts); got != tc.want {
 				t.Fatalf("shouldNotify() = %v, want %v", got, tc.want)
 			}
 		})

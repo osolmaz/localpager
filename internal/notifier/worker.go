@@ -42,6 +42,7 @@ type WorkerOptions struct {
 	SendDiscord       bool
 	DryRunDiscord     bool
 	PollInterval      time.Duration
+	NotifyTopicsAny   []string
 }
 
 type WorkerStats struct {
@@ -382,7 +383,7 @@ func processJob(ctx context.Context, pool *Pool, job ClaimedJob, opts WorkerOpti
 			if err := tx.Create(&result).Error; err != nil {
 				return err
 			}
-			if shouldNotify(output) {
+			if shouldNotify(output, opts) {
 				status := "pending"
 				var sentAt *time.Time
 				var suppression *string
@@ -539,7 +540,23 @@ func skipClaimedJobIfSuperseded(ctx context.Context, tx *gorm.DB, job ClaimedJob
 	return result.RowsAffected > 0, nil
 }
 
-func shouldNotify(output ClassifierOutput) bool {
+func shouldNotify(output ClassifierOutput, opts WorkerOptions) bool {
+	if len(opts.NotifyTopicsAny) > 0 {
+		allowed := map[string]bool{}
+		for _, topic := range opts.NotifyTopicsAny {
+			normalized := normalizeTopic(topic)
+			if normalized != "" {
+				allowed[normalized] = true
+			}
+		}
+		for _, topic := range output.TopicsOfInterest {
+			if allowed[normalizeTopic(topic)] {
+				return true
+			}
+		}
+		return false
+	}
+
 	interest := strings.ToLower(strings.TrimSpace(output.Interest))
 	switch interest {
 	case "", "none", "no", "low", "irrelevant", "i0", "false":
@@ -547,6 +564,10 @@ func shouldNotify(output ClassifierOutput) bool {
 	default:
 		return true
 	}
+}
+
+func normalizeTopic(topic string) string {
+	return strings.ToLower(strings.TrimSpace(topic))
 }
 
 func buildNotificationMessage(job ClaimedJob, output ClassifierOutput) string {

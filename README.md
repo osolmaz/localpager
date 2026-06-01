@@ -45,9 +45,10 @@ The classifier command receives one target argument, usually a GitHub URL or
 }
 ```
 
-The worker stores the full JSON. It treats empty, `none`, `low`, `irrelevant`,
-`false`, or `i0` interest values as non-notifying. Other interest values create a
-notification.
+The worker stores the full JSON. By default it treats empty, `none`, `low`,
+`irrelevant`, `false`, or `i0` interest values as non-notifying. Other interest
+values create a notification. Set `worker.notify_topics_any` in config to require
+at least one matching `topics_of_interest` value instead.
 
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:

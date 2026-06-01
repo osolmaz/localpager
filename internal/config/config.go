@@ -33,20 +33,21 @@ type Watch struct {
 }
 
 type Worker struct {
-	MaxConcurrency      int    `json:"max_concurrency"`
-	LeaseTTL            string `json:"lease_ttl"`
-	MaxAttempts         int    `json:"max_attempts"`
-	Limit               int    `json:"limit"`
-	Once                bool   `json:"once"`
-	ClassifierCommand   string `json:"classifier_command"`
-	Model               string `json:"model"`
-	DiscordChannelID    string `json:"discord_channel_id"`
-	DiscordChannelIDEnv string `json:"discord_channel_id_env"`
-	DiscordTokenEnv     string `json:"discord_token_env"`
-	SendDiscord         bool   `json:"send_discord"`
-	DryRunDiscord       bool   `json:"dry_run_discord"`
-	SendPendingOnly     bool   `json:"send_pending_only"`
-	PollInterval        string `json:"poll_interval"`
+	MaxConcurrency      int      `json:"max_concurrency"`
+	LeaseTTL            string   `json:"lease_ttl"`
+	MaxAttempts         int      `json:"max_attempts"`
+	Limit               int      `json:"limit"`
+	Once                bool     `json:"once"`
+	ClassifierCommand   string   `json:"classifier_command"`
+	Model               string   `json:"model"`
+	DiscordChannelID    string   `json:"discord_channel_id"`
+	DiscordChannelIDEnv string   `json:"discord_channel_id_env"`
+	DiscordTokenEnv     string   `json:"discord_token_env"`
+	SendDiscord         bool     `json:"send_discord"`
+	DryRunDiscord       bool     `json:"dry_run_discord"`
+	SendPendingOnly     bool     `json:"send_pending_only"`
+	PollInterval        string   `json:"poll_interval"`
+	NotifyTopicsAny     []string `json:"notify_topics_any"`
 }
 
 func Load(path string) (Config, error) {

@@ -25,7 +25,7 @@
     "discord_token_env": "DISCORD_BOT_TOKEN",
     "send_discord": false,
     "dry_run_discord": true,
+    "notify_topics_any": [],
     "poll_interval": "30s"
   }
 }
-

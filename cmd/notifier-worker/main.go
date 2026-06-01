@@ -135,6 +135,7 @@ func main() {
 		SendDiscord:       sendDiscord,
 		DryRunDiscord:     dryRunDiscord,
 		PollInterval:      pollEvery,
+		NotifyTopicsAny:   cfg.Worker.NotifyTopicsAny,
 	}
 	if sendPendingOnly {
 		sent, err := notifier.SendPendingDiscord(ctx, pool, opts)
