@@ -1,0 +1,10 @@
+.env
+.env.*
+*.db
+*.sqlite
+*.sqlite-*
+*.log
+dist/
+tmp/
+vendor/
+

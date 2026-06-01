@@ -1,0 +1,14 @@
+[Unit]
+Description=Run Localpager GitHub enqueue every 10 minutes
+
+[Timer]
+OnBootSec=6m
+OnUnitActiveSec=10m
+AccuracySec=1m
+RandomizedDelaySec=2m
+Persistent=true
+Unit=localpager-notifier-enqueue-github.service
+
+[Install]
+WantedBy=timers.target
+
