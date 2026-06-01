@@ -14,11 +14,11 @@ delivery, a bundled local model runner in `localpager-agent/`, and a small
 ## Current Commands
 
 ```text
-cmd/localpager               validate config, show status, install services, test Discord
-cmd/localpager-enqueue-github  enqueue GitHub issues and PRs once
-cmd/localpager-ingest-json     ingest one normalized item from JSON
-cmd/localpager-watch           poll source adapters and enqueue items
-cmd/localpager-worker          run classifier jobs and send notifications
+localpager                 validate config, show status, install services, test Discord
+localpager-enqueue-github  enqueue GitHub issues and PRs once
+localpager-ingest-json     ingest one normalized item from JSON
+localpager-watch           poll source adapters and enqueue items
+localpager-worker          run classifier jobs and send notifications
 ```
 
 ## Classifier Contract
@@ -143,14 +143,20 @@ is the one-shot equivalent.
 
 ## Services
 
-Install compiled binaries and write user systemd units:
+Install compiled binaries and write user systemd units. The service installer
+writes `localpager-worker.service`, `localpager-watch.service`,
+`localpager-enqueue-github.service`, and `localpager-enqueue-github.timer`.
 
 ```bash
 make install
 localpager install-service --config ~/.config/localpager/config.json --work-dir "$PWD"
 systemctl --user daemon-reload
-systemctl --user enable --now localpager-worker.service localpager-watch.service
+systemctl --user enable --now localpager-worker.service localpager-enqueue-github.timer
 ```
+
+That setup runs the worker continuously and enqueues GitHub issues and pull
+requests on the timer. Enable `localpager-watch.service` instead if you want
+continuous source polling.
 
 Check state:
 
