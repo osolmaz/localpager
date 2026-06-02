@@ -28,6 +28,11 @@ func main() {
 	flag.StringVar(&flags.githubBaseURL, "github-base-url", "https://api.github.com", "GitHub API base URL for classifier context")
 	flag.StringVar(&flags.githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token for classifier context")
 	flag.StringVar(&flags.model, "model", "", "optional localpager-agent model override")
+	flag.StringVar(&flags.agentBaseURL, "agent-base-url", "", "localpager-agent OpenAI-compatible base URL")
+	flag.IntVar(&flags.agentContextWindow, "agent-context-window", 0, "localpager-agent model context window")
+	flag.IntVar(&flags.agentMaxTokens, "agent-max-tokens", 0, "localpager-agent max output tokens")
+	flag.IntVar(&flags.agentTimeoutMS, "agent-timeout-ms", 0, "localpager-agent model probe timeout in milliseconds")
+	flag.StringVar(&flags.modelUnavailableRetryDelay, "model-unavailable-retry-delay", "5m", "retry delay for transient model endpoint failures")
 	flag.StringVar(&flags.discordChannelID, "discord-channel-id", os.Getenv("DISCORD_CHANNEL_ID"), "Discord channel for notifications")
 	flag.StringVar(&flags.discordTokenEnv, "discord-token-env", "DISCORD_BOT_TOKEN", "environment variable containing Discord bot token")
 	flag.BoolVar(&flags.sendDiscord, "send-discord", false, "send pending Discord notifications")
@@ -46,6 +51,7 @@ func main() {
 
 	ttl := app.ParseDurationFlag("lease-ttl", flags.leaseTTL)
 	pollEvery := app.ParseDurationFlag("poll-interval", flags.pollInterval)
+	modelUnavailableRetryDelay := app.ParseDurationFlag("model-unavailable-retry-delay", flags.modelUnavailableRetryDelay)
 	ctx := context.Background()
 	pool, err := localpager.NewPool(ctx, flags.dbPath)
 	if err != nil {
@@ -64,23 +70,28 @@ func main() {
 		}
 	}
 	opts := localpager.WorkerOptions{
-		MaxConcurrency:           flags.maxConcurrency,
-		LeaseTTL:                 ttl,
-		MaxAttempts:              flags.maxAttempts,
-		Limit:                    flags.limit,
-		Once:                     flags.once,
-		ClassifierCommand:        flags.classifierCommand,
-		ClassifierSchema:         flags.classifierSchema,
-		ClassifierPromptTemplate: flags.classifierPromptTemplate,
-		ClassifierTopicTaxonomy:  flags.classifierTopicTaxonomy,
-		ClassifierContext:        classifierContextOptions(cfg, flags.githubBaseURL, flags.githubTokenEnv),
-		Model:                    flags.model,
-		DestinationRef:           flags.discordChannelID,
-		DiscordToken:             token,
-		SendDiscord:              flags.sendDiscord,
-		DryRunDiscord:            flags.dryRunDiscord,
-		PollInterval:             pollEvery,
-		NotifyTopicsAny:          cfg.Worker.NotifyTopicsAny,
+		MaxConcurrency:             flags.maxConcurrency,
+		LeaseTTL:                   ttl,
+		MaxAttempts:                flags.maxAttempts,
+		Limit:                      flags.limit,
+		Once:                       flags.once,
+		ClassifierCommand:          flags.classifierCommand,
+		ClassifierSchema:           flags.classifierSchema,
+		ClassifierPromptTemplate:   flags.classifierPromptTemplate,
+		ClassifierTopicTaxonomy:    flags.classifierTopicTaxonomy,
+		ClassifierContext:          classifierContextOptions(cfg, flags.githubBaseURL, flags.githubTokenEnv),
+		Model:                      flags.model,
+		AgentBaseURL:               flags.agentBaseURL,
+		AgentContextWindow:         flags.agentContextWindow,
+		AgentMaxTokens:             flags.agentMaxTokens,
+		AgentTimeoutMS:             flags.agentTimeoutMS,
+		ModelUnavailableRetryDelay: modelUnavailableRetryDelay,
+		DestinationRef:             flags.discordChannelID,
+		DiscordToken:               token,
+		SendDiscord:                flags.sendDiscord,
+		DryRunDiscord:              flags.dryRunDiscord,
+		PollInterval:               pollEvery,
+		NotifyTopicsAny:            cfg.Worker.NotifyTopicsAny,
 	}
 	if flags.sendPendingOnly {
 		sent, err := localpager.SendPendingDiscord(ctx, pool, opts)
@@ -98,26 +109,31 @@ func main() {
 }
 
 type workerFlags struct {
-	configPath               string
-	dbPath                   string
-	maxConcurrency           int
-	leaseTTL                 string
-	maxAttempts              int
-	limit                    int
-	once                     bool
-	classifierCommand        string
-	classifierSchema         string
-	classifierPromptTemplate string
-	classifierTopicTaxonomy  string
-	githubBaseURL            string
-	githubTokenEnv           string
-	model                    string
-	discordChannelID         string
-	discordTokenEnv          string
-	sendDiscord              bool
-	dryRunDiscord            bool
-	sendPendingOnly          bool
-	pollInterval             string
+	configPath                 string
+	dbPath                     string
+	maxConcurrency             int
+	leaseTTL                   string
+	maxAttempts                int
+	limit                      int
+	once                       bool
+	classifierCommand          string
+	classifierSchema           string
+	classifierPromptTemplate   string
+	classifierTopicTaxonomy    string
+	githubBaseURL              string
+	githubTokenEnv             string
+	model                      string
+	agentBaseURL               string
+	agentContextWindow         int
+	agentMaxTokens             int
+	agentTimeoutMS             int
+	modelUnavailableRetryDelay string
+	discordChannelID           string
+	discordTokenEnv            string
+	sendDiscord                bool
+	dryRunDiscord              bool
+	sendPendingOnly            bool
+	pollInterval               string
 }
 
 func (flags *workerFlags) applyConfig(cfg config.Config, setFlags map[string]bool) {
@@ -166,6 +182,25 @@ func (flags *workerFlags) applyClassifierConfig(cfg config.Config, setFlags map[
 	}
 	if cfg.Worker.Model != "" && !config.FlagSet(setFlags, "model") {
 		flags.model = cfg.Worker.Model
+	}
+	flags.applyAgentConfig(cfg, setFlags)
+}
+
+func (flags *workerFlags) applyAgentConfig(cfg config.Config, setFlags map[string]bool) {
+	if cfg.Worker.AgentBaseURL != "" && !config.FlagSet(setFlags, "agent-base-url") {
+		flags.agentBaseURL = cfg.Worker.AgentBaseURL
+	}
+	if cfg.Worker.AgentContextWindow != 0 && !config.FlagSet(setFlags, "agent-context-window") {
+		flags.agentContextWindow = cfg.Worker.AgentContextWindow
+	}
+	if cfg.Worker.AgentMaxTokens != 0 && !config.FlagSet(setFlags, "agent-max-tokens") {
+		flags.agentMaxTokens = cfg.Worker.AgentMaxTokens
+	}
+	if cfg.Worker.AgentTimeoutMS != 0 && !config.FlagSet(setFlags, "agent-timeout-ms") {
+		flags.agentTimeoutMS = cfg.Worker.AgentTimeoutMS
+	}
+	if cfg.Worker.ModelUnavailableRetryDelay != "" && !config.FlagSet(setFlags, "model-unavailable-retry-delay") {
+		flags.modelUnavailableRetryDelay = cfg.Worker.ModelUnavailableRetryDelay
 	}
 }
 

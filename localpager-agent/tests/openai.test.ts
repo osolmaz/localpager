@@ -23,6 +23,12 @@ describe("OpenAI-compatible model discovery", () => {
     );
     expect(resolved.contextWindow).toBe(120000);
   });
+
+  it("reports the model endpoint when discovery cannot connect", async () => {
+    await expect(
+      listModels("http://local.test/v1", 1000, () => Promise.reject(new Error("fetch failed")))
+    ).rejects.toThrow("model list failed for http://local.test/v1/models: fetch failed");
+  });
 });
 
 function jsonResponse(value: unknown): Response {

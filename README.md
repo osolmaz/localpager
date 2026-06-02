@@ -63,6 +63,11 @@ Notification policy is deployment config, not classifier logic:
     }
   },
   "worker": {
+    "agent_base_url": "http://127.0.0.1:1234/v1",
+    "agent_context_window": 8192,
+    "agent_max_tokens": 768,
+    "agent_timeout_ms": 5000,
+    "model_unavailable_retry_delay": "5m",
     "notify_topics_any": ["local_models", "open_weight_models"]
   }
 }
@@ -76,6 +81,13 @@ deployment profile. See [Classifier Profiles](docs/2026-06-01-classifier-profile
 When `classifier.topic_taxonomy` is set, `localpager-classifier` generates a
 runtime schema that rejects topics outside that taxonomy.
 
+For OpenClaw maintainer routing, use
+`examples/profiles/openclaw-routing-v8.prompt.md` with the OpenClaw topic
+keyword taxonomy. That profile encodes the DS4/Gemma prompt work: notification
+routing, title-first centrality, one-topic default, a second-topic gate, and
+false-positive suppression for broad topics such as `local_model_providers`,
+`reliability`, `api_surface`, `tool_calling`, and `config`.
+
 Before the classifier runs, Localpager renders GitHub context into the prompt:
 stored title/body/labels plus optional comments, changed files, and selected PR
 diff. Prompt templates can include that block with `__GITHUB_CONTEXT__`.
@@ -85,13 +97,29 @@ To test a prompt profile on a small live GitHub sample, use
 `scripts/localpager-experiment.mjs`; see
 [Classifier Experiment Runner](docs/2026-06-01-classifier-experiment-runner.md)
 and [Classifier Benchmark Metrics](docs/2026-06-01-classifier-benchmark-metrics.md).
+Machine-specific runtime values, such as the loaded model context window,
+parallelism, context truncation budget, and DS4/LM Studio exclusivity rules,
+belong in a deployment setup document. See
+[Onur's Isengard Setup](docs/2026-06-02-onur-isengard-localpager-setup.md) for
+the current OpenClaw/Gemma deployment.
 
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:
 
 ```text
 prompt: /path/to/prompt.md
-session: /path/to/session.jsonl
+session: /path/to/session-dir
+```
+
+Transient local model failures, such as the LM Studio endpoint being down, are
+requeued with `model_unavailable_retry_delay` and do not burn classifier
+attempts. To manually requeue matching dead jobs:
+
+```bash
+localpager requeue-jobs \
+  --config ~/.config/localpager/config.json \
+  --status dead \
+  --last-error-contains "fetch failed"
 ```
 
 ## Local Run
@@ -137,6 +165,9 @@ The main environment variables are:
 ```text
 LOCALPAGER_AGENT_BASE_URL
 LOCALPAGER_AGENT_MODEL
+LOCALPAGER_AGENT_CONTEXT_WINDOW
+LOCALPAGER_AGENT_MAX_TOKENS
+LOCALPAGER_AGENT_TIMEOUT_MS
 LOCALPAGER_AGENT_STATE_DIR
 LOCALPAGER_AGENT_SESSION_DIR
 LOCALPAGER_AGENT_PI_CMD

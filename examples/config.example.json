@@ -28,19 +28,24 @@
         "include_comments": true,
         "include_changed_files": true,
         "include_diff": true,
-        "max_body_chars": 2500,
-        "max_comments_chars": 1500,
-        "max_changed_files_chars": 2000,
-        "max_diff_chars": 5000
+        "max_body_chars": 1200,
+        "max_comments_chars": 400,
+        "max_changed_files_chars": 800,
+        "max_diff_chars": 1200
       }
     }
   },
   "worker": {
-    "max_concurrency": 2,
+    "max_concurrency": 1,
     "lease_ttl": "30m",
     "max_attempts": 3,
     "classifier_command": "./scripts/localpager-classifier",
     "model": "gemma-4-e4b-it",
+    "agent_base_url": "http://127.0.0.1:1234/v1",
+    "agent_context_window": 8192,
+    "agent_max_tokens": 768,
+    "agent_timeout_ms": 5000,
+    "model_unavailable_retry_delay": "5m",
     "discord_channel_id_env": "DISCORD_CHANNEL_ID",
     "discord_token_env": "DISCORD_BOT_TOKEN",
     "send_discord": false,

@@ -26,10 +26,7 @@ func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (Cla
 		return ClassifierOutput{}, "", "", "", err
 	}
 	defer cancel()
-	args := []string{target}
-	if opts.Model != "" {
-		args = append(args, "--model", opts.Model)
-	}
+	args := classifierCommandArgs(target, opts)
 	if opts.ClassifierSchema != "" {
 		args = append(args, "--schema", opts.ClassifierSchema)
 	}
@@ -60,6 +57,30 @@ func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (Cla
 		return ClassifierOutput{}, "", "", "", fmt.Errorf("classifier returned invalid JSON: %w stdout=%s stderr=%s", err, outputJSON, strings.TrimSpace(stderr))
 	}
 	return output, outputJSON, parseStderrPath(stderr, "prompt"), parseStderrPath(stderr, "session"), nil
+}
+
+func classifierCommandArgs(target string, opts WorkerOptions) []string {
+	args := []string{target}
+	args = appendStringFlag(args, "--model", opts.Model)
+	args = appendStringFlag(args, "--base-url", opts.AgentBaseURL)
+	args = appendIntFlag(args, "--context-window", opts.AgentContextWindow)
+	args = appendIntFlag(args, "--max-tokens", opts.AgentMaxTokens)
+	args = appendIntFlag(args, "--timeout-ms", opts.AgentTimeoutMS)
+	return args
+}
+
+func appendStringFlag(args []string, flag string, value string) []string {
+	if value == "" {
+		return args
+	}
+	return append(args, flag, value)
+}
+
+func appendIntFlag(args []string, flag string, value int) []string {
+	if value <= 0 {
+		return args
+	}
+	return append(args, flag, fmt.Sprintf("%d", value))
 }
 
 func writeClassifierContextFile(ctx context.Context, item Item, opts ClassifierContextOptions) (string, error) {

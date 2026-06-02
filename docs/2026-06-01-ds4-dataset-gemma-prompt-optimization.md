@@ -608,6 +608,10 @@ The Localpager translation was checked against DS4 without loading LM Studio at
 the same time. The machine guardrail is: stop LM Studio/Gemma first, then verify
 that only `ds4-server` remains in GPU compute apps.
 
+For Onur's current `isengard` Localpager/Gemma setup, including the exact LM
+Studio context, parallelism, GitHub context budget, and customization steps, see
+[Onur Isengard Localpager Setup](2026-06-02-onur-isengard-localpager-setup.md).
+
 `scripts/localpager-experiment.mjs` now uses the same classifier setup as
 Localpager for non-mock models. For DS4, that means the experiment runner and
 production classifier both go through `localpager-classifier` and

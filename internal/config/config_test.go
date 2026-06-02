@@ -8,7 +8,7 @@ import (
 
 func TestLoadReadsConfigFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"repo":"example/repo","classifier":{"schema":"schema.json","prompt_template":"prompt.md","topic_taxonomy":"topics.json","context":{"github":{"include_body":true,"include_diff":false,"max_body_chars":1200}}},"worker":{"send_discord":true,"notify_topics_any":["local_models"]}}`), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"repo":"example/repo","classifier":{"schema":"schema.json","prompt_template":"prompt.md","topic_taxonomy":"topics.json","context":{"github":{"include_body":true,"include_diff":false,"max_body_chars":1200}}},"worker":{"send_discord":true,"notify_topics_any":["local_models"],"agent_base_url":"http://127.0.0.1:1234/v1","agent_context_window":8192,"agent_max_tokens":768,"agent_timeout_ms":5000,"model_unavailable_retry_delay":"5m"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load(path)
@@ -38,6 +38,21 @@ func TestLoadReadsConfigFile(t *testing.T) {
 	}
 	if cfg.Classifier.Context.GitHub.MaxBodyChars != 1200 {
 		t.Fatalf("Classifier.Context.GitHub.MaxBodyChars = %d, want 1200", cfg.Classifier.Context.GitHub.MaxBodyChars)
+	}
+	if cfg.Worker.AgentBaseURL != "http://127.0.0.1:1234/v1" {
+		t.Fatalf("Worker.AgentBaseURL = %q, want local base URL", cfg.Worker.AgentBaseURL)
+	}
+	if cfg.Worker.AgentContextWindow != 8192 {
+		t.Fatalf("Worker.AgentContextWindow = %d, want 8192", cfg.Worker.AgentContextWindow)
+	}
+	if cfg.Worker.AgentMaxTokens != 768 {
+		t.Fatalf("Worker.AgentMaxTokens = %d, want 768", cfg.Worker.AgentMaxTokens)
+	}
+	if cfg.Worker.AgentTimeoutMS != 5000 {
+		t.Fatalf("Worker.AgentTimeoutMS = %d, want 5000", cfg.Worker.AgentTimeoutMS)
+	}
+	if cfg.Worker.ModelUnavailableRetryDelay != "5m" {
+		t.Fatalf("Worker.ModelUnavailableRetryDelay = %q, want 5m", cfg.Worker.ModelUnavailableRetryDelay)
 	}
 }
 

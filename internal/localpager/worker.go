@@ -27,23 +27,28 @@ var supportedJobTypes = map[string]bool{
 }
 
 type WorkerOptions struct {
-	MaxConcurrency           int
-	LeaseTTL                 time.Duration
-	MaxAttempts              int
-	Limit                    int
-	Once                     bool
-	ClassifierCommand        string
-	ClassifierSchema         string
-	ClassifierPromptTemplate string
-	ClassifierTopicTaxonomy  string
-	ClassifierContext        ClassifierContextOptions
-	Model                    string
-	DestinationRef           string
-	DiscordToken             string
-	SendDiscord              bool
-	DryRunDiscord            bool
-	PollInterval             time.Duration
-	NotifyTopicsAny          []string
+	MaxConcurrency             int
+	LeaseTTL                   time.Duration
+	MaxAttempts                int
+	Limit                      int
+	Once                       bool
+	ClassifierCommand          string
+	ClassifierSchema           string
+	ClassifierPromptTemplate   string
+	ClassifierTopicTaxonomy    string
+	ClassifierContext          ClassifierContextOptions
+	Model                      string
+	AgentBaseURL               string
+	AgentContextWindow         int
+	AgentMaxTokens             int
+	AgentTimeoutMS             int
+	ModelUnavailableRetryDelay time.Duration
+	DestinationRef             string
+	DiscordToken               string
+	SendDiscord                bool
+	DryRunDiscord              bool
+	PollInterval               time.Duration
+	NotifyTopicsAny            []string
 }
 
 type ClassifierContextOptions struct {
@@ -97,6 +102,9 @@ func RunWorker(ctx context.Context, pool *Pool, opts WorkerOptions) (WorkerStats
 	}
 	if opts.PollInterval == 0 {
 		opts.PollInterval = 30 * time.Second
+	}
+	if opts.ModelUnavailableRetryDelay == 0 {
+		opts.ModelUnavailableRetryDelay = 5 * time.Minute
 	}
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -344,6 +352,9 @@ func processJob(ctx context.Context, pool *Pool, job ClaimedJob, opts WorkerOpti
 
 	output, outputJSON, promptPath, sessionPath, err := runClassifier(ctx, job, opts)
 	if err != nil {
+		if isTransientClassifierError(err) {
+			return retryTransientClaimedJob(ctx, pool, job, err.Error(), opts.ModelUnavailableRetryDelay)
+		}
 		return failClaimedJob(ctx, pool, job, err.Error(), opts.MaxAttempts)
 	}
 	result := classifierResult(job, opts, output, outputJSON, promptPath, sessionPath)
@@ -363,8 +374,16 @@ func processJob(ctx context.Context, pool *Pool, job ClaimedJob, opts WorkerOpti
 }
 
 func failClaimedJob(ctx context.Context, pool *Pool, job ClaimedJob, reason string, maxAttempts int) WorkerStats {
+	return failedStats(markClaimedJobFailed(ctx, pool.GORM(), job, reason, maxAttempts))
+}
+
+func retryTransientClaimedJob(ctx context.Context, pool *Pool, job ClaimedJob, reason string, delay time.Duration) WorkerStats {
+	return failedStats(markClaimedJobTransient(ctx, pool.GORM(), job, reason, delay))
+}
+
+func failedStats(err error) WorkerStats {
 	var stats WorkerStats
-	if err := markClaimedJobFailed(ctx, pool.GORM(), job, reason, maxAttempts); err == nil {
+	if err == nil {
 		stats.Failed++
 	}
 	return stats
@@ -541,6 +560,32 @@ func markClaimedJobFailed(ctx context.Context, db *gorm.DB, job ClaimedJob, reas
 	return markJobFailedStatus(ctx, db, job.ID, job.Attempts, reason, maxAttempts, job.LeasedUntil)
 }
 
+func markClaimedJobTransient(ctx context.Context, db *gorm.DB, job ClaimedJob, reason string, delay time.Duration) error {
+	if delay <= 0 {
+		delay = 5 * time.Minute
+	}
+	runAfter := time.Now().UTC().Add(delay)
+	query := db.WithContext(ctx).Model(&Job{}).Where("id = ?", job.ID)
+	if job.LeasedUntil != nil {
+		query = query.Where("status = ? AND leased_until = ?", "running", job.LeasedUntil)
+	}
+	result := query.Updates(map[string]any{
+		"status":       "pending",
+		"attempts":     gorm.Expr("CASE WHEN attempts > 0 THEN attempts - 1 ELSE 0 END"),
+		"leased_until": nil,
+		"run_after":    &runAfter,
+		"last_error":   reason,
+		"updated_at":   time.Now().UTC(),
+	})
+	if result.Error != nil {
+		return result.Error
+	}
+	if job.LeasedUntil != nil && result.RowsAffected == 0 {
+		return errStaleJobLease
+	}
+	return nil
+}
+
 func markJobFailedStatus(ctx context.Context, db *gorm.DB, jobID int64, attempts int, reason string, maxAttempts int, leasedUntil *time.Time) error {
 	status := "pending"
 	runAfter := (*time.Time)(nil)
@@ -568,6 +613,34 @@ func markJobFailedStatus(ctx context.Context, db *gorm.DB, jobID int64, attempts
 		return errStaleJobLease
 	}
 	return nil
+}
+
+func isTransientClassifierError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	transientSubstrings := []string{
+		"localpager-agent: fetch failed",
+		"failed to fetch",
+		"connection refused",
+		"econnrefused",
+		"connection reset",
+		"socket hang up",
+		"model list failed with http 429",
+		"model list failed with http 500",
+		"model list failed with http 502",
+		"model list failed with http 503",
+		"model list failed with http 504",
+		"temporary failure",
+		"no models returned",
+	}
+	for _, needle := range transientSubstrings {
+		if strings.Contains(message, needle) {
+			return true
+		}
+	}
+	return false
 }
 
 func retryDelay(attempts int) time.Duration {

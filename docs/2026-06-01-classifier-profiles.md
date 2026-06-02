@@ -51,6 +51,28 @@ configurable.
 `classifier.topic_taxonomy` is the full set of topics the classifier may output.
 `worker.notify_topics_any` is only the smaller paging filter.
 
+Worker model runtime settings can also be pinned in config so service behavior
+does not depend on manually loaded local-model defaults:
+
+```json
+{
+  "worker": {
+    "agent_base_url": "http://127.0.0.1:1234/v1",
+    "agent_context_window": 8192,
+    "agent_max_tokens": 768,
+    "agent_timeout_ms": 5000,
+    "model_unavailable_retry_delay": "5m"
+  }
+}
+```
+
+Treat those numbers as deployment-specific. The configured
+`agent_context_window` should match the context length of the model currently
+loaded at `agent_base_url`, and `worker.max_concurrency` should be compatible
+with the model server's parallelism. For a concrete OpenClaw/Gemma deployment
+example, see
+[Onur's Isengard Setup](2026-06-02-onur-isengard-localpager-setup.md).
+
 ## Topic Taxonomy
 
 The taxonomy should be data, not prose embedded in code:
@@ -70,6 +92,19 @@ The taxonomy should be data, not prose embedded in code:
 }
 ```
 
+Localpager also accepts the dataset topic-keyword map shape:
+
+```json
+{
+  "topics": {
+    "local_models": {
+      "description": "Local model execution and local inference behavior.",
+      "keywords": ["lm studio", "ollama", "llama.cpp"]
+    }
+  }
+}
+```
+
 The classifier wrapper should load this file and generate or validate the schema
 so `topics_of_interest.items.enum` is exactly the taxonomy topic IDs.
 
@@ -77,6 +112,13 @@ A generic starter taxonomy lives at
 `examples/profiles/repo-routing-topics.json`. Its matching prompt template is
 `examples/profiles/repo-routing.prompt.md`, and its fully expanded example
 schema is `examples/profiles/repo-routing.schema.json`.
+
+The OpenClaw routing prompt lives at
+`examples/profiles/openclaw-routing-v8.prompt.md`. It should be paired with the
+OpenClaw topic keyword taxonomy from the dataset workflow. That prompt is the
+production translation of the DS4/Gemma v8 routing policy: title-first
+centrality, one-topic default, second-topic gate, and explicit suppression of
+known Gemma false positives.
 
 ## Schema Contract
 
@@ -111,8 +153,9 @@ The template should be deployment-owned. Localpager should inject:
 - topic descriptions
 - any deployment-specific classification policy
 
-The prompt should tell the model to choose only from the allowed topics and use
-an empty array when no listed topic applies.
+The prompt should tell the model to choose only from the allowed topics, use an
+empty array when no listed topic applies, and pick the smallest routing set
+rather than every technically related topic.
 
 ## Runtime Behavior
 
@@ -121,15 +164,18 @@ an empty array when no listed topic applies.
 3. Wrapper renders a runtime schema from `classifier.schema` and
    `classifier.topic_taxonomy`.
 4. Wrapper renders the prompt template.
-5. Wrapper runs `localpager-agent` with the rendered schema.
+5. Wrapper runs `localpager-agent` with the rendered schema, pinned runtime
+   settings, and a per-run session directory.
 6. Schema validation rejects invalid topics before output reaches the worker.
 7. Worker stores the raw JSON and `topics_json`.
 8. Notification policy checks `notify_topics_any`.
 
-Current implementation note: context fetching is still handled by the classifier
-runtime and prompt. Localpager passes the target URL/ref and profile paths. A
-future `classifier.context` block can move GitHub body/comment/diff collection
-into Localpager itself without changing the worker contract.
+Localpager builds the GitHub context before launching the classifier. If GitHub
+comments, changed files, or diff cannot be fetched, the rendered context keeps
+the failure detail, such as the GitHub status code.
+
+Transient model endpoint failures are requeued with
+`worker.model_unavailable_retry_delay` without burning classifier attempts.
 
 ## Implementation Checklist
 
@@ -139,4 +185,8 @@ into Localpager itself without changing the worker contract.
 - Add a default generic profile for non-OpenClaw users.
 - Add a small example taxonomy for maintainers.
 - Add tests that the worker passes classifier profile arguments.
+- Add tests that the worker passes model runtime arguments.
+- Add a checked-in OpenClaw v8 routing prompt.
+- Preserve prompt and session paths for live auditability.
+- Add a requeue command for transient dead jobs.
 - Update README to explain the difference between taxonomy topics and notification topics.

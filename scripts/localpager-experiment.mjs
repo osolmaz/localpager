@@ -581,7 +581,7 @@ function formatRate(count, total) {
 
 function loadTopics(filePath) {
   const body = JSON.parse(readFileSync(filePath, "utf8"));
-  const rawTopics = Array.isArray(body.topics) ? body.topics : body?.properties?.topics_of_interest?.items?.enum;
+  const rawTopics = rawTopicEntries(body);
   if (!Array.isArray(rawTopics)) {
     throw new Error(`topic taxonomy does not contain topics or topics_of_interest enum: ${filePath}`);
   }
@@ -599,12 +599,28 @@ function loadTopics(filePath) {
   return topics;
 }
 
+function rawTopicEntries(body) {
+  if (Array.isArray(body.topics)) {
+    return body.topics;
+  }
+  if (body.topics && typeof body.topics === "object") {
+    return Object.entries(body.topics).map(([id, entry]) => ({ id, ...entry }));
+  }
+  return body?.properties?.topics_of_interest?.items?.enum;
+}
+
 function normalizeTopic(topic) {
   if (typeof topic === "string") {
-    return { id: topic, description: "" };
+    return { id: topic, description: "", keywords: [] };
   }
   if (topic && typeof topic === "object" && typeof topic.id === "string") {
-    return { id: topic.id, description: typeof topic.description === "string" ? topic.description : "" };
+    return {
+      id: topic.id,
+      description: typeof topic.description === "string" ? topic.description : "",
+      keywords: Array.isArray(topic.keywords)
+        ? topic.keywords.filter((keyword) => typeof keyword === "string").slice(0, 1)
+        : [],
+    };
   }
   throw new Error(`invalid topic entry: ${JSON.stringify(topic)}`);
 }
@@ -634,7 +650,16 @@ function renderPrompt(template, target, topics, githubContext) {
   const descriptions =
     topics.length > 0
       ? topics
-          .map((topic) => (topic.description ? `- \`${topic.id}\`: ${topic.description}` : `- \`${topic.id}\``))
+          .map((topic) => {
+            const details = [];
+            if (topic.description) {
+              details.push(truncateInline(topic.description, 80));
+            }
+            if (topic.keywords.length > 0) {
+              details.push(`cues: ${topic.keywords.join(", ")}`);
+            }
+            return details.length > 0 ? `- \`${topic.id}\`: ${details.join(" ")}` : `- \`${topic.id}\``;
+          })
           .join("\n")
       : "No topic taxonomy configured.";
   return template
@@ -643,6 +668,10 @@ function renderPrompt(template, target, topics, githubContext) {
     .replaceAll("__ALLOWED_TOPICS_JSON__", allowedTopicsJSON)
     .replaceAll("__TOPIC_TAXONOMY_JSON__", JSON.stringify({ topics }, null, 2))
     .replaceAll("__TOPIC_DESCRIPTIONS__", descriptions);
+}
+
+function truncateInline(value, maxLength) {
+  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 3)}...`;
 }
 
 function validateOutput(output, topics) {

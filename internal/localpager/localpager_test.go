@@ -1623,6 +1623,38 @@ func TestRenderClassifierContextFetchesGitHubDetails(t *testing.T) {
 	}
 }
 
+func TestRenderClassifierContextIncludesGitHubErrorDetail(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "rate limited", http.StatusForbidden)
+	}))
+	defer server.Close()
+
+	metadata := `{"repo":"example/repo","number":9}`
+	rendered := renderClassifierContext(context.Background(), Item{
+		SourceKind:   "github_pr",
+		SourceRef:    "example/repo#9",
+		Type:         stringPtr("github_pr"),
+		Ref:          stringPtr("example/repo#9"),
+		Title:        stringPtr("PR with missing context"),
+		MetadataJSON: &metadata,
+	}, ClassifierContextOptions{
+		IncludeComments:     true,
+		IncludeChangedFiles: true,
+		IncludeDiff:         true,
+		GitHubBaseURL:       server.URL,
+	})
+
+	for _, want := range []string{
+		"comments unavailable: github returned status 403",
+		"changed files unavailable: github returned status 403",
+		"diff unavailable: github returned status 403",
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("rendered context missing %q:\n%s", want, rendered)
+		}
+	}
+}
+
 func TestClassifierPassesProfileArguments(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell script fixture is POSIX-only")
@@ -1697,6 +1729,61 @@ JSON
 	for _, want := range []string{"Title: Context title", "Labels: local_models", "Context body"} {
 		if !strings.Contains(string(contextBody), want) {
 			t.Fatalf("context file missing %q:\n%s", want, string(contextBody))
+		}
+	}
+}
+
+func TestClassifierPassesAgentRuntimeArguments(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell script fixture is POSIX-only")
+	}
+	ctx := context.Background()
+	dir := t.TempDir()
+	argsPath := filepath.Join(dir, "args.txt")
+	classifier := filepath.Join(dir, "classifier.sh")
+	script := strings.ReplaceAll(`#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$@" > __ARGS__
+cat <<'JSON'
+{"caveats":[],"topics_of_interest":["local_models"],"description":"Local model related change."}
+JSON
+`, "__ARGS__", argsPath)
+	if err := os.WriteFile(classifier, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, _, err := runClassifier(ctx, ClaimedJob{
+		Item: Item{
+			SourceURL: stringPtr("https://github.com/example/repo/pull/1"),
+			SourceRef: "example/repo#1",
+		},
+	}, WorkerOptions{
+		ClassifierCommand:  classifier,
+		Model:              "gemma-4-e4b-it",
+		AgentBaseURL:       "http://127.0.0.1:1234/v1",
+		AgentContextWindow: 8192,
+		AgentMaxTokens:     768,
+		AgentTimeoutMS:     5000,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := strings.Split(strings.TrimSuffix(string(args), "\n"), "\n")
+	for _, want := range []string{
+		"--base-url",
+		"http://127.0.0.1:1234/v1",
+		"--context-window",
+		"8192",
+		"--max-tokens",
+		"768",
+		"--timeout-ms",
+		"5000",
+	} {
+		if !containsString(got, want) {
+			t.Fatalf("args = %#v, missing %q", got, want)
 		}
 	}
 }
@@ -2143,6 +2230,147 @@ func TestFailedJobUsesRunAfterBackoff(t *testing.T) {
 	}
 }
 
+func TestTransientClassifierFailureDoesNotBurnAttempt(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	item := Item{
+		SourceKind: "github_pr",
+		SourceRef:  "example/repo#3",
+		SourceURL:  stringPtr("https://github.com/example/repo/pull/3"),
+	}
+	if err := pool.GORM().Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	leaseUntil := time.Now().UTC().Add(time.Minute)
+	job := Job{
+		ItemID:           item.ID,
+		JobKind:          "classify_github_pr",
+		ProcessorName:    "test",
+		ProcessorVersion: "v1",
+		ContentHash:      "hash",
+		Priority:         1,
+		Status:           "running",
+		Attempts:         1,
+		LeasedUntil:      &leaseUntil,
+	}
+	if err := pool.GORM().Create(&job).Error; err != nil {
+		t.Fatal(err)
+	}
+	classifier := filepath.Join(dir, "classifier.sh")
+	if err := os.WriteFile(classifier, []byte(`#!/usr/bin/env bash
+echo "localpager-agent: fetch failed" >&2
+exit 1
+`), 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	stats := processJob(ctx, pool, ClaimedJob{Job: job, Item: item}, WorkerOptions{
+		MaxAttempts:                3,
+		ClassifierCommand:          classifier,
+		ModelUnavailableRetryDelay: time.Hour,
+	})
+	if stats.Failed != 1 || stats.Succeeded != 0 {
+		t.Fatalf("stats = %+v, want transient failure recorded without success", stats)
+	}
+	var updated Job
+	if err := pool.GORM().First(&updated, job.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != "pending" {
+		t.Fatalf("status = %q, want pending", updated.Status)
+	}
+	if updated.Attempts != 0 {
+		t.Fatalf("attempts = %d, want transient failure not to burn attempt", updated.Attempts)
+	}
+	if updated.RunAfter == nil || !updated.RunAfter.After(time.Now().UTC().Add(55*time.Minute)) {
+		t.Fatalf("RunAfter = %v, want retry delayed by model outage", updated.RunAfter)
+	}
+	if updated.LastError == nil || !strings.Contains(*updated.LastError, "fetch failed") {
+		t.Fatalf("LastError = %v, want fetch failed", updated.LastError)
+	}
+}
+
+func TestRequeueJobsResetsMatchingDeadJobs(t *testing.T) {
+	ctx := context.Background()
+	dir := t.TempDir()
+	pool, err := NewPool(ctx, filepath.Join(dir, "localpager.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+
+	item := Item{SourceKind: "github_pr", SourceRef: "example/repo#3"}
+	if err := pool.GORM().Create(&item).Error; err != nil {
+		t.Fatal(err)
+	}
+	jobs := []Job{
+		{
+			ItemID:           item.ID,
+			JobKind:          "classify_github_pr",
+			ProcessorName:    "test",
+			ProcessorVersion: "v1",
+			ContentHash:      "hash-a",
+			Status:           "dead",
+			Attempts:         3,
+			LastError:        stringPtr("localpager-agent: fetch failed"),
+		},
+		{
+			ItemID:           item.ID,
+			JobKind:          "classify_github_pr",
+			ProcessorName:    "test",
+			ProcessorVersion: "v1",
+			ContentHash:      "hash-b",
+			Status:           "dead",
+			Attempts:         3,
+			LastError:        stringPtr("schema failure"),
+		},
+	}
+	if err := pool.GORM().Create(&jobs).Error; err != nil {
+		t.Fatal(err)
+	}
+	dryRunCount, err := RequeueJobs(ctx, pool, RequeueJobsOptions{
+		Statuses:          []string{"dead"},
+		LastErrorContains: "fetch failed",
+		DryRun:            true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dryRunCount != 1 {
+		t.Fatalf("dry run count = %d, want 1", dryRunCount)
+	}
+	changed, err := RequeueJobs(ctx, pool, RequeueJobsOptions{
+		Statuses:          []string{"dead"},
+		LastErrorContains: "fetch failed",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if changed != 1 {
+		t.Fatalf("requeued = %d, want 1", changed)
+	}
+	var updated Job
+	if err := pool.GORM().Where("content_hash = ?", "hash-a").First(&updated).Error; err != nil {
+		t.Fatal(err)
+	}
+	if updated.Status != "pending" || updated.Attempts != 0 || updated.LastError != nil {
+		t.Fatalf("updated job = %+v, want reset pending job", updated)
+	}
+	var untouched Job
+	if err := pool.GORM().Where("content_hash = ?", "hash-b").First(&untouched).Error; err != nil {
+		t.Fatal(err)
+	}
+	if untouched.Status != "dead" {
+		t.Fatalf("untouched status = %q, want dead", untouched.Status)
+	}
+}
+
 func TestResetUnsentNotificationsReturnsClaimedRowsToPending(t *testing.T) {
 	ctx := context.Background()
 	dir := t.TempDir()
@@ -2274,4 +2502,8 @@ func indexOfString(values []string, target string) int {
 		}
 	}
 	return -1
+}
+
+func containsString(values []string, target string) bool {
+	return indexOfString(values, target) != -1
 }

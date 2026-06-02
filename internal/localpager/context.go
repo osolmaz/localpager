@@ -258,7 +258,7 @@ func githubComments(ctx context.Context, meta githubMetadata, opts ClassifierCon
 		} `json:"user"`
 	}
 	if err := githubJSON(ctx, opts, fmt.Sprintf("/repos/%s/issues/%d/comments", meta.repo, meta.number), &comments); err != nil {
-		return "", false, fmt.Errorf("comments unavailable")
+		return "", false, fmt.Errorf("comments unavailable: %w", err)
 	}
 	parts := make([]string, 0, len(comments))
 	for _, comment := range comments {
@@ -284,7 +284,7 @@ func githubChangedFiles(ctx context.Context, meta githubMetadata, opts Classifie
 		Filename string `json:"filename"`
 	}
 	if err := githubJSON(ctx, opts, fmt.Sprintf("/repos/%s/pulls/%d/files", meta.repo, meta.number), &files); err != nil {
-		return "", false, fmt.Errorf("changed files unavailable")
+		return "", false, fmt.Errorf("changed files unavailable: %w", err)
 	}
 	names := make([]string, 0, len(files))
 	for _, file := range files {
@@ -300,7 +300,7 @@ func githubDiff(ctx context.Context, meta githubMetadata, opts ClassifierContext
 	}
 	diff, err := githubText(ctx, opts, fmt.Sprintf("/repos/%s/pulls/%d", meta.repo, meta.number), "application/vnd.github.v3.diff")
 	if err != nil {
-		return "", false, fmt.Errorf("diff unavailable")
+		return "", false, fmt.Errorf("diff unavailable: %w", err)
 	}
 	selected := selectDiff(neutralizeControlTags(diff), opts.MaxDiffChars)
 	return selected.text, selected.truncated, nil

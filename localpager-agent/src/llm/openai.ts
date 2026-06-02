@@ -16,11 +16,17 @@ export async function listModels(
   timeoutMs = 3000,
   fetcher: Fetcher = fetch
 ): Promise<readonly ModelInfo[]> {
-  const response = await fetcher(`${normalizeBaseUrl(baseUrl)}/models`, {
-    signal: AbortSignal.timeout(timeoutMs)
-  });
+  const modelsUrl = `${normalizeBaseUrl(baseUrl)}/models`;
+  let response: Response;
+  try {
+    response = await fetcher(modelsUrl, {
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+  } catch (error) {
+    throw new Error(`model list failed for ${modelsUrl}: ${errorMessage(error)}`);
+  }
   if (!response.ok) {
-    throw new Error(`model list failed with HTTP ${String(response.status)}`);
+    throw new Error(`model list failed for ${modelsUrl} with HTTP ${String(response.status)}`);
   }
   const payload: unknown = await response.json();
   const root = asObject(payload, "models response");
@@ -28,6 +34,10 @@ export async function listModels(
   return data
     .map((entry) => modelInfo(asObject(entry, "model entry")))
     .filter((model): model is ModelInfo => model !== undefined);
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 export async function resolveLocalModel(

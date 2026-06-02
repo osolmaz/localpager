@@ -30,10 +30,41 @@ func main() {
 		runTestDiscord(os.Args[2:])
 	case "install-service":
 		runInstallService(os.Args[2:])
+	case "requeue-jobs":
+		runRequeueJobs(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
 	}
+}
+
+func runRequeueJobs(args []string) {
+	fs := flag.NewFlagSet("requeue-jobs", flag.ExitOnError)
+	configPath := fs.String("config", "", "JSON config file path")
+	statuses := fs.String("status", "dead", "comma-separated job statuses to requeue")
+	lastErrorContains := fs.String("last-error-contains", "", "only requeue jobs whose last_error contains this text")
+	dryRun := fs.Bool("dry-run", false, "count matching jobs without requeueing")
+	_ = fs.Parse(args)
+	cfg := loadConfig(*configPath)
+	ctx := context.Background()
+	pool, err := localpager.NewPool(ctx, valueOrDefault(cfg.DBPath, localpager.DefaultDBPath))
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer app.ClosePool(pool)
+	count, err := localpager.RequeueJobs(ctx, pool, localpager.RequeueJobsOptions{
+		Statuses:          splitCSV(*statuses),
+		LastErrorContains: *lastErrorContains,
+		DryRun:            *dryRun,
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	if *dryRun {
+		app.Printf(os.Stdout, "matching_jobs=%d\n", count)
+		return
+	}
+	app.Printf(os.Stdout, "requeued_jobs=%d\n", count)
 }
 
 func runValidate(args []string) {
@@ -66,6 +97,11 @@ func runStatus(args []string) {
 	app.Printf(os.Stdout, "repo=%s\n", cfg.Repo)
 	app.Printf(os.Stdout, "db=%s\n", valueOrDefault(cfg.DBPath, localpager.DefaultDBPath))
 	app.Printf(os.Stdout, "model=%s\n", cfg.Worker.Model)
+	app.Printf(os.Stdout, "agent_base_url=%s\n", cfg.Worker.AgentBaseURL)
+	app.Printf(os.Stdout, "agent_context_window=%d\n", cfg.Worker.AgentContextWindow)
+	app.Printf(os.Stdout, "agent_max_tokens=%d\n", cfg.Worker.AgentMaxTokens)
+	app.Printf(os.Stdout, "agent_timeout_ms=%d\n", cfg.Worker.AgentTimeoutMS)
+	app.Printf(os.Stdout, "model_unavailable_retry_delay=%s\n", cfg.Worker.ModelUnavailableRetryDelay)
 	app.Printf(os.Stdout, "classifier_schema=%s\n", cfg.Classifier.Schema)
 	app.Printf(os.Stdout, "classifier_prompt_template=%s\n", cfg.Classifier.PromptTemplate)
 	app.Printf(os.Stdout, "classifier_topic_taxonomy=%s\n", cfg.Classifier.TopicTaxonomy)
@@ -255,6 +291,18 @@ func valueOrDefault(value, fallback string) string {
 	return value
 }
 
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
+}
+
 func defaultServicePath() string {
 	pathValue := strings.TrimSpace(os.Getenv("PATH"))
 	if pathValue == "" {
@@ -283,5 +331,5 @@ func mustExpand(path string) string {
 }
 
 func usage() {
-	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service> [flags]")
+	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service|requeue-jobs> [flags]")
 }
