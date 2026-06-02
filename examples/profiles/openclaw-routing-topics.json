@@ -1,0 +1,626 @@
+{
+  "topics": {
+    "local_models": {
+      "description": "Local model execution, local inference behavior, local model UX, local-only fallback, and local hardware constraints.",
+      "keywords": [
+        "local model",
+        "local models",
+        "local llm",
+        "offline model",
+        "on-device model",
+        "ollama",
+        "lm studio",
+        "lmstudio",
+        "llama.cpp",
+        "gguf",
+        "gemma",
+        "qwen",
+        "mlx",
+        "local gpu",
+        "vram",
+        "cold start",
+        "model fallback",
+        "small model",
+        "reasoning model",
+        "thinking tags",
+        "context window"
+      ]
+    },
+    "local_model_providers": {
+      "description": "Provider configuration, discovery, auth, routing, and compatibility for local or OpenAI-compatible model backends.",
+      "keywords": [
+        "provider config",
+        "provider setup",
+        "provider auth",
+        "openai-compatible provider",
+        "base url",
+        "OPENAI_BASE_URL",
+        "api key",
+        "model resolver",
+        "provider preflight",
+        "model discovery",
+        "fallback chain",
+        "lite llm",
+        "litellm",
+        "lm studio provider",
+        "ollama provider",
+        "vllm provider"
+      ]
+    },
+    "model_serving": {
+      "description": "Serving protocols, streaming behavior, routing, lifecycle, and gateway behavior for model endpoints.",
+      "keywords": [
+        "vllm",
+        "tgi",
+        "localai",
+        "openai-compatible streaming",
+        "chat completions",
+        "responses api",
+        "stream closed",
+        "usage chunk",
+        "endpoint lifecycle",
+        "multi-endpoint",
+        "request routing",
+        "sampling parameters",
+        "frequency_penalty",
+        "presence_penalty",
+        "seed",
+        "sse heartbeat",
+        "idle timeout"
+      ]
+    },
+    "self_hosted_inference": {
+      "description": "Self-hosted inference systems and locally operated services, including embeddings, speech, and memory providers.",
+      "keywords": [
+        "self-hosted",
+        "self hosted",
+        "local server",
+        "private inference",
+        "embeddings",
+        "memory provider",
+        "ollama embeddings",
+        "lancedb",
+        "speech-to-text",
+        "stt",
+        "text-to-speech",
+        "tts",
+        "gateway routed tts",
+        "no_proxy",
+        "proxy bypass",
+        "ssrf"
+      ]
+    },
+    "open_weight_models": {
+      "description": "Open-weight model families, model packaging, quantization, and local deployability signals.",
+      "keywords": [
+        "open weight",
+        "open weights",
+        "hugging face model",
+        "model weights",
+        "gguf",
+        "quantized",
+        "quantization",
+        "safetensors",
+        "model card",
+        "weights download",
+        "checkpoint"
+      ]
+    },
+    "acpx": {
+      "description": "ACPX protocol, transport, proxy, backend process, compatibility, and files or commands explicitly named ACPX.",
+      "keywords": [
+        "acpx",
+        "extensions/acpx",
+        "acpx proxy",
+        "acpx backend",
+        "acpx transport",
+        "acpx command",
+        "acpx exec",
+        "silent acpx exit",
+        "acpx compatibility",
+        "acpx session",
+        "acpx auth",
+        "acpx hmac"
+      ]
+    },
+    "acp": {
+      "description": "ACP protocol features and session tools that are not necessarily ACPX-specific.",
+      "keywords": [
+        "acp",
+        "agent client protocol",
+        "acp_send",
+        "sessions_spawn",
+        "sessions_cancel",
+        "acp session",
+        "acp block",
+        "acp runtime",
+        "acp binding",
+        "acp server",
+        "acp client"
+      ]
+    },
+    "coding_agents": {
+      "description": "General coding-agent runtime, tools, approvals, sandboxes, sessions, hooks, and orchestration.",
+      "keywords": [
+        "agent run",
+        "subagent",
+        "sandbox",
+        "exec approval",
+        "toolsAllow",
+        "gateway run",
+        "session resume",
+        "heartbeat",
+        "hooks",
+        "queue",
+        "compaction",
+        "conversation summary",
+        "tool call",
+        "agent harness",
+        "durable exec"
+      ]
+    },
+    "mcp_tooling": {
+      "description": "MCP server or client behavior, tools/list, resources, and tool invocation compatibility.",
+      "keywords": [
+        "mcp",
+        "model context protocol",
+        "tools/list",
+        "tool invocation",
+        "mcp server",
+        "mcp client",
+        "resources/list",
+        "prompts/list",
+        "hermes agent"
+      ]
+    },
+    "hf_agents": {
+      "description": "Hugging Face agent workflows, Spaces, Hub agent demos, or HF-specific agent integrations.",
+      "keywords": [
+        "hugging face",
+        "huggingface",
+        "hf agent",
+        "smolagents",
+        "transformers agents",
+        "space",
+        "dataset repo",
+        "hub workflow"
+      ]
+    },
+    "hub_workflows": {
+      "description": "Hub automation for datasets, models, Spaces, releases, and repository synchronization.",
+      "keywords": [
+        "hub",
+        "dataset upload",
+        "model upload",
+        "space deploy",
+        "huggingface hub",
+        "hf hub",
+        "repo sync",
+        "lfs",
+        "dataset card",
+        "model card"
+      ]
+    },
+    "post_training": {
+      "description": "Fine-tuning, preference optimization, evaluation loops, and data generation after pretraining.",
+      "keywords": [
+        "fine tune",
+        "finetune",
+        "sft",
+        "dpo",
+        "rlhf",
+        "distillation",
+        "eval set",
+        "preference data",
+        "synthetic data",
+        "post training"
+      ]
+    },
+    "model_releases": {
+      "description": "New model release tracking or version-specific model behavior.",
+      "keywords": [
+        "model release",
+        "new model",
+        "release notes",
+        "version bump",
+        "model family",
+        "benchmark",
+        "eval"
+      ]
+    },
+    "agent_demos": {
+      "description": "Demo workflows and visible examples for agents.",
+      "keywords": [
+        "demo",
+        "showcase",
+        "example agent",
+        "agent demo",
+        "walkthrough",
+        "sample workflow"
+      ]
+    },
+    "codex": {
+      "description": "Items that explicitly involve the Codex runtime or command compatibility.",
+      "keywords": [
+        "codex",
+        "codex cli",
+        "codex acp",
+        "codex command",
+        "codex runtime",
+        "native vision"
+      ]
+    },
+    "agent_runtime": {
+      "description": "Agent runner, harness, orchestration, subagent execution, heartbeat, and agent lifecycle behavior.",
+      "keywords": [
+        "agent run",
+        "runner",
+        "harness",
+        "subagent",
+        "spawn",
+        "heartbeat",
+        "orchestration",
+        "embedded runner",
+        "attempt",
+        "agent lifecycle",
+        "agent wait",
+        "child task"
+      ]
+    },
+    "sessions": {
+      "description": "Session identity, persistence, binding, transcript, resume, reset, parent/child session behavior, and session stores.",
+      "keywords": [
+        "session",
+        "sessions",
+        "session key",
+        "session store",
+        "transcript",
+        "resume",
+        "reset",
+        "thread-bound",
+        "parent session",
+        "child session",
+        "bound session",
+        "session list"
+      ]
+    },
+    "gateway": {
+      "description": "OpenClaw gateway behavior, daemon startup, HTTP gateway routes, gateway restart, gateway state, and service health.",
+      "keywords": [
+        "gateway",
+        "daemon",
+        "gateway restart",
+        "gateway state",
+        "gateway api",
+        "http gateway",
+        "service health",
+        "startup",
+        "launcher"
+      ]
+    },
+    "exec_tools": {
+      "description": "Shell execution, exec tools, command allowlists, tool invocation, tool schemas, and durable process handling.",
+      "keywords": [
+        "exec",
+        "command",
+        "tool call",
+        "tools",
+        "tools/invoke",
+        "allowlist",
+        "safeBins",
+        "durable exec",
+        "process",
+        "shell",
+        "tool_choice"
+      ]
+    },
+    "approvals": {
+      "description": "Approval flows, permission modes, approve/deny commands, policy checks, and pending approval state.",
+      "keywords": [
+        "approval",
+        "approve",
+        "deny",
+        "permissionMode",
+        "approval-pending",
+        "exec approval",
+        "tools.deny",
+        "policy"
+      ]
+    },
+    "sandboxing": {
+      "description": "Sandbox isolation, containers, Docker, process limits, filesystem hiding, and execution boundaries.",
+      "keywords": [
+        "sandbox",
+        "container",
+        "docker",
+        "bubblewrap",
+        "pidsLimit",
+        "isolation",
+        "filesystem",
+        "workspace",
+        "volumes"
+      ]
+    },
+    "hooks": {
+      "description": "Hook lifecycle, hook events, hook payloads, hook filtering, and managed hook behavior.",
+      "keywords": [
+        "hook",
+        "hooks",
+        "before_agent_start",
+        "agent_end",
+        "before_tools_resolve",
+        "message hooks",
+        "hook trigger",
+        "hook ingress"
+      ]
+    },
+    "cron_automation": {
+      "description": "Cron jobs, scheduled runs, heartbeat automation, one-shot jobs, and recurring task execution.",
+      "keywords": [
+        "cron",
+        "scheduled",
+        "schedule",
+        "heartbeat",
+        "one-shot",
+        "job execution",
+        "deleteAfterRun",
+        "at jobs"
+      ]
+    },
+    "chat_integrations": {
+      "description": "Chat platform integrations and delivery surfaces such as Discord, Telegram, Slack, Feishu, WhatsApp, Zulip, Mattermost, and webchat.",
+      "keywords": [
+        "discord",
+        "telegram",
+        "slack",
+        "feishu",
+        "whatsapp",
+        "zulip",
+        "mattermost",
+        "webchat",
+        "channel",
+        "dm",
+        "thread",
+        "topic"
+      ]
+    },
+    "ui_tui": {
+      "description": "Control UI, TUI, dashboard, web UI, session list, status views, and user-facing interface changes.",
+      "keywords": [
+        "ui",
+        "tui",
+        "dashboard",
+        "web ui",
+        "session list",
+        "status footer",
+        "preview",
+        "display name",
+        "chat ui"
+      ]
+    },
+    "browser_automation": {
+      "description": "Browser automation, screenshots, Chrome integration, browser vision, and web interaction tooling.",
+      "keywords": [
+        "browser",
+        "chrome",
+        "screenshot",
+        "vision",
+        "web page",
+        "google sign-in",
+        "profile attach"
+      ]
+    },
+    "memory": {
+      "description": "Memory systems, embeddings, vector stores, active memory, LanceDB, and memory archival or recovery.",
+      "keywords": [
+        "memory",
+        "embedding",
+        "embeddings",
+        "vector",
+        "lancedb",
+        "active-memory",
+        "archive",
+        "recall",
+        "memory hook"
+      ]
+    },
+    "security": {
+      "description": "Security, SSRF, credentials, secrets, token handling, auth hardening, HMAC, vulnerabilities, and unsafe access prevention.",
+      "keywords": [
+        "security",
+        "ssrf",
+        "credential",
+        "secret",
+        "token",
+        "api key",
+        "hmac",
+        "auth",
+        "oauth",
+        "vulnerability",
+        "private/internal",
+        "password",
+        "redaction"
+      ]
+    },
+    "config": {
+      "description": "Configuration files, config schema, defaults, setup/onboarding, environment variables, overrides, and migration.",
+      "keywords": [
+        "config",
+        "configuration",
+        "defaults",
+        "setup",
+        "onboarding",
+        "env",
+        "environment",
+        "override",
+        "migration",
+        "schema",
+        "baseUrl"
+      ]
+    },
+    "packaging_deployment": {
+      "description": "Build, packaging, deployment, service managers, SEA, launchd, systemd, pnpm, and runtime distribution.",
+      "keywords": [
+        "build",
+        "package",
+        "sea",
+        "deployment",
+        "launchd",
+        "systemd",
+        "pnpm",
+        "postbuild",
+        "single executable",
+        "service path"
+      ]
+    },
+    "docs": {
+      "description": "Documentation, guides, README changes, spelling, taxonomy, and explanatory content.",
+      "keywords": [
+        "docs",
+        "documentation",
+        "readme",
+        "guide",
+        "clarify",
+        "spelling",
+        "taxonomy",
+        "quick start"
+      ]
+    },
+    "tests_ci": {
+      "description": "Tests, CI, fixtures, coverage, mocks, and platform-specific test fixes.",
+      "keywords": [
+        "test",
+        "tests",
+        "ci",
+        "coverage",
+        "mock",
+        "mocks",
+        "fixture",
+        "fixtures",
+        "windows ci",
+        "test coverage"
+      ]
+    },
+    "telemetry_usage": {
+      "description": "Usage accounting, token counts, cost metadata, traces, diagnostics, status reporting, and observability.",
+      "keywords": [
+        "usage",
+        "cost",
+        "tokens",
+        "trace",
+        "diagnostic",
+        "telemetry",
+        "status",
+        "reporting",
+        "metrics",
+        "signalCount"
+      ]
+    },
+    "api_surface": {
+      "description": "HTTP APIs, gateway APIs, REST endpoints, webhooks, SSE, OpenResponses, chat completions, and request/response contracts.",
+      "keywords": [
+        "api",
+        "http",
+        "webhook",
+        "sse",
+        "responses",
+        "chat completions",
+        "/v1",
+        "endpoint",
+        "request",
+        "response",
+        "tools/invoke"
+      ]
+    },
+    "queueing": {
+      "description": "Queues, lanes, task state, follow-up queues, run ordering, locks, stuck jobs, and backpressure.",
+      "keywords": [
+        "queue",
+        "lane",
+        "task",
+        "followup",
+        "follow-up",
+        "lock",
+        "backpressure",
+        "stuck",
+        "pending",
+        "running"
+      ]
+    },
+    "notifications": {
+      "description": "Notification policy, delivery gates, notify settings, outbound messages, announcements, and sent-message handling.",
+      "keywords": [
+        "notify",
+        "notification",
+        "announce",
+        "delivery",
+        "message delivery",
+        "done_only",
+        "silent",
+        "completion delivery"
+      ]
+    },
+    "skills_plugins": {
+      "description": "Skills, plugins, plugin runtime, extensions, Superpowers, hook packs, MCP Apps, and plugin approvals.",
+      "keywords": [
+        "skill",
+        "skills",
+        "plugin",
+        "plugins",
+        "extension",
+        "extensions",
+        "superpowers",
+        "hook pack",
+        "mcp apps",
+        "plugin runtime"
+      ]
+    },
+    "auth_identity": {
+      "description": "Authentication, identity, OAuth, device identity, profile selection, account binding, token-only auth, and credential scope.",
+      "keywords": [
+        "auth",
+        "oauth",
+        "identity",
+        "device identity",
+        "profile",
+        "account",
+        "token-only",
+        "credential",
+        "api key",
+        "login"
+      ]
+    },
+    "reliability": {
+      "description": "Reliability fixes for retries, stale state, crashes, timeouts, recovery, cleanup, race conditions, and wedged processes.",
+      "keywords": [
+        "retry",
+        "stale",
+        "crash",
+        "timeout",
+        "recover",
+        "cleanup",
+        "race",
+        "wedged",
+        "dead",
+        "orphaned",
+        "fail fast",
+        "restart",
+        "liveness"
+      ]
+    },
+    "tool_calling": {
+      "description": "Model tool-calling behavior, tool-call deltas, tool schemas, tool result routing, and tool-use compatibility.",
+      "keywords": [
+        "tool call",
+        "tool-call",
+        "tool_use",
+        "tool schema",
+        "tool result",
+        "tools array",
+        "tool_choice",
+        "parallel tool call",
+        "function call"
+      ]
+    }
+  }
+}

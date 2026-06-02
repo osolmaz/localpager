@@ -83,10 +83,11 @@ runtime schema that rejects topics outside that taxonomy.
 
 For OpenClaw maintainer routing, use
 `examples/profiles/openclaw-routing-v8.prompt.md` with the OpenClaw topic
-keyword taxonomy. That profile encodes the DS4/Gemma prompt work: notification
-routing, title-first centrality, one-topic default, a second-topic gate, and
-false-positive suppression for broad topics such as `local_model_providers`,
-`reliability`, `api_surface`, `tool_calling`, and `config`.
+keyword taxonomy in `examples/profiles/openclaw-routing-topics.json`. That
+profile encodes the DS4/Gemma prompt work: notification routing, title-first
+centrality, one-topic default, a second-topic gate, and false-positive
+suppression for broad topics such as `local_model_providers`, `reliability`,
+`api_surface`, `tool_calling`, and `config`.
 
 Before the classifier runs, Localpager renders GitHub context into the prompt:
 stored title/body/labels plus optional comments, changed files, and selected PR

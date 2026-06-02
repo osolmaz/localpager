@@ -20,7 +20,7 @@
   "classifier": {
     "schema": "./schemas/classification.schema.json",
     "prompt_template": "./prompts/github-relevance-classifier.md",
-    "topic_taxonomy": "./examples/profiles/maintainer-topics.example.json",
+    "topic_taxonomy": "./examples/profiles/openclaw-routing-topics.json",
     "context": {
       "github": {
         "include_body": true,

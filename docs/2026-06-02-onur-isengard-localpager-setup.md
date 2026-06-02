@@ -27,7 +27,7 @@ same time on this machine.
 - Repo: `/home/bob/repos/localpager`
 - Live config: `/home/bob/.config/localpager/config.json`
 - Live prompt: `/home/bob/.config/localpager/openclaw.prompt.md`
-- Topic taxonomy: `/home/bob/oc/openclaw-classification-dataset/topic_keywords.json`
+- Topic taxonomy: `/home/bob/repos/localpager/examples/profiles/openclaw-routing-topics.json`
 - SQLite state: `/home/bob/.local/state/localpager/localpager.sqlite`
 - Classifier artifacts: `/home/bob/.local/state/localpager/classifier`
 - Service: `localpager-worker.service`
@@ -214,7 +214,7 @@ controls what pages Onur.
 For this setup, the full taxonomy is:
 
 ```text
-/home/bob/oc/openclaw-classification-dataset/topic_keywords.json
+/home/bob/repos/localpager/examples/profiles/openclaw-routing-topics.json
 ```
 
 The paging filter is:

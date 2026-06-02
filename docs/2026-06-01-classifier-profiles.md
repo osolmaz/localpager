@@ -115,10 +115,13 @@ schema is `examples/profiles/repo-routing.schema.json`.
 
 The OpenClaw routing prompt lives at
 `examples/profiles/openclaw-routing-v8.prompt.md`. It should be paired with the
-OpenClaw topic keyword taxonomy from the dataset workflow. That prompt is the
-production translation of the DS4/Gemma v8 routing policy: title-first
-centrality, one-topic default, second-topic gate, and explicit suppression of
-known Gemma false positives.
+OpenClaw topic keyword taxonomy in
+`examples/profiles/openclaw-routing-topics.json`. That checked-in taxonomy was
+copied from the Hugging Face dataset's `topic_keywords.json`, so the Localpager
+profile and dataset labels use the same allowed topic IDs and keyword hints.
+That prompt is the production translation of the DS4/Gemma v8 routing policy:
+title-first centrality, one-topic default, second-topic gate, and explicit
+suppression of known Gemma false positives.
 
 ## Schema Contract
 
