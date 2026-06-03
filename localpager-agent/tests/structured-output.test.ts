@@ -127,6 +127,37 @@ describe("structured output", () => {
     expect(plan.args).toContain("final_json");
   });
 
+  it("adds reposhell bash extension without final schema", async () => {
+    const plan = await createLaunchPlan(
+      { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["-p", "inspect"] },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it",
+      undefined,
+      {
+        extensionPath: "/tmp/reposhell-bash-extension.ts",
+        instruction: "use bash only if needed"
+      }
+    );
+
+    expect(plan.finalSchemaOutputPath).toBeUndefined();
+    expect(plan.args).toEqual([
+      "--provider",
+      "local-openai",
+      "--model",
+      "gemma-4-e4b-it",
+      "--thinking",
+      "off",
+      "--extension",
+      "/tmp/reposhell-bash-extension.ts",
+      "--append-system-prompt",
+      "use bash only if needed",
+      "--tools",
+      "bash",
+      "-p",
+      "inspect"
+    ]);
+  });
+
   it("rejects bash allowlist without reposhell extension", async () => {
     await expect(
       createLaunchPlan(

@@ -59,6 +59,7 @@ type Binding struct {
 	Snapshots    map[string]string
 	Roots        map[string]string
 	GitDirs      map[string]string
+	IndexFiles   map[string]string
 }
 
 type ExecRequest struct {
@@ -97,6 +98,7 @@ func (m Manager) Bind(ctx context.Context, defaultRepo string, visibleRepos []st
 	seen := map[string]bool{}
 	roots := map[string]string{}
 	gitDirs := map[string]string{}
+	indexFiles := map[string]string{}
 	snapshots := map[string]string{}
 	for _, repoID := range visibleRepos {
 		if seen[repoID] {
@@ -107,12 +109,13 @@ func (m Manager) Bind(ctx context.Context, defaultRepo string, visibleRepos []st
 		if !ok {
 			return Binding{}, fmt.Errorf("repo %q is not configured", repoID)
 		}
-		snapshot, commit, gitDir, err := m.EnsureSnapshot(ctx, repo)
+		snapshot, commit, gitDir, indexFile, err := m.EnsureSnapshot(ctx, repo)
 		if err != nil {
 			return Binding{}, err
 		}
 		roots[repoID] = snapshot
 		gitDirs[repoID] = gitDir
+		indexFiles[repoID] = indexFile
 		snapshots[repoID] = commit
 	}
 	if _, ok := roots[defaultRepo]; !ok {
@@ -125,15 +128,16 @@ func (m Manager) Bind(ctx context.Context, defaultRepo string, visibleRepos []st
 		Snapshots:    snapshots,
 		Roots:        roots,
 		GitDirs:      gitDirs,
+		IndexFiles:   indexFiles,
 	}, nil
 }
 
-func (m Manager) EnsureSnapshot(ctx context.Context, repo Repo) (string, string, string, error) {
+func (m Manager) EnsureSnapshot(ctx context.Context, repo Repo) (string, string, string, string, error) {
 	if repo.ID == "" {
-		return "", "", "", fmt.Errorf("repo id is required")
+		return "", "", "", "", fmt.Errorf("repo id is required")
 	}
 	if repo.Remote == "" {
-		return "", "", "", fmt.Errorf("repo %s remote is required", repo.ID)
+		return "", "", "", "", fmt.Errorf("repo %s remote is required", repo.ID)
 	}
 	ref := repo.DefaultRef
 	if ref == "" {
@@ -141,7 +145,7 @@ func (m Manager) EnsureSnapshot(ctx context.Context, repo Repo) (string, string,
 	}
 	root, err := expandHome(m.Config.Root)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	if root == "" {
 		root = filepath.Join(os.TempDir(), "localpager-reposhell")
@@ -151,18 +155,19 @@ func (m Manager) EnsureSnapshot(ctx context.Context, repo Repo) (string, string,
 	lock.Lock()
 	defer lock.Unlock()
 	if err := m.ensureMirror(ctx, repo, mirror); err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	commit, err := resolveCommit(ctx, mirror, repo.ID, ref)
 	if err != nil {
-		return "", "", "", err
+		return "", "", "", "", err
 	}
 	snapshot := filepath.Join(root, "snapshots", safeID(repo.ID), commit)
+	indexFile := filepath.Join(root, "snapshots", safeID(repo.ID), commit+".index")
 	marker := filepath.Join(root, "snapshots", safeID(repo.ID), commit+".ready")
-	if err := ensureSnapshotCheckout(ctx, repo.ID, mirror, snapshot, marker, commit); err != nil {
-		return "", "", "", err
+	if err := ensureSnapshotCheckout(ctx, repo.ID, mirror, snapshot, indexFile, marker, commit); err != nil {
+		return "", "", "", "", err
 	}
-	return snapshot, commit, mirror, nil
+	return snapshot, commit, mirror, indexFile, nil
 }
 
 func (m Manager) ensureMirror(ctx context.Context, repo Repo, mirror string) error {
@@ -195,14 +200,14 @@ func resolveCommit(ctx context.Context, mirror, repoID, ref string) (string, err
 	return commit, nil
 }
 
-func ensureSnapshotCheckout(ctx context.Context, repoID, mirror, snapshot, marker, commit string) error {
-	if _, err := os.Stat(marker); err == nil {
+func ensureSnapshotCheckout(ctx context.Context, repoID, mirror, snapshot, indexFile, marker, commit string) error {
+	if fileExists(marker) && fileExists(indexFile) {
 		return nil
 	}
 	if err := os.MkdirAll(snapshot, 0o755); err != nil {
 		return fmt.Errorf("create snapshot dir: %w", err)
 	}
-	checkout := runGit(ctx, "", "--git-dir", mirror, "--work-tree", snapshot, "checkout", "-f", commit)
+	checkout := runGitWithEnv(ctx, "", []string{"GIT_INDEX_FILE=" + indexFile}, "--git-dir", mirror, "--work-tree", snapshot, "checkout", "-f", commit)
 	if checkout.err != nil {
 		return fmt.Errorf("checkout snapshot for %s: %w stderr=%s", repoID, checkout.err, strings.TrimSpace(checkout.stderr))
 	}
@@ -239,7 +244,7 @@ func (m Manager) Exec(ctx context.Context, req ExecRequest) ExecResult {
 	defer cancel()
 	cmd := exec.CommandContext(runCtx, plan.Name, plan.Args...)
 	cmd.Dir = plan.Dir
-	cmd.Env = []string{"PATH=/usr/bin:/bin", "LC_ALL=C", "LANG=C"}
+	cmd.Env = append([]string{"PATH=/usr/bin:/bin", "LC_ALL=C", "LANG=C"}, plan.Env...)
 	cmd.Stdin = nil
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	cmd.Cancel = func() error {
@@ -272,6 +277,7 @@ type execPlan struct {
 	Name            string
 	Args            []string
 	Dir             string
+	Env             []string
 	SyntheticStdout string
 }
 
@@ -625,10 +631,14 @@ func planGit(args []string, binding Binding) (execPlan, error) {
 	if gitDir == "" {
 		return execPlan{}, deny("default repo git dir is not bound")
 	}
+	gitEnv, err := boundGitEnv(binding)
+	if err != nil {
+		return execPlan{}, err
+	}
 	switch args[0] {
 	case "status":
 		if len(args) == 2 && args[1] == "--short" {
-			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, args...), Dir: root}, nil
+			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, args...), Dir: root, Env: gitEnv}, nil
 		}
 	case "show":
 		if len(args) == 2 && args[1] == "--name-only" {
@@ -637,7 +647,7 @@ func planGit(args []string, binding Binding) (execPlan, error) {
 				return execPlan{}, err
 			}
 			showArgs := []string{"show", "--name-only", commit}
-			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, showArgs...), Dir: root}, nil
+			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, showArgs...), Dir: root, Env: gitEnv}, nil
 		}
 	case "grep":
 		if len(args) >= 2 {
@@ -653,6 +663,14 @@ func boundCommit(binding Binding) (string, error) {
 		return "", deny("default repo snapshot is not bound")
 	}
 	return commit, nil
+}
+
+func boundGitEnv(binding Binding) ([]string, error) {
+	indexFile := binding.IndexFiles[binding.DefaultRepo]
+	if indexFile == "" {
+		return nil, deny("default repo git index is not bound")
+	}
+	return []string{"GIT_INDEX_FILE=" + indexFile}, nil
 }
 
 func planGitGrep(args []string, binding Binding) (execPlan, error) {
@@ -682,7 +700,11 @@ func planGitGrep(args []string, binding Binding) (execPlan, error) {
 		}
 		out = append(out, virtual)
 	}
-	return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(binding.GitDirs[binding.DefaultRepo], binding.Roots[binding.DefaultRepo], out...), Dir: binding.Roots[binding.DefaultRepo]}, nil
+	gitEnv, err := boundGitEnv(binding)
+	if err != nil {
+		return execPlan{}, err
+	}
+	return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(binding.GitDirs[binding.DefaultRepo], binding.Roots[binding.DefaultRepo], out...), Dir: binding.Roots[binding.DefaultRepo], Env: gitEnv}, nil
 }
 
 func resolveVirtualPath(binding Binding, raw string) (string, error) {
@@ -798,9 +820,21 @@ func shouldRefresh(mirror string, repoInterval, defaultInterval time.Duration) b
 	return time.Since(info.ModTime()) >= interval
 }
 
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
 func runGit(ctx context.Context, dir string, args ...string) gitResult {
+	return runGitWithEnv(ctx, dir, nil, args...)
+}
+
+func runGitWithEnv(ctx context.Context, dir string, env []string, args ...string) gitResult {
 	cmd := exec.CommandContext(ctx, "/usr/bin/git", args...)
 	cmd.Dir = dir
+	if len(env) > 0 {
+		cmd.Env = append(os.Environ(), env...)
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

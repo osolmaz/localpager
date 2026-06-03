@@ -16,11 +16,15 @@ import (
 	"time"
 )
 
+const DefaultBindingTTL = time.Hour
+
 type Server struct {
 	manager Manager
 
 	mu              sync.Mutex
 	bindings        map[string]Binding
+	bindingCreated  map[string]time.Time
+	bindingTTL      time.Duration
 	toolCalls       int64
 	policyDenials   int64
 	truncatedOutput int64
@@ -53,7 +57,12 @@ type StatusResponse struct {
 }
 
 func NewServer(manager Manager) *Server {
-	return &Server{manager: manager, bindings: map[string]Binding{}}
+	return &Server{
+		manager:        manager,
+		bindings:       map[string]Binding{},
+		bindingCreated: map[string]time.Time{},
+		bindingTTL:     DefaultBindingTTL,
+	}
 }
 
 func (s *Server) ServeUnix(ctx context.Context, socketPath string) error {
@@ -146,7 +155,9 @@ func (s *Server) handleBind(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	s.pruneExpiredBindingsLocked(time.Now())
 	s.bindings[runID] = binding
+	s.bindingCreated[runID] = time.Now()
 	s.mu.Unlock()
 	writeJSON(w, http.StatusOK, BindResponse{
 		RunID:        runID,
@@ -168,6 +179,7 @@ func (s *Server) handleExec(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.mu.Lock()
+	s.pruneExpiredBindingsLocked(time.Now())
 	binding, ok := s.bindings[req.RunID]
 	s.mu.Unlock()
 	if !ok {
@@ -194,6 +206,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.pruneExpiredBindingsLocked(time.Now())
 	runs := map[string]string{}
 	for id, binding := range s.bindings {
 		runs[id] = binding.CWD
@@ -205,6 +218,19 @@ func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 		TruncatedOutput: s.truncatedOutput,
 		Runs:            runs,
 	})
+}
+
+func (s *Server) pruneExpiredBindingsLocked(now time.Time) {
+	ttl := s.bindingTTL
+	if ttl <= 0 {
+		ttl = DefaultBindingTTL
+	}
+	for id, created := range s.bindingCreated {
+		if now.Sub(created) >= ttl {
+			delete(s.bindingCreated, id)
+			delete(s.bindings, id)
+		}
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

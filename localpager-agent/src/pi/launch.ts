@@ -24,7 +24,7 @@ export async function createLaunchPlan(
   await mkdir(options.sessionDir, { recursive: true });
   const forwardedArgs =
     finalSchemaRuntime === undefined
-      ? [...options.forwardedArgs]
+      ? plainOutputArgs(options.forwardedArgs, reposhellRuntime)
       : structuredOutputArgs(options.forwardedArgs, finalSchemaRuntime, reposhellRuntime);
   return {
     command: options.piCommand,
@@ -83,24 +83,43 @@ function structuredOutputArgs(
   if (!hasPrintMode(forwardedArgs)) {
     throw new Error("--final-schema requires Pi print mode (-p or --print)");
   }
-  const args = ensureAllowedTools(forwardedArgs, reposhellRuntime !== undefined);
-  const extensions =
-    reposhellRuntime === undefined
-      ? []
-      : [
-          "--extension",
-          reposhellRuntime.extensionPath,
-          "--append-system-prompt",
-          reposhellRuntime.instruction
-        ];
+  const args = ensureAllowedTools(forwardedArgs, {
+    reposhellEnabled: reposhellRuntime !== undefined,
+    finalJsonRequired: true
+  });
   return [
-    ...extensions,
+    ...reposhellExtensionArgs(reposhellRuntime),
     "--extension",
     runtime.extensionPath,
     "--append-system-prompt",
     runtime.instruction,
     ...args
   ];
+}
+
+function plainOutputArgs(
+  forwardedArgs: readonly string[],
+  reposhellRuntime: ReposhellRuntime | undefined
+): string[] {
+  if (reposhellRuntime === undefined) {
+    return [...forwardedArgs];
+  }
+  if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
+    throw new Error("--reposhell-socket cannot be used with --no-tools");
+  }
+  return [
+    ...reposhellExtensionArgs(reposhellRuntime),
+    ...ensureAllowedTools(forwardedArgs, {
+      reposhellEnabled: true,
+      finalJsonRequired: false
+    })
+  ];
+}
+
+function reposhellExtensionArgs(runtime: ReposhellRuntime | undefined): string[] {
+  return runtime === undefined
+    ? []
+    : ["--extension", runtime.extensionPath, "--append-system-prompt", runtime.instruction];
 }
 
 function hasRpcMode(args: readonly string[]): boolean {
@@ -111,18 +130,24 @@ function hasPrintMode(args: readonly string[]): boolean {
   return args.includes("--print") || args.includes("-p");
 }
 
-function ensureAllowedTools(args: readonly string[], reposhellEnabled: boolean): string[] {
+type ToolOptions = {
+  readonly reposhellEnabled: boolean;
+  readonly finalJsonRequired: boolean;
+};
+
+function ensureAllowedTools(args: readonly string[], options: ToolOptions): string[] {
   const next = [...args];
   const index = toolsFlagIndex(next);
   if (index === -1) {
-    return ["--tools", reposhellEnabled ? "bash,final_json" : "final_json", ...next];
+    const tools = defaultTools(options);
+    return tools.length === 0 ? next : ["--tools", tools.join(","), ...next];
   }
   const flag = next[index];
   const value = next[index + 1];
   if (flag === undefined || value === undefined) {
     throw new Error(`${flag ?? "--tools"} requires a value`);
   }
-  next[index + 1] = normalizeTools(value, reposhellEnabled).join(",");
+  next[index + 1] = normalizeTools(value, options).join(",");
   return next;
 }
 
@@ -130,18 +155,29 @@ function toolsFlagIndex(args: readonly string[]): number {
   return args.findIndex((arg) => arg === "--tools" || arg === "-t");
 }
 
-function normalizeTools(value: string, reposhellEnabled: boolean): string[] {
+function defaultTools(options: ToolOptions): string[] {
+  const tools: string[] = [];
+  if (options.reposhellEnabled) {
+    tools.push("bash");
+  }
+  if (options.finalJsonRequired) {
+    tools.push("final_json");
+  }
+  return tools;
+}
+
+function normalizeTools(value: string, options: ToolOptions): string[] {
   const tools = value
     .split(",")
     .map((tool) => tool.trim())
     .filter((tool) => tool.length > 0);
-  if (tools.includes("bash") && !reposhellEnabled) {
+  if (tools.includes("bash") && !options.reposhellEnabled) {
     throw new Error("--tools bash requires --reposhell-socket");
   }
-  if (reposhellEnabled && !tools.includes("bash")) {
+  if (options.reposhellEnabled && !tools.includes("bash")) {
     tools.push("bash");
   }
-  if (!tools.includes("final_json")) {
+  if (options.finalJsonRequired && !tools.includes("final_json")) {
     tools.push("final_json");
   }
   return tools;

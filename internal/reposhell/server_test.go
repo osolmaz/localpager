@@ -48,6 +48,25 @@ func TestServeUnixRestrictsSocketPermissions(t *testing.T) {
 	}
 }
 
+func TestServerPrunesExpiredBindings(t *testing.T) {
+	server := NewServer(NewManager(Config{}))
+	server.bindingTTL = time.Minute
+	server.mu.Lock()
+	server.bindings["old"] = Binding{CWD: "/repo/old"}
+	server.bindingCreated["old"] = time.Now().Add(-2 * time.Minute)
+	server.bindings["fresh"] = Binding{CWD: "/repo/fresh"}
+	server.bindingCreated["fresh"] = time.Now()
+	server.pruneExpiredBindingsLocked(time.Now())
+	server.mu.Unlock()
+
+	if _, ok := server.bindings["old"]; ok {
+		t.Fatal("old binding was not pruned")
+	}
+	if _, ok := server.bindings["fresh"]; !ok {
+		t.Fatal("fresh binding was pruned")
+	}
+}
+
 func waitForSocket(t *testing.T, path string) {
 	t.Helper()
 	deadline := time.Now().Add(2 * time.Second)

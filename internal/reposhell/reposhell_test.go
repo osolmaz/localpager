@@ -121,6 +121,46 @@ func TestGitShowUsesBoundSnapshotCommit(t *testing.T) {
 	}
 }
 
+func TestGitCommandsUseBoundSnapshotIndex(t *testing.T) {
+	ctx := context.Background()
+	source := testGitRepo(t, map[string]string{"old.txt": "old\n"})
+	manager := NewManager(Config{
+		Root:  filepath.Join(t.TempDir(), "state"),
+		Repos: []Repo{{ID: "project", Remote: source, DefaultRef: "main"}},
+	})
+	oldBinding, err := manager.Bind(ctx, "project", []string{"project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "new.txt"), []byte("new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, source, "add", "new.txt")
+	git(t, source, "commit", "-m", "advance")
+	if _, err := manager.Bind(ctx, "project", []string{"project"}); err != nil {
+		t.Fatal(err)
+	}
+
+	oldGrep := manager.Exec(ctx, ExecRequest{Command: "git grep -n old", Binding: oldBinding})
+	if oldGrep.PolicyError != "" || oldGrep.ExitCode != 0 {
+		t.Fatalf("old git grep failed: policy=%q exit=%d stderr=%s", oldGrep.PolicyError, oldGrep.ExitCode, oldGrep.Stderr)
+	}
+	if !strings.Contains(oldGrep.Stdout, "old.txt:1:old") {
+		t.Fatalf("old git grep stdout = %q", oldGrep.Stdout)
+	}
+	newGrep := manager.Exec(ctx, ExecRequest{Command: "git grep -n new", Binding: oldBinding})
+	if strings.Contains(newGrep.Stdout, "new.txt") {
+		t.Fatalf("old binding saw newer file: %q", newGrep.Stdout)
+	}
+	status := manager.Exec(ctx, ExecRequest{Command: "git status --short", Binding: oldBinding})
+	if status.PolicyError != "" || status.ExitCode != 0 {
+		t.Fatalf("git status failed: policy=%q exit=%d stderr=%s", status.PolicyError, status.ExitCode, status.Stderr)
+	}
+	if strings.TrimSpace(status.Stdout) != "" {
+		t.Fatalf("old binding status = %q, want clean snapshot", status.Stdout)
+	}
+}
+
 func TestGitShowRejectsOptionalRevision(t *testing.T) {
 	ctx := context.Background()
 	source := testGitRepo(t, map[string]string{"secret.txt": "secret\n"})
