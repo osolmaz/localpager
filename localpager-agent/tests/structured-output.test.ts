@@ -73,6 +73,10 @@ describe("structured output", () => {
       outputPath: "/tmp/final-output.json",
       instruction: "call final_json"
     };
+    const repoReaderRuntime = {
+      extensionPath: "/tmp/repo-reader-bash-extension.ts",
+      instruction: "use bash only if needed"
+    };
     const plan = await createLaunchPlan(
       {
         ...options("/tmp/localpager-agent-state"),
@@ -80,7 +84,8 @@ describe("structured output", () => {
       },
       runtimeConfig("/tmp/localpager-agent-state"),
       "gemma-4-e4b-it",
-      runtime
+      runtime,
+      repoReaderRuntime
     );
 
     expect(plan.finalSchemaOutputPath).toBe("/tmp/final-output.json");
@@ -92,6 +97,10 @@ describe("structured output", () => {
       "--thinking",
       "off",
       "--extension",
+      "/tmp/repo-reader-bash-extension.ts",
+      "--append-system-prompt",
+      "use bash only if needed",
+      "--extension",
       "/tmp/final-json-extension.ts",
       "--append-system-prompt",
       "call final_json",
@@ -100,6 +109,40 @@ describe("structured output", () => {
       "-p",
       "classify"
     ]);
+  });
+
+  it("adds explicit final_json tools when no allowlist is provided", async () => {
+    const plan = await createLaunchPlan(
+      { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["-p", "classify"] },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it",
+      {
+        extensionPath: "/tmp/final-json-extension.ts",
+        outputPath: "/tmp/final-output.json",
+        instruction: "call final_json"
+      }
+    );
+
+    expect(plan.args).toContain("--tools");
+    expect(plan.args).toContain("final_json");
+  });
+
+  it("rejects bash allowlist without repo-reader extension", async () => {
+    await expect(
+      createLaunchPlan(
+        {
+          ...options("/tmp/localpager-agent-state"),
+          forwardedArgs: ["--tools", "bash", "-p", "classify"]
+        },
+        runtimeConfig("/tmp/localpager-agent-state"),
+        "gemma-4-e4b-it",
+        {
+          extensionPath: "/tmp/final-json-extension.ts",
+          outputPath: "/tmp/final-output.json",
+          instruction: "call final_json"
+        }
+      )
+    ).rejects.toThrow("--tools bash requires --repo-reader-socket");
   });
 
   it("rejects schema mode when Pi tools are disabled", async () => {
@@ -171,6 +214,9 @@ function options(stateDir: string): LocalpagerAgentOptions {
     maxTokens: 8192,
     timeoutMs: 1000,
     finalSchemaPath: undefined,
+    repoReaderSocket: undefined,
+    repoReaderDefaultRepo: undefined,
+    repoReaderVisibleRepos: [],
     status: false,
     forwardedArgs: []
   };

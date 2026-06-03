@@ -22,6 +22,7 @@ type Config struct {
 	Watch            Watch      `json:"watch"`
 	Classifier       Classifier `json:"classifier"`
 	Worker           Worker     `json:"worker"`
+	RepoReader       RepoReader `json:"repo_reader"`
 }
 
 type Enqueue struct {
@@ -37,10 +38,13 @@ type Watch struct {
 }
 
 type Classifier struct {
-	Schema         string  `json:"schema"`
-	PromptTemplate string  `json:"prompt_template"`
-	TopicTaxonomy  string  `json:"topic_taxonomy"`
-	Context        Context `json:"context"`
+	Schema                 string   `json:"schema"`
+	PromptTemplate         string   `json:"prompt_template"`
+	TopicTaxonomy          string   `json:"topic_taxonomy"`
+	Tools                  []string `json:"tools"`
+	RepoReaderDefaultRepo  string   `json:"repo_reader_default_repo"`
+	RepoReaderVisibleRepos []string `json:"repo_reader_visible_repos"`
+	Context                Context  `json:"context"`
 }
 
 type Context struct {
@@ -80,6 +84,23 @@ type Worker struct {
 	SendPendingOnly            bool     `json:"send_pending_only"`
 	PollInterval               string   `json:"poll_interval"`
 	NotifyTopicsAny            []string `json:"notify_topics_any"`
+}
+
+type RepoReader struct {
+	Enabled         bool             `json:"enabled"`
+	Root            string           `json:"root"`
+	Socket          string           `json:"socket"`
+	CommandTimeout  string           `json:"command_timeout"`
+	MaxOutputBytes  int64            `json:"max_output_bytes"`
+	RefreshInterval string           `json:"refresh_interval"`
+	Repos           []RepoReaderRepo `json:"repos"`
+}
+
+type RepoReaderRepo struct {
+	ID              string `json:"id"`
+	Remote          string `json:"remote"`
+	DefaultRef      string `json:"default_ref"`
+	RefreshInterval string `json:"refresh_interval"`
 }
 
 func Load(path string) (Config, error) {

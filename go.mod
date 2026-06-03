@@ -1,10 +1,11 @@
 module github.com/osolmaz/localpager
 
-go 1.24
+go 1.25.0
 
 require (
 	github.com/glebarez/sqlite v1.11.0
 	gorm.io/gorm v1.31.1
+	mvdan.cc/sh/v3 v3.12.0
 )
 
 require (
@@ -15,7 +16,7 @@ require (
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	golang.org/x/sys v0.7.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
 	modernc.org/libc v1.22.5 // indirect
 	modernc.org/mathutil v1.5.0 // indirect

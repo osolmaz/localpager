@@ -82,6 +82,9 @@ function options(stateDir: string): LocalpagerAgentOptions {
     maxTokens: 8192,
     timeoutMs: 1000,
     finalSchemaPath: undefined,
+    repoReaderSocket: undefined,
+    repoReaderDefaultRepo: undefined,
+    repoReaderVisibleRepos: [],
     status: false,
     forwardedArgs: []
   };

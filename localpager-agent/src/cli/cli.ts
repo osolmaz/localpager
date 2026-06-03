@@ -4,6 +4,7 @@ import { resolveLocalModel } from "../llm/openai.js";
 import { writeRuntimeConfig } from "../pi/config.js";
 import type { RuntimeConfig } from "../pi/config.js";
 import { createLaunchPlan, execLaunchPlan } from "../pi/launch.js";
+import { createRepoReaderRuntime } from "../repo-reader/bash-extension.js";
 import { createFinalSchemaRuntime, readFinalSchemaOutput } from "../structured/final-schema.js";
 
 export async function run(args: readonly string[]): Promise<CommandResult> {
@@ -24,7 +25,14 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
       options.finalSchemaPath === undefined
         ? undefined
         : await createFinalSchemaRuntime(options.finalSchemaPath, options.stateDir);
-    const plan = await createLaunchPlan(options, runtimeConfig, resolved.model, finalSchemaRuntime);
+    const repoReaderRuntime = await createRepoReaderRuntime(options);
+    const plan = await createLaunchPlan(
+      options,
+      runtimeConfig,
+      resolved.model,
+      finalSchemaRuntime,
+      repoReaderRuntime
+    );
     const code = await execLaunchPlan(plan);
     if (code !== 0 || plan.finalSchemaOutputPath === undefined) {
       return { code, stdout: "", stderr: "" };

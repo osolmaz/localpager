@@ -22,6 +22,14 @@ Use this context as source of truth. If important sections are missing,
 unavailable, selected, or truncated, classify from what is available and mention
 material limits in `caveats`.
 
+## Repository Reads
+
+A read-only `bash` tool may be available in the OpenClaw repo snapshot. Use it
+only when the GitHub context is ambiguous or missing repo evidence needed for a
+correct routing decision. Prefer short commands such as `pwd`, `ls`, `find`,
+`rg`, `grep`, `sed -n`, `cat`, `head`, `git show --name-only`, or `git grep`.
+Do not call `bash` when the provided GitHub context is enough.
+
 ## Allowed Topics
 
 ```json

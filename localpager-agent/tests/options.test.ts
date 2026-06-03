@@ -29,4 +29,21 @@ describe("localpager-agent option parsing", () => {
       "schema.json"
     );
   });
+
+  it("parses repo-reader flags as localpager-agent options", () => {
+    const options = parseLocalpagerAgentArgs([
+      "--repo-reader-socket",
+      "/tmp/localpager.sock",
+      "--repo-reader-default-repo",
+      "openclaw",
+      "--repo-reader-visible-repos",
+      "openclaw,clawhub",
+      "-p",
+      "classify"
+    ]);
+    expect(options.repoReaderSocket).toBe("/tmp/localpager.sock");
+    expect(options.repoReaderDefaultRepo).toBe("openclaw");
+    expect(options.repoReaderVisibleRepos).toEqual(["openclaw", "clawhub"]);
+    expect(options.forwardedArgs).toEqual(["-p", "classify"]);
+  });
 });

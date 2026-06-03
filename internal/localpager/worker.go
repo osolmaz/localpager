@@ -36,6 +36,10 @@ type WorkerOptions struct {
 	ClassifierSchema           string
 	ClassifierPromptTemplate   string
 	ClassifierTopicTaxonomy    string
+	ClassifierTools            []string
+	RepoReaderSocket           string
+	RepoReaderDefaultRepo      string
+	RepoReaderVisibleRepos     []string
 	ClassifierContext          ClassifierContextOptions
 	Model                      string
 	AgentBaseURL               string

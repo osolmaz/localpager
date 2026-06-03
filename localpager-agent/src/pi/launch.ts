@@ -3,6 +3,7 @@ import type { StdioOptions } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 
 import type { LocalpagerAgentOptions } from "../agent/options.js";
+import type { RepoReaderRuntime } from "../repo-reader/bash-extension.js";
 import type { FinalSchemaRuntime } from "../structured/final-schema.js";
 import type { RuntimeConfig } from "./config.js";
 
@@ -17,13 +18,14 @@ export async function createLaunchPlan(
   options: LocalpagerAgentOptions,
   runtimeConfig: RuntimeConfig,
   model: string,
-  finalSchemaRuntime?: FinalSchemaRuntime
+  finalSchemaRuntime?: FinalSchemaRuntime,
+  repoReaderRuntime?: RepoReaderRuntime
 ): Promise<LaunchPlan> {
   await mkdir(options.sessionDir, { recursive: true });
   const forwardedArgs =
     finalSchemaRuntime === undefined
       ? [...options.forwardedArgs]
-      : structuredOutputArgs(options.forwardedArgs, finalSchemaRuntime);
+      : structuredOutputArgs(options.forwardedArgs, finalSchemaRuntime, repoReaderRuntime);
   return {
     command: options.piCommand,
     args: [
@@ -69,7 +71,8 @@ export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {
 
 function structuredOutputArgs(
   forwardedArgs: readonly string[],
-  runtime: FinalSchemaRuntime
+  runtime: FinalSchemaRuntime,
+  repoReaderRuntime: RepoReaderRuntime | undefined
 ): string[] {
   if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
     throw new Error("--final-schema cannot be used with --no-tools");
@@ -80,12 +83,23 @@ function structuredOutputArgs(
   if (!hasPrintMode(forwardedArgs)) {
     throw new Error("--final-schema requires Pi print mode (-p or --print)");
   }
+  const args = ensureAllowedTools(forwardedArgs, repoReaderRuntime !== undefined);
+  const extensions =
+    repoReaderRuntime === undefined
+      ? []
+      : [
+          "--extension",
+          repoReaderRuntime.extensionPath,
+          "--append-system-prompt",
+          repoReaderRuntime.instruction
+        ];
   return [
+    ...extensions,
     "--extension",
     runtime.extensionPath,
     "--append-system-prompt",
     runtime.instruction,
-    ...ensureFinalJsonToolAllowed(forwardedArgs)
+    ...args
   ];
 }
 
@@ -97,27 +111,40 @@ function hasPrintMode(args: readonly string[]): boolean {
   return args.includes("--print") || args.includes("-p");
 }
 
-function ensureFinalJsonToolAllowed(args: readonly string[]): string[] {
+function ensureAllowedTools(args: readonly string[], repoReaderEnabled: boolean): string[] {
   const next = [...args];
-  for (let index = 0; index < next.length; index += 1) {
-    const arg = next[index];
-    if (arg !== "--tools" && arg !== "-t") {
-      continue;
-    }
-    const value = next[index + 1];
-    if (value === undefined) {
-      throw new Error(`${arg} requires a value`);
-    }
-    const tools = value
-      .split(",")
-      .map((tool) => tool.trim())
-      .filter((tool) => tool.length > 0);
-    if (!tools.includes("final_json")) {
-      tools.push("final_json");
-    }
-    next[index + 1] = tools.join(",");
+  const index = toolsFlagIndex(next);
+  if (index === -1) {
+    return ["--tools", repoReaderEnabled ? "bash,final_json" : "final_json", ...next];
   }
+  const flag = next[index];
+  const value = next[index + 1];
+  if (flag === undefined || value === undefined) {
+    throw new Error(`${flag ?? "--tools"} requires a value`);
+  }
+  next[index + 1] = normalizeTools(value, repoReaderEnabled).join(",");
   return next;
+}
+
+function toolsFlagIndex(args: readonly string[]): number {
+  return args.findIndex((arg) => arg === "--tools" || arg === "-t");
+}
+
+function normalizeTools(value: string, repoReaderEnabled: boolean): string[] {
+  const tools = value
+    .split(",")
+    .map((tool) => tool.trim())
+    .filter((tool) => tool.length > 0);
+  if (tools.includes("bash") && !repoReaderEnabled) {
+    throw new Error("--tools bash requires --repo-reader-socket");
+  }
+  if (repoReaderEnabled && !tools.includes("bash")) {
+    tools.push("bash");
+  }
+  if (!tools.includes("final_json")) {
+    tools.push("final_json");
+  }
+  return tools;
 }
 
 function shellCommand(command: string, args: readonly string[]): string {

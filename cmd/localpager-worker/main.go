@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/config"
@@ -25,6 +26,10 @@ func main() {
 	flag.StringVar(&flags.classifierSchema, "classifier-schema", "", "classifier JSON schema path")
 	flag.StringVar(&flags.classifierPromptTemplate, "classifier-prompt-template", "", "classifier prompt template path")
 	flag.StringVar(&flags.classifierTopicTaxonomy, "classifier-topic-taxonomy", "", "classifier topic taxonomy path")
+	flag.StringVar(&flags.classifierTools, "classifier-tools", "", "comma-separated classifier tool allowlist")
+	flag.StringVar(&flags.repoReaderSocket, "repo-reader-socket", "", "repo-reader Unix socket path")
+	flag.StringVar(&flags.repoReaderDefaultRepo, "repo-reader-default-repo", "", "default repo id for repo-reader bash tool")
+	flag.StringVar(&flags.repoReaderVisibleRepos, "repo-reader-visible-repos", "", "comma-separated visible repo ids for repo-reader bash tool")
 	flag.StringVar(&flags.githubBaseURL, "github-base-url", "https://api.github.com", "GitHub API base URL for classifier context")
 	flag.StringVar(&flags.githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token for classifier context")
 	flag.StringVar(&flags.model, "model", "", "optional localpager-agent model override")
@@ -79,6 +84,10 @@ func main() {
 		ClassifierSchema:           flags.classifierSchema,
 		ClassifierPromptTemplate:   flags.classifierPromptTemplate,
 		ClassifierTopicTaxonomy:    flags.classifierTopicTaxonomy,
+		ClassifierTools:            splitCSV(flags.classifierTools),
+		RepoReaderSocket:           flags.repoReaderSocket,
+		RepoReaderDefaultRepo:      flags.repoReaderDefaultRepo,
+		RepoReaderVisibleRepos:     splitCSV(flags.repoReaderVisibleRepos),
 		ClassifierContext:          classifierContextOptions(cfg, flags.githubBaseURL, flags.githubTokenEnv),
 		Model:                      flags.model,
 		AgentBaseURL:               flags.agentBaseURL,
@@ -120,6 +129,10 @@ type workerFlags struct {
 	classifierSchema           string
 	classifierPromptTemplate   string
 	classifierTopicTaxonomy    string
+	classifierTools            string
+	repoReaderSocket           string
+	repoReaderDefaultRepo      string
+	repoReaderVisibleRepos     string
 	githubBaseURL              string
 	githubTokenEnv             string
 	model                      string
@@ -179,6 +192,18 @@ func (flags *workerFlags) applyClassifierConfig(cfg config.Config, setFlags map[
 	}
 	if cfg.Classifier.TopicTaxonomy != "" && !config.FlagSet(setFlags, "classifier-topic-taxonomy") {
 		flags.classifierTopicTaxonomy = cfg.Classifier.TopicTaxonomy
+	}
+	if len(cfg.Classifier.Tools) > 0 && !config.FlagSet(setFlags, "classifier-tools") {
+		flags.classifierTools = strings.Join(cfg.Classifier.Tools, ",")
+	}
+	if cfg.RepoReader.Enabled && !config.FlagSet(setFlags, "repo-reader-socket") {
+		flags.repoReaderSocket = app.RepoReaderSocket(cfg)
+	}
+	if cfg.Classifier.RepoReaderDefaultRepo != "" && !config.FlagSet(setFlags, "repo-reader-default-repo") {
+		flags.repoReaderDefaultRepo = cfg.Classifier.RepoReaderDefaultRepo
+	}
+	if len(cfg.Classifier.RepoReaderVisibleRepos) > 0 && !config.FlagSet(setFlags, "repo-reader-visible-repos") {
+		flags.repoReaderVisibleRepos = strings.Join(cfg.Classifier.RepoReaderVisibleRepos, ",")
 	}
 	if cfg.Worker.Model != "" && !config.FlagSet(setFlags, "model") {
 		flags.model = cfg.Worker.Model
@@ -262,4 +287,16 @@ func boolValue(value *bool, fallback bool) bool {
 		return fallback
 	}
 	return *value
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
 }

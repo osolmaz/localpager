@@ -328,24 +328,27 @@ large source snippets. Store them in classifier session artifacts if needed.
 
 ## Implementation Checklist
 
-- Add `repo_reader` config structs and validation.
-- Add `classifier.tools`, `classifier.repo_reader_default_repo`, and
+- [x] Add `repo_reader` config structs.
+- [x] Add `classifier.tools`, `classifier.repo_reader_default_repo`, and
   `classifier.repo_reader_visible_repos`.
-- Add `localpager repo-reader serve`.
-- Add mirror clone/fetch and snapshot pinning.
-- Add the command parser and policy validator.
-- Add read-only command execution with timeouts and output caps.
-- Add Unix socket API.
-- Add a Pi extension that registers tool name `bash`.
-- Make `localpager-agent` support explicit `--tools final_json` in schema mode.
-- Make `scripts/localpager-classifier` pass explicit tools.
-- Add tests that unrestricted shell commands are rejected.
-- Add tests that path traversal and symlink escapes are rejected.
-- Add tests that a classifier run starts in the default repo cwd.
-- Add tests for multiple visible repos and explicit `/repo/<id>` paths.
-- Add service docs and an example config.
-- Roll out with `final_json` only first, then enable repo-reader `bash` after
-  the extension ownership check is in place.
+- [x] Add `localpager repo-reader serve`.
+- [x] Add mirror clone/fetch and snapshot pinning.
+- [x] Add the command parser and policy validator.
+- [x] Add read-only command execution with timeouts and output caps.
+- [x] Add Unix socket API.
+- [x] Add a Pi extension that registers tool name `bash`.
+- [x] Make `localpager-agent` support explicit `--tools final_json` in schema
+  mode.
+- [x] Make `scripts/localpager-classifier` pass explicit tools.
+- [x] Add tests that unrestricted shell commands are rejected.
+- [x] Add tests that path traversal and symlink escapes are rejected.
+- [x] Add tests that a classifier run starts in the default repo cwd.
+- [x] Add tests for multiple visible repos and explicit `/repo/<id>` paths.
+- [x] Add service docs and an example config.
+- [x] Reject `--tools bash` unless the Localpager repo-reader extension is
+  attached.
+- [ ] Persist repo-reader audit metadata on classifier results.
+- [ ] Add snapshot garbage collection.
 
 ## Open Questions
 

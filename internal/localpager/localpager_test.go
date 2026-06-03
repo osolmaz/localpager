@@ -1757,12 +1757,16 @@ JSON
 			SourceRef: "example/repo#1",
 		},
 	}, WorkerOptions{
-		ClassifierCommand:  classifier,
-		Model:              "gemma-4-e4b-it",
-		AgentBaseURL:       "http://127.0.0.1:1234/v1",
-		AgentContextWindow: 8192,
-		AgentMaxTokens:     768,
-		AgentTimeoutMS:     5000,
+		ClassifierCommand:      classifier,
+		Model:                  "gemma-4-e4b-it",
+		AgentBaseURL:           "http://127.0.0.1:1234/v1",
+		AgentContextWindow:     8192,
+		AgentMaxTokens:         768,
+		AgentTimeoutMS:         5000,
+		ClassifierTools:        []string{"bash", "final_json"},
+		RepoReaderSocket:       "/tmp/localpager.sock",
+		RepoReaderDefaultRepo:  "openclaw",
+		RepoReaderVisibleRepos: []string{"openclaw", "clawhub"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1781,6 +1785,14 @@ JSON
 		"768",
 		"--timeout-ms",
 		"5000",
+		"--tools",
+		"bash,final_json",
+		"--repo-reader-socket",
+		"/tmp/localpager.sock",
+		"--repo-reader-default-repo",
+		"openclaw",
+		"--repo-reader-visible-repos",
+		"openclaw,clawhub",
 	} {
 		if !containsString(got, want) {
 			t.Fatalf("args = %#v, missing %q", got, want)

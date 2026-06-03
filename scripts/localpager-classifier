@@ -7,9 +7,13 @@ schema="${LOCALPAGER_CLASSIFIER_SCHEMA:-$root/schemas/classification.schema.json
 prompt_template="${LOCALPAGER_CLASSIFIER_PROMPT_TEMPLATE:-$root/prompts/github-relevance-classifier.md}"
 topic_taxonomy="${LOCALPAGER_CLASSIFIER_TOPIC_TAXONOMY:-}"
 github_context_file="${LOCALPAGER_CLASSIFIER_GITHUB_CONTEXT_FILE:-}"
+tools="${LOCALPAGER_CLASSIFIER_TOOLS:-final_json}"
+repo_reader_socket="${LOCALPAGER_REPO_READER_SOCKET:-}"
+repo_reader_default_repo="${LOCALPAGER_REPO_READER_DEFAULT_REPO:-}"
+repo_reader_visible_repos="${LOCALPAGER_REPO_READER_VISIBLE_REPOS:-}"
 
 if [[ $# -lt 1 ]]; then
-  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>] [--base-url <url>] [--context-window <n>] [--max-tokens <n>] [--timeout-ms <n>] [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>] [--github-context-file <path>]" >&2
+  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>] [--base-url <url>] [--context-window <n>] [--max-tokens <n>] [--timeout-ms <n>] [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>] [--github-context-file <path>] [--tools <list>] [--repo-reader-socket <path>] [--repo-reader-default-repo <id>] [--repo-reader-visible-repos <list>]" >&2
   exit 2
 fi
 
@@ -95,6 +99,38 @@ while [[ $# -gt 0 ]]; do
       github_context_file="$2"
       shift 2
       ;;
+    --tools)
+      if [[ $# -lt 2 ]]; then
+        echo "--tools requires a value" >&2
+        exit 2
+      fi
+      tools="$2"
+      shift 2
+      ;;
+    --repo-reader-socket)
+      if [[ $# -lt 2 ]]; then
+        echo "--repo-reader-socket requires a value" >&2
+        exit 2
+      fi
+      repo_reader_socket="$2"
+      shift 2
+      ;;
+    --repo-reader-default-repo)
+      if [[ $# -lt 2 ]]; then
+        echo "--repo-reader-default-repo requires a value" >&2
+        exit 2
+      fi
+      repo_reader_default_repo="$2"
+      shift 2
+      ;;
+    --repo-reader-visible-repos)
+      if [[ $# -lt 2 ]]; then
+        echo "--repo-reader-visible-repos requires a value" >&2
+        exit 2
+      fi
+      repo_reader_visible_repos="$2"
+      shift 2
+      ;;
     *)
       echo "unsupported classifier argument: $1" >&2
       exit 2
@@ -117,6 +153,9 @@ if [[ -n "$topic_taxonomy" ]]; then
 fi
 if [[ -n "$github_context_file" ]]; then
   github_context_file="$(expand_path "$github_context_file")"
+fi
+if [[ -n "$repo_reader_socket" ]]; then
+  repo_reader_socket="$(expand_path "$repo_reader_socket")"
 fi
 
 if [[ ! -f "$prompt_template" ]]; then
@@ -178,6 +217,18 @@ if [[ -n "$max_tokens" ]]; then
 fi
 if [[ -n "$timeout_ms" ]]; then
   agent_args+=(--timeout-ms "$timeout_ms")
+fi
+if [[ -n "$tools" ]]; then
+  agent_args+=(--tools "$tools")
+fi
+if [[ -n "$repo_reader_socket" ]]; then
+  agent_args+=(--repo-reader-socket "$repo_reader_socket")
+fi
+if [[ -n "$repo_reader_default_repo" ]]; then
+  agent_args+=(--repo-reader-default-repo "$repo_reader_default_repo")
+fi
+if [[ -n "$repo_reader_visible_repos" ]]; then
+  agent_args+=(--repo-reader-visible-repos "$repo_reader_visible_repos")
 fi
 
 stderr_path="$(mktemp)"
