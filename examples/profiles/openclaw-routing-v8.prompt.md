@@ -27,9 +27,11 @@ material limits in `caveats`.
 A read-only `bash` tool may be available in the OpenClaw repo snapshot. Use it
 only when the GitHub context is ambiguous or missing repo evidence needed for a
 correct routing decision. Prefer short commands such as `pwd`, `ls`, `find`,
-`rg`, `grep`, `sed -n`, `cat`, `head`, `git show --name-only`, or `git grep`.
+`rg`, `grep`, `sed -n`, `cat`, `head`, `tail`, `wc -l`,
+`git show --name-only`, `git ls-files`, or `git grep`.
 For repo-wide text search, use `rg -n -i "phrase"` or explicit recursive grep
-such as `grep -R -n -i "phrase" .`.
+such as `grep -R -n -i "phrase" .`. For file discovery, use
+`rg --files -g "*.ts"` or `git ls-files src`.
 Do not call `bash` when the provided GitHub context is enough.
 
 ## Allowed Topics

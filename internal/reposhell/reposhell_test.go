@@ -17,6 +17,8 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 		"README.md":     "Localpager reposhell\nSecond line\n",
 		"docs/note.txt": "tool_calling notes\n",
 		"dash.txt":      "-n\n",
+		"src/app.go":    "package app\n// tool_calling implementation\n",
+		"src/app.ts":    "export const topic = 'tool_calling';\n",
 	})
 	manager := NewManager(Config{
 		Root:            filepath.Join(t.TempDir(), "state"),
@@ -39,11 +41,16 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 		{"pwd", "/repo/project\n"},
 		{"cat README.md", "Localpager reposhell"},
 		{"head -n 1 README.md", "Localpager reposhell\n"},
+		{"tail -n 1 README.md", "Second line\n"},
+		{"wc -l README.md", "2 /repo/project/README.md\n"},
 		{"sed -n 2,2p README.md", "Second line\n"},
 		{"find . -maxdepth 2 -type f -name note.txt", "docs/note.txt"},
+		{"rg --files -g '*.ts' src", "src/app.ts\n"},
+		{"rg -n -g '*.go' tool_calling src", "src/app.go:2:// tool_calling implementation\n"},
 		{"grep -n Local README.md", "1:Localpager reposhell\n"},
 		{"grep -R -n tool_calling docs", "docs/note.txt:1:tool_calling notes\n"},
 		{"grep -- -n dash.txt", "-n\n"},
+		{"git ls-files src", "src/app.go\nsrc/app.ts\n"},
 		{"git grep -n tool_calling docs", "docs/note.txt:1:tool_calling notes\n"},
 		{"git show --name-only", "README.md"},
 	}
@@ -230,6 +237,9 @@ func TestExecRejectsUnsafeShellAndPathFeatures(t *testing.T) {
 		"FOO=bar cat README.md",
 		"cat secret-link",
 		"grep hello",
+		"rg --files --hidden",
+		"tail -f README.md",
+		"wc README.md",
 	}
 	for _, command := range denied {
 		t.Run(command, func(t *testing.T) {

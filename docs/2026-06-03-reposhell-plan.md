@@ -154,12 +154,17 @@ pwd
 ls
 find
 rg
+rg --files
+rg -g
 grep
 sed -n
 cat
 head
+tail
+wc -l
 git status --short
 git show --name-only
+git ls-files
 git grep
 ```
 

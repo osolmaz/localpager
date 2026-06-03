@@ -87,6 +87,7 @@ You can also use reposhell directly without Localpager:
 
 ```bash
 reposhell exec --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager --command 'rg -n reposhell README.md'
+reposhell exec --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager --command 'rg --files -g "*.ts"'
 reposhell exec --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager --command 'grep -R -n -i "lm studio" .'
 reposhell shell --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager
 ```

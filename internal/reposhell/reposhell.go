@@ -282,6 +282,29 @@ type execPlan struct {
 	SyntheticStdout string
 }
 
+type commandPlanner func(args []string, binding Binding) (execPlan, error)
+
+var execCommandPlanners = map[string]commandPlanner{
+	"ls": func(args []string, binding Binding) (execPlan, error) {
+		return planPathCommand("/bin/ls", args, binding, lsArg)
+	},
+	"cat": func(args []string, binding Binding) (execPlan, error) {
+		return planPathCommand("/bin/cat", args, binding, noFlags)
+	},
+	"head": func(args []string, binding Binding) (execPlan, error) {
+		return planLineEdge("/usr/bin/head", "head", args, binding)
+	},
+	"tail": func(args []string, binding Binding) (execPlan, error) {
+		return planLineEdge("/usr/bin/tail", "tail", args, binding)
+	},
+	"wc":   planWC,
+	"sed":  planSed,
+	"find": planFind,
+	"rg":   planRg,
+	"grep": func(args []string, binding Binding) (execPlan, error) { return planSearch("/bin/grep", args, binding) },
+	"git":  planGit,
+}
+
 func buildExecPlan(argv []string, binding Binding) (execPlan, error) {
 	if len(argv) == 0 {
 		return execPlan{}, deny("empty command")
@@ -296,25 +319,12 @@ func buildExecPlan(argv []string, binding Binding) (execPlan, error) {
 			return execPlan{}, deny("pwd does not accept arguments")
 		}
 		return execPlan{SyntheticStdout: binding.CWD + "\n", Dir: root}, nil
-	case "ls":
-		return planPathCommand("/bin/ls", argv[1:], binding, lsArg)
-	case "cat":
-		return planPathCommand("/bin/cat", argv[1:], binding, noFlags)
-	case "head":
-		return planHead(argv[1:], binding)
-	case "sed":
-		return planSed(argv[1:], binding)
-	case "find":
-		return planFind(argv[1:], binding)
-	case "rg":
-		return planSearch("rg", argv[1:], binding)
-	case "grep":
-		return planSearch("/bin/grep", argv[1:], binding)
-	case "git":
-		return planGit(argv[1:], binding)
-	default:
+	}
+	planner, ok := execCommandPlanners[argv[0]]
+	if !ok {
 		return execPlan{}, deny("unsupported command %q", argv[0])
 	}
+	return planner(argv[1:], binding)
 }
 
 func parseCommand(command string) ([]string, error) {
@@ -437,15 +447,15 @@ func planPathCommand(name string, args []string, binding Binding, validator argV
 	return execPlan{Name: name, Args: out, Dir: root}, nil
 }
 
-func planHead(args []string, binding Binding) (execPlan, error) {
+func planLineEdge(name, label string, args []string, binding Binding) (execPlan, error) {
 	if len(args) < 1 {
-		return execPlan{}, deny("head requires a path")
+		return execPlan{}, deny("%s requires a path", label)
 	}
 	out := []string{}
 	index := 0
 	if args[0] == "-n" {
 		if len(args) < 3 {
-			return execPlan{}, deny("head -n requires a count and path")
+			return execPlan{}, deny("%s -n requires a count and path", label)
 		}
 		if err := validatePositiveBounded(args[1], 1000); err != nil {
 			return execPlan{}, err
@@ -461,16 +471,37 @@ func planHead(args []string, binding Binding) (execPlan, error) {
 		index = 1
 	}
 	if index >= len(args) {
-		return execPlan{}, deny("head requires a path")
+		return execPlan{}, deny("%s requires a path", label)
 	}
 	for _, pathArg := range args[index:] {
+		if strings.HasPrefix(pathArg, "-") {
+			return execPlan{}, deny("unsupported %s flag %q", label, pathArg)
+		}
 		resolved, err := resolveVirtualPath(binding, pathArg)
 		if err != nil {
 			return execPlan{}, err
 		}
 		out = append(out, resolved)
 	}
-	return execPlan{Name: "/usr/bin/head", Args: out, Dir: binding.Roots[binding.DefaultRepo]}, nil
+	return execPlan{Name: name, Args: out, Dir: binding.Roots[binding.DefaultRepo]}, nil
+}
+
+func planWC(args []string, binding Binding) (execPlan, error) {
+	if len(args) < 2 || args[0] != "-l" {
+		return execPlan{}, deny("wc only allows: wc -l path [path...]")
+	}
+	out := []string{"-l"}
+	for _, pathArg := range args[1:] {
+		if strings.HasPrefix(pathArg, "-") {
+			return execPlan{}, deny("unsupported wc flag %q", pathArg)
+		}
+		resolved, err := resolveVirtualPath(binding, pathArg)
+		if err != nil {
+			return execPlan{}, err
+		}
+		out = append(out, resolved)
+	}
+	return execPlan{Name: "/usr/bin/wc", Args: out, Dir: binding.Roots[binding.DefaultRepo]}, nil
 }
 
 func planSed(args []string, binding Binding) (execPlan, error) {
@@ -554,6 +585,100 @@ func findValue(args []string, index int, flag string) (string, error) {
 	return args[index+1], nil
 }
 
+func planRg(args []string, binding Binding) (execPlan, error) {
+	if len(args) == 0 {
+		return execPlan{}, deny("rg requires a pattern or --files")
+	}
+	out, filesMode, index, err := parseRgPrefix(args)
+	if err != nil {
+		return execPlan{}, err
+	}
+	if filesMode {
+		out, err = appendResolvedSearchPaths(out, args[index:], binding)
+		if err != nil {
+			return execPlan{}, err
+		}
+		return execPlan{Name: "rg", Args: out, Dir: binding.Roots[binding.DefaultRepo]}, nil
+	}
+	if index >= len(args) {
+		return execPlan{}, deny("rg requires a pattern")
+	}
+	pattern := args[index]
+	index++
+	out = append(out, pattern)
+	out, err = appendResolvedSearchPaths(out, args[index:], binding)
+	if err != nil {
+		return execPlan{}, err
+	}
+	return execPlan{Name: "rg", Args: out, Dir: binding.Roots[binding.DefaultRepo]}, nil
+}
+
+func parseRgPrefix(args []string) ([]string, bool, int, error) {
+	out := []string{}
+	filesMode := false
+	index := 0
+	for index < len(args) {
+		arg := args[index]
+		if arg == "--" {
+			out = append(out, "--")
+			index++
+			break
+		}
+		if !strings.HasPrefix(arg, "-") || arg == "-" {
+			break
+		}
+		consumed, setsFilesMode, err := appendRgFlag(&out, args[index:])
+		if err != nil {
+			return nil, false, 0, err
+		}
+		filesMode = filesMode || setsFilesMode
+		index += consumed
+	}
+	return out, filesMode, index, nil
+}
+
+func appendRgFlag(out *[]string, args []string) (int, bool, error) {
+	arg := args[0]
+	switch {
+	case arg == "--files":
+		*out = append(*out, arg)
+		return 1, true, nil
+	case arg == "-g" || arg == "--glob":
+		if len(args) < 2 {
+			return 0, false, deny("%s requires a glob", arg)
+		}
+		if err := validateRgGlob(args[1]); err != nil {
+			return 0, false, err
+		}
+		*out = append(*out, arg, args[1])
+		return 2, false, nil
+	case strings.HasPrefix(arg, "--glob="):
+		glob := strings.TrimPrefix(arg, "--glob=")
+		if err := validateRgGlob(glob); err != nil {
+			return 0, false, err
+		}
+		*out = append(*out, arg)
+		return 1, false, nil
+	default:
+		consumed, err := appendSearchFlag(out, args, false)
+		return consumed, false, err
+	}
+}
+
+func appendResolvedSearchPaths(out []string, pathArgs []string, binding Binding) ([]string, error) {
+	if len(pathArgs) == 0 {
+		return append(out, binding.Roots[binding.DefaultRepo]), nil
+	}
+	for _, pathArg := range pathArgs {
+		resolved, err := resolveVirtualPath(binding, pathArg)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, resolved)
+	}
+	return out, nil
+}
+
 func planSearch(name string, args []string, binding Binding) (execPlan, error) {
 	if len(args) == 0 {
 		return execPlan{}, deny("%s requires a pattern", filepath.Base(name))
@@ -586,16 +711,9 @@ func planSearch(name string, args []string, binding Binding) (execPlan, error) {
 		return execPlan{}, deny("grep requires an explicit file or directory path; use rg for repo-wide search")
 	}
 	out = append(out, pattern)
-	if index == len(args) {
-		out = append(out, binding.Roots[binding.DefaultRepo])
-	} else {
-		for _, pathArg := range args[index:] {
-			resolved, err := resolveVirtualPath(binding, pathArg)
-			if err != nil {
-				return execPlan{}, err
-			}
-			out = append(out, resolved)
-		}
+	out, err := appendResolvedSearchPaths(out, args[index:], binding)
+	if err != nil {
+		return execPlan{}, err
 	}
 	return execPlan{Name: name, Args: out, Dir: binding.Roots[binding.DefaultRepo]}, nil
 }
@@ -674,6 +792,8 @@ func planGit(args []string, binding Binding) (execPlan, error) {
 		if len(args) >= 2 {
 			return planGitGrep(args, binding)
 		}
+	case "ls-files":
+		return planGitLsFiles(args, binding)
 	}
 	return execPlan{}, deny("unsupported git command")
 }
@@ -714,18 +834,47 @@ func planGitGrep(args []string, binding Binding) (execPlan, error) {
 	if index < len(args) {
 		out = append(out, "--")
 	}
-	for _, pathArg := range args[index:] {
+	out, err := appendCleanRepoRelativePaths(out, args[index:], binding)
+	if err != nil {
+		return execPlan{}, err
+	}
+	return gitExecPlan(out, binding)
+}
+
+func planGitLsFiles(args []string, binding Binding) (execPlan, error) {
+	out := []string{"ls-files"}
+	index := 1
+	if index < len(args) && args[index] == "--" {
+		out = append(out, "--")
+		index++
+	} else if index < len(args) {
+		out = append(out, "--")
+	}
+	out, err := appendCleanRepoRelativePaths(out, args[index:], binding)
+	if err != nil {
+		return execPlan{}, err
+	}
+	return gitExecPlan(out, binding)
+}
+
+func appendCleanRepoRelativePaths(out []string, pathArgs []string, binding Binding) ([]string, error) {
+	for _, pathArg := range pathArgs {
 		virtual, err := cleanRepoRelativePath(binding, pathArg)
 		if err != nil {
-			return execPlan{}, err
+			return nil, err
 		}
 		out = append(out, virtual)
 	}
+	return out, nil
+}
+
+func gitExecPlan(args []string, binding Binding) (execPlan, error) {
 	gitEnv, err := boundGitEnv(binding)
 	if err != nil {
 		return execPlan{}, err
 	}
-	return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(binding.GitDirs[binding.DefaultRepo], binding.Roots[binding.DefaultRepo], out...), Dir: binding.Roots[binding.DefaultRepo], Env: gitEnv}, nil
+	root := binding.Roots[binding.DefaultRepo]
+	return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(binding.GitDirs[binding.DefaultRepo], root, args...), Dir: root, Env: gitEnv}, nil
 }
 
 func resolveVirtualPath(binding Binding, raw string) (string, error) {
@@ -809,6 +958,24 @@ func validatePositiveBounded(raw string, max int) error {
 	n, err := strconv.Atoi(raw)
 	if err != nil || n < 0 || n > max {
 		return deny("count must be between 0 and %d", max)
+	}
+	return nil
+}
+
+func validateRgGlob(raw string) error {
+	if raw == "" {
+		return deny("rg glob cannot be empty")
+	}
+	glob := strings.TrimPrefix(raw, "!")
+	if filepath.IsAbs(glob) {
+		return deny("rg glob cannot be absolute")
+	}
+	for _, part := range strings.FieldsFunc(glob, func(r rune) bool {
+		return r == '/' || r == '\\'
+	}) {
+		if part == ".." {
+			return deny("rg glob cannot escape repo root")
+		}
 	}
 	return nil
 }
