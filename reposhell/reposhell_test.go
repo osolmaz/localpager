@@ -14,7 +14,7 @@ import (
 func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 	ctx := context.Background()
 	source := testGitRepo(t, map[string]string{
-		"README.md":     "Localpager reposhell\nSecond line\n",
+		"README.md":     "Reposhell project\nSecond line\n",
 		"docs/note.txt": "tool_calling notes\n",
 		"dash.txt":      "-n\n",
 		"src/app.go":    "package app\n// tool_calling implementation\n",
@@ -39,15 +39,15 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 		want    string
 	}{
 		{"pwd", "/repo/project\n"},
-		{"cat README.md", "Localpager reposhell"},
-		{"head -n 1 README.md", "Localpager reposhell\n"},
+		{"cat README.md", "Reposhell project"},
+		{"head -n 1 README.md", "Reposhell project\n"},
 		{"tail -n 1 README.md", "Second line\n"},
 		{"wc -l README.md", "2 /repo/project/README.md\n"},
 		{"sed -n 2,2p README.md", "Second line\n"},
 		{"find . -maxdepth 2 -type f -name note.txt", "docs/note.txt"},
 		{"rg --files -g '*.ts' src", "src/app.ts\n"},
 		{"rg -n -g '*.go' tool_calling src", "src/app.go:2:// tool_calling implementation\n"},
-		{"grep -n Local README.md", "1:Localpager reposhell\n"},
+		{"grep -n Reposhell README.md", "1:Reposhell project\n"},
 		{"grep -R -n tool_calling docs", "docs/note.txt:1:tool_calling notes\n"},
 		{"grep -- -n dash.txt", "-n\n"},
 		{"git ls-files src", "src/app.go\nsrc/app.ts\n"},
@@ -351,8 +351,8 @@ func testGitRepo(t *testing.T, files map[string]string) string {
 	t.Helper()
 	dir := t.TempDir()
 	git(t, dir, "init", "-b", "main")
-	git(t, dir, "config", "user.email", "localpager@example.invalid")
-	git(t, dir, "config", "user.name", "Localpager Tests")
+	git(t, dir, "config", "user.email", "reposhell@example.invalid")
+	git(t, dir, "config", "user.name", "Reposhell Tests")
 	for name, body := range files {
 		path := filepath.Join(dir, filepath.FromSlash(name))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {

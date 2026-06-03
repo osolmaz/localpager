@@ -7,6 +7,7 @@ go:
   exclude:
     - "**/*_test.go"
     - "localpager-agent/**"
+    - "reposhell/**"
     - "examples/**"
     - "bin/**"
   dry:
@@ -39,15 +40,13 @@ go:
         - internal/cli
         - internal/config
         - internal/localpager
-        - internal/reposhell
-        - internal/reposhellcli
         - internal/sources
         - internal/timing
+        - reposhell/reposhellcli
     - from: internal/app
       allow:
         - internal/config
         - internal/localpager
-        - internal/reposhell
         - internal/sources
     - from: internal/cli
       allow:
@@ -58,13 +57,13 @@ go:
     - from: internal/localpager
       allow:
         - internal/timing
-    - from: internal/reposhell
-      allow: []
-    - from: internal/reposhellcli
-      allow:
-        - internal/config
-        - internal/reposhell
     - from: internal/sources
       allow:
         - internal/localpager
         - internal/sources
+    - from: reposhell/cmd
+      allow:
+        - reposhell/reposhellcli
+    - from: reposhell/reposhellcli
+      allow:
+        - reposhell

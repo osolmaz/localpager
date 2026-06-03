@@ -10,7 +10,7 @@ import (
 )
 
 func TestStandaloneExecReadsRepoConfig(t *testing.T) {
-	repoRoot, head := currentRepo(t)
+	repoRoot, head := testGitRepo(t, map[string]string{"go.mod": "module example.com/project\n"})
 	configPath := writeConfig(t, repoRoot, head)
 	var stdout, stderr bytes.Buffer
 
@@ -23,13 +23,13 @@ func TestStandaloneExecReadsRepoConfig(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("exit code = %d stderr=%s", code, stderr.String())
 	}
-	if stdout.String() != "1:module github.com/osolmaz/localpager\n" {
+	if stdout.String() != "1:module example.com/project\n" {
 		t.Fatalf("stdout = %q", stdout.String())
 	}
 }
 
 func TestStandaloneShellLoopsAndEnforcesPolicy(t *testing.T) {
-	repoRoot, head := currentRepo(t)
+	repoRoot, head := testGitRepo(t, map[string]string{"go.mod": "module example.com/project\n"})
 	configPath := writeConfig(t, repoRoot, head)
 	var stdout, stderr bytes.Buffer
 
@@ -44,7 +44,7 @@ func TestStandaloneShellLoopsAndEnforcesPolicy(t *testing.T) {
 	for _, want := range []string{
 		"reposhell bound cwd=/repo/project repos=project",
 		"reposhell /repo/project> /repo/project\n",
-		"1:module github.com/osolmaz/localpager\n",
+		"1:module example.com/project\n",
 	} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("stdout = %q, missing %q", stdout.String(), want)
@@ -55,44 +55,6 @@ func TestStandaloneShellLoopsAndEnforcesPolicy(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), "exit_code=2") {
 		t.Fatalf("stderr = %q, missing exit code", stderr.String())
-	}
-}
-
-func TestLoadConfigAcceptsLocalpagerNestedReposhell(t *testing.T) {
-	repoRoot, head := currentRepo(t)
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, "localpager.json")
-	body := `{
-  "classifier": {
-    "reposhell_default_repo": "project",
-    "reposhell_visible_repos": ["project"]
-  },
-  "reposhell": {
-    "root": "` + filepath.ToSlash(filepath.Join(dir, "state")) + `",
-    "socket": "` + filepath.ToSlash(filepath.Join(dir, "reposhell.sock")) + `",
-    "snapshot_retain": 3,
-    "repos": [{"id": "project", "remote": "` + filepath.ToSlash(repoRoot) + `", "default_ref": "` + head + `"}]
-  }
-}`
-	if err := os.WriteFile(configPath, []byte(body), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := LoadConfig(configPath, LocalpagerOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cfg.DefaultRepo != "project" {
-		t.Fatalf("DefaultRepo = %q", cfg.DefaultRepo)
-	}
-	if len(cfg.VisibleRepos) != 1 || cfg.VisibleRepos[0] != "project" {
-		t.Fatalf("VisibleRepos = %#v", cfg.VisibleRepos)
-	}
-	if cfg.Socket != filepath.Join(dir, "reposhell.sock") {
-		t.Fatalf("Socket = %q", cfg.Socket)
-	}
-	if cfg.ManagerConfig.SnapshotRetain != 3 {
-		t.Fatalf("SnapshotRetain = %d, want 3", cfg.ManagerConfig.SnapshotRetain)
 	}
 }
 
@@ -113,15 +75,36 @@ func writeConfig(t *testing.T, source, head string) string {
 	return configPath
 }
 
-func currentRepo(t *testing.T) (string, string) {
+func testGitRepo(t *testing.T, files map[string]string) (string, string) {
 	t.Helper()
-	rootRaw, err := exec.Command("/usr/bin/git", "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		t.Fatalf("resolve repo root: %v", err)
+	dir := t.TempDir()
+	git(t, dir, "init", "-b", "main")
+	git(t, dir, "config", "user.email", "reposhell@example.invalid")
+	git(t, dir, "config", "user.name", "Reposhell Tests")
+	for name, body := range files {
+		path := filepath.Join(dir, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
 	}
-	headRaw, err := exec.Command("/usr/bin/git", "rev-parse", "HEAD").Output()
+	git(t, dir, "add", ".")
+	git(t, dir, "commit", "-m", "initial")
+	headRaw, err := exec.Command("/usr/bin/git", "-C", dir, "rev-parse", "HEAD").Output()
 	if err != nil {
 		t.Fatalf("resolve repo head: %v", err)
 	}
-	return strings.TrimSpace(string(rootRaw)), strings.TrimSpace(string(headRaw))
+	return dir, strings.TrimSpace(string(headRaw))
+}
+
+func git(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("/usr/bin/git", args...)
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, out)
+	}
 }

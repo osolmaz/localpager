@@ -19,4 +19,8 @@ make build
 "$slophammer_go" dry . --max-candidates 0
 "$slophammer_go" crap .
 "$slophammer_go" mutate . --scan
+(
+  cd reposhell
+  "$golangci_lint" run
+)
 "$slophammer_go" check .

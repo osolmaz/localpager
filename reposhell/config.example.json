@@ -1,16 +1,16 @@
 {
   "root": "~/.local/state/reposhell",
   "socket": "~/.local/state/reposhell/reposhell.sock",
-  "default_repo": "localpager",
-  "visible_repos": ["localpager"],
+  "default_repo": "project",
+  "visible_repos": ["project"],
   "refresh_interval": "24h",
   "command_timeout": "2s",
   "max_output_bytes": 65536,
   "snapshot_retain": 5,
   "repos": [
     {
-      "id": "localpager",
-      "remote": "https://github.com/osolmaz/localpager.git",
+      "id": "project",
+      "remote": "https://github.com/example/project.git",
       "default_ref": "origin/main",
       "refresh_interval": "24h"
     }
