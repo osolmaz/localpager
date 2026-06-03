@@ -6,6 +6,7 @@
   "refresh_interval": "24h",
   "command_timeout": "2s",
   "max_output_bytes": 65536,
+  "snapshot_retain": 5,
   "repos": [
     {
       "id": "localpager",

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -24,6 +25,7 @@ const (
 	DefaultRefreshInterval = 24 * time.Hour
 	DefaultCommandTimeout  = 2 * time.Second
 	DefaultMaxOutputBytes  = 65536
+	DefaultSnapshotRetain  = 5
 	DefaultRoot            = "~/.local/state/localpager/reposhell"
 	DefaultSocket          = "~/.local/state/localpager/reposhell.sock"
 )
@@ -40,6 +42,7 @@ type Config struct {
 	CommandTimeout  time.Duration
 	MaxOutputBytes  int64
 	RefreshInterval time.Duration
+	SnapshotRetain  int
 }
 
 type Repo struct {
@@ -85,6 +88,9 @@ func NewManager(cfg Config) Manager {
 	}
 	if cfg.RefreshInterval == 0 {
 		cfg.RefreshInterval = DefaultRefreshInterval
+	}
+	if cfg.SnapshotRetain <= 0 {
+		cfg.SnapshotRetain = DefaultSnapshotRetain
 	}
 	return Manager{Config: cfg}
 }
@@ -217,6 +223,116 @@ func ensureSnapshotCheckout(ctx context.Context, repoID, mirror, snapshot, index
 	}
 	if err := os.WriteFile(marker, []byte(commit+"\n"), 0o444); err != nil {
 		return fmt.Errorf("write snapshot marker: %w", err)
+	}
+	return nil
+}
+
+func (m Manager) GCSnapshots(ctx context.Context, protected map[string]map[string]bool) error {
+	root, err := expandHome(m.Config.Root)
+	if err != nil {
+		return err
+	}
+	if root == "" {
+		root = filepath.Join(os.TempDir(), "localpager-reposhell")
+	}
+	for _, repo := range m.Config.Repos {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if repo.ID == "" {
+			continue
+		}
+		mirror := filepath.Join(root, "mirrors", safeID(repo.ID)+".git")
+		lock := snapshotLock(filepath.Clean(mirror))
+		lock.Lock()
+		err := gcRepoSnapshots(root, repo.ID, m.Config.SnapshotRetain, protected[repo.ID])
+		lock.Unlock()
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type snapshotCandidate struct {
+	Commit string
+	Dir    string
+	Index  string
+	Marker string
+	MTime  time.Time
+}
+
+func gcRepoSnapshots(root, repoID string, retain int, protected map[string]bool) error {
+	dir := filepath.Join(root, "snapshots", safeID(repoID))
+	entries, err := os.ReadDir(dir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read snapshots for %s: %w", repoID, err)
+	}
+	candidates, err := snapshotCandidates(dir, entries)
+	if err != nil {
+		return err
+	}
+	sort.Slice(candidates, func(i, j int) bool {
+		return candidates[i].MTime.After(candidates[j].MTime)
+	})
+	kept := 0
+	for _, candidate := range candidates {
+		if protected[candidate.Commit] {
+			continue
+		}
+		if kept < retain {
+			kept++
+			continue
+		}
+		if err := removeSnapshotCandidate(candidate); err != nil {
+			return fmt.Errorf("remove snapshot %s %s: %w", repoID, candidate.Commit, err)
+		}
+	}
+	return nil
+}
+
+func snapshotCandidates(dir string, entries []os.DirEntry) ([]snapshotCandidate, error) {
+	candidates := []snapshotCandidate{}
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() || !strings.HasSuffix(entry.Name(), ".ready") {
+			continue
+		}
+		commit := strings.TrimSuffix(entry.Name(), ".ready")
+		if !commitRE.MatchString(commit) {
+			continue
+		}
+		marker := filepath.Join(dir, entry.Name())
+		info, err := entry.Info()
+		if err != nil {
+			return nil, fmt.Errorf("stat snapshot marker %s: %w", marker, err)
+		}
+		candidates = append(candidates, snapshotCandidate{
+			Commit: commit,
+			Dir:    filepath.Join(dir, commit),
+			Index:  filepath.Join(dir, commit+".index"),
+			Marker: marker,
+			MTime:  info.ModTime(),
+		})
+	}
+	return candidates, nil
+}
+
+func removeSnapshotCandidate(candidate snapshotCandidate) error {
+	if err := os.RemoveAll(candidate.Dir); err != nil {
+		return err
+	}
+	if err := removeIfExists(candidate.Index); err != nil {
+		return err
+	}
+	return removeIfExists(candidate.Marker)
+}
+
+func removeIfExists(path string) error {
+	if err := os.Remove(path); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	return nil
 }
