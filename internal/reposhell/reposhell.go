@@ -949,6 +949,10 @@ func expandHome(path string) (string, error) {
 	return "", fmt.Errorf("unsupported home path %q", path)
 }
 
+func ExpandHome(path string) (string, error) {
+	return expandHome(path)
+}
+
 type cappedBuffer struct {
 	buf       bytes.Buffer
 	limit     int64

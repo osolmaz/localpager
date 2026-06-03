@@ -16,7 +16,7 @@ but is enforced by Localpager.
 ## Desired Shape
 
 ```text
-localpager reposhell service
+standalone reposhell service
   - owns repo mirrors
   - keeps them fresh
   - creates pinned read-only snapshots
@@ -331,7 +331,8 @@ large source snippets. Store them in classifier session artifacts if needed.
 - [x] Add `reposhell` config structs.
 - [x] Add `classifier.tools`, `classifier.reposhell_default_repo`, and
   `classifier.reposhell_visible_repos`.
-- [x] Add `localpager reposhell serve`.
+- [x] Add standalone `reposhell serve`, plus `reposhell exec`, `reposhell status`,
+  and interactive `reposhell shell`.
 - [x] Add mirror clone/fetch and snapshot pinning.
 - [x] Add the command parser and policy validator.
 - [x] Add read-only command execution with timeouts and output caps.

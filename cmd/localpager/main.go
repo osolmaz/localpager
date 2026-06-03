@@ -176,7 +176,7 @@ func runInstallService(args []string) {
 			"Localpager worker", "simple", filepath.Join(expandedBinDir, "localpager-worker"), "Restart=always\nRestartSec=10s\n",
 		)),
 		"localpager-reposhell.service": commandUnit(sharedUnit.withCommand(
-			"Localpager reposhell", "simple", filepath.Join(expandedBinDir, "localpager")+" reposhell serve", "Restart=always\nRestartSec=10s\n",
+			"Localpager reposhell", "simple", filepath.Join(expandedBinDir, "reposhell")+" serve", "Restart=always\nRestartSec=10s\n",
 		)),
 		"localpager-watch.service": commandUnit(sharedUnit.withCommand(
 			"Localpager source watcher", "simple", filepath.Join(expandedBinDir, "localpager-watch"), "Restart=always\nRestartSec=10s\n",

@@ -40,6 +40,7 @@ go:
         - internal/config
         - internal/localpager
         - internal/reposhell
+        - internal/reposhellcli
         - internal/sources
         - internal/timing
     - from: internal/app
@@ -59,6 +60,10 @@ go:
         - internal/timing
     - from: internal/reposhell
       allow: []
+    - from: internal/reposhellcli
+      allow:
+        - internal/config
+        - internal/reposhell
     - from: internal/sources
       allow:
         - internal/localpager

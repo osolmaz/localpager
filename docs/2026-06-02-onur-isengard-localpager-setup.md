@@ -142,7 +142,8 @@ localpager validate --config /home/bob/.config/localpager/config.json
 localpager status --config /home/bob/.config/localpager/config.json
 systemctl --user is-active localpager-worker.service localpager-enqueue-github.timer
 systemctl --user is-active localpager-reposhell.service
-localpager reposhell status --config /home/bob/.config/localpager/config.json
+reposhell status --config /home/bob/.config/localpager/config.json
+reposhell shell --config /home/bob/.config/localpager/config.json --repo openclaw --visible-repo openclaw
 pgrep -af 'ds4|deepseek' || true
 ```
 
@@ -152,7 +153,9 @@ Expected:
 - `localpager validate` reports `config_ok=true`.
 - `localpager status` reports `agent_context_window=131072`.
 - The worker, reposhell service, and enqueue timer are `active`.
-- `localpager reposhell status` returns JSON rather than a socket error.
+- `reposhell status` returns JSON rather than a socket error.
+- `reposhell shell` opens an interactive read-only prompt rooted at
+  `/repo/openclaw`; type `exit` to leave.
 - The `pgrep` command does not show a real DS4/DeepSeek server process.
 
 ## Change Model Context Or Parallelism

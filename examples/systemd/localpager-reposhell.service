@@ -10,7 +10,7 @@ Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 EnvironmentFile=-%h/.config/localpager/localpager.env
 EnvironmentFile=-%h/.config/localpager/secrets.env
 WorkingDirectory=%h/repos/localpager
-ExecStart=%h/.local/bin/localpager reposhell serve --config %h/.config/localpager/config.json
+ExecStart=%h/.local/bin/reposhell serve --config %h/.config/localpager/config.json
 Restart=always
 RestartSec=30s
 TimeoutStartSec=10m

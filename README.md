@@ -15,11 +15,12 @@ delivery, a bundled local model runner in `localpager-agent/`, and a small
 
 ```text
 localpager                 validate config, show status, install services, test Discord
-localpager reposhell       run the read-only repository shell service and probes
+localpager reposhell       compatibility wrapper for the standalone reposhell CLI
 localpager-enqueue-github  enqueue GitHub issues and PRs once
 localpager-ingest-json     ingest one normalized item from JSON
 localpager-watch           poll source adapters and enqueue items
 localpager-worker          run classifier jobs and send notifications
+reposhell                  standalone read-only repository shell service, exec, and shell
 ```
 
 ## Classifier Contract
@@ -77,10 +78,20 @@ Notification policy is deployment config, not classifier logic:
 }
 ```
 
-When `classifier.tools` includes `bash`, run `localpager reposhell serve` with
+When `classifier.tools` includes `bash`, run `reposhell serve` with
 matching `reposhell` config. The model sees a familiar bash-shaped tool, but
 Localpager enforces a read-only command allowlist against pinned repository
 snapshots.
+
+You can also use reposhell directly without Localpager:
+
+```bash
+reposhell exec --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager --command 'rg -n reposhell README.md'
+reposhell shell --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager
+```
+
+Inside `reposhell shell`, type one read-only command per line. Use `help` for
+the allowed command shapes and `exit` or `quit` to leave.
 
 If `notify_topics_any` is set, at least one classifier topic must match before a
 notification is created.
@@ -227,6 +238,7 @@ Check state:
 ```bash
 localpager status --config ~/.config/localpager/config.json
 localpager test-discord --config ~/.config/localpager/config.json
+reposhell status --config ~/.config/localpager/config.json
 ```
 
 ## Runtime State
