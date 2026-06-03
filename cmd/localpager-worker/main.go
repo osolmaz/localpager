@@ -84,10 +84,10 @@ func main() {
 		ClassifierSchema:           flags.classifierSchema,
 		ClassifierPromptTemplate:   flags.classifierPromptTemplate,
 		ClassifierTopicTaxonomy:    flags.classifierTopicTaxonomy,
-		ClassifierTools:            splitCSV(flags.classifierTools),
+		ClassifierTools:            app.SplitCSV(flags.classifierTools),
 		RepoReaderSocket:           flags.repoReaderSocket,
 		RepoReaderDefaultRepo:      flags.repoReaderDefaultRepo,
-		RepoReaderVisibleRepos:     splitCSV(flags.repoReaderVisibleRepos),
+		RepoReaderVisibleRepos:     app.SplitCSV(flags.repoReaderVisibleRepos),
 		ClassifierContext:          classifierContextOptions(cfg, flags.githubBaseURL, flags.githubTokenEnv),
 		Model:                      flags.model,
 		AgentBaseURL:               flags.agentBaseURL,
@@ -193,6 +193,14 @@ func (flags *workerFlags) applyClassifierConfig(cfg config.Config, setFlags map[
 	if cfg.Classifier.TopicTaxonomy != "" && !config.FlagSet(setFlags, "classifier-topic-taxonomy") {
 		flags.classifierTopicTaxonomy = cfg.Classifier.TopicTaxonomy
 	}
+	flags.applyClassifierToolConfig(cfg, setFlags)
+	if cfg.Worker.Model != "" && !config.FlagSet(setFlags, "model") {
+		flags.model = cfg.Worker.Model
+	}
+	flags.applyAgentConfig(cfg, setFlags)
+}
+
+func (flags *workerFlags) applyClassifierToolConfig(cfg config.Config, setFlags map[string]bool) {
 	if len(cfg.Classifier.Tools) > 0 && !config.FlagSet(setFlags, "classifier-tools") {
 		flags.classifierTools = strings.Join(cfg.Classifier.Tools, ",")
 	}
@@ -205,10 +213,6 @@ func (flags *workerFlags) applyClassifierConfig(cfg config.Config, setFlags map[
 	if len(cfg.Classifier.RepoReaderVisibleRepos) > 0 && !config.FlagSet(setFlags, "repo-reader-visible-repos") {
 		flags.repoReaderVisibleRepos = strings.Join(cfg.Classifier.RepoReaderVisibleRepos, ",")
 	}
-	if cfg.Worker.Model != "" && !config.FlagSet(setFlags, "model") {
-		flags.model = cfg.Worker.Model
-	}
-	flags.applyAgentConfig(cfg, setFlags)
 }
 
 func (flags *workerFlags) applyAgentConfig(cfg config.Config, setFlags map[string]bool) {
@@ -287,16 +291,4 @@ func boolValue(value *bool, fallback bool) bool {
 		return fallback
 	}
 	return *value
-}
-
-func splitCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			result = append(result, part)
-		}
-	}
-	return result
 }

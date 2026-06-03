@@ -55,7 +55,7 @@ func runRequeueJobs(args []string) {
 	}
 	defer app.ClosePool(pool)
 	count, err := localpager.RequeueJobs(ctx, pool, localpager.RequeueJobsOptions{
-		Statuses:          splitCSV(*statuses),
+		Statuses:          app.SplitCSV(*statuses),
 		LastErrorContains: *lastErrorContains,
 		DryRun:            *dryRun,
 	})
@@ -294,18 +294,6 @@ func valueOrDefault(value, fallback string) string {
 		return fallback
 	}
 	return value
-}
-
-func splitCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			result = append(result, part)
-		}
-	}
-	return result
 }
 
 func defaultServicePath() string {

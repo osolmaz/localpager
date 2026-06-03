@@ -91,6 +91,36 @@ func TestExecSupportsVisibleReposAndDefaultRepo(t *testing.T) {
 	}
 }
 
+func TestGitShowUsesBoundSnapshotCommit(t *testing.T) {
+	ctx := context.Background()
+	source := testGitRepo(t, map[string]string{"old.txt": "old\n"})
+	manager := NewManager(Config{
+		Root:  filepath.Join(t.TempDir(), "state"),
+		Repos: []Repo{{ID: "project", Remote: source, DefaultRef: "main"}},
+	})
+	binding, err := manager.Bind(ctx, "project", []string{"project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(source, "new.txt"), []byte("new\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, source, "add", "new.txt")
+	git(t, source, "commit", "-m", "advance")
+	git(t, "", "--git-dir", binding.GitDirs["project"], "fetch", "--prune")
+
+	result := manager.Exec(ctx, ExecRequest{Command: "git show --name-only", Binding: binding})
+	if result.PolicyError != "" || result.ExitCode != 0 {
+		t.Fatalf("git show failed: policy=%q exit=%d stderr=%s", result.PolicyError, result.ExitCode, result.Stderr)
+	}
+	if !strings.Contains(result.Stdout, "old.txt") {
+		t.Fatalf("Stdout = %q, want old snapshot file", result.Stdout)
+	}
+	if strings.Contains(result.Stdout, "new.txt") {
+		t.Fatalf("Stdout = %q, should not include file from later commit", result.Stdout)
+	}
+}
+
 func TestExecRejectsUnsafeShellAndPathFeatures(t *testing.T) {
 	ctx := context.Background()
 	outside := filepath.Join(t.TempDir(), "outside.txt")

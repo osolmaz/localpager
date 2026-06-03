@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -27,7 +28,8 @@ const (
 )
 
 var (
-	ErrPolicy = errors.New("repo reader policy denied command")
+	ErrPolicy     = errors.New("repo reader policy denied command")
+	snapshotLocks sync.Map
 )
 
 type Config struct {
@@ -145,47 +147,72 @@ func (m Manager) EnsureSnapshot(ctx context.Context, repo Repo) (string, string,
 		root = filepath.Join(os.TempDir(), "localpager-repo-reader")
 	}
 	mirror := filepath.Join(root, "mirrors", safeID(repo.ID)+".git")
-	if _, err := os.Stat(mirror); errors.Is(err, os.ErrNotExist) {
-		if err := os.MkdirAll(filepath.Dir(mirror), 0o755); err != nil {
-			return "", "", "", fmt.Errorf("create mirror dir: %w", err)
-		}
-		if result := runGit(ctx, "", "clone", "--mirror", repo.Remote, mirror); result.err != nil {
-			return "", "", "", fmt.Errorf("clone mirror for %s: %w stderr=%s", repo.ID, result.err, strings.TrimSpace(result.stderr))
-		}
-	} else if err != nil {
-		return "", "", "", fmt.Errorf("stat mirror: %w", err)
-	} else if shouldRefresh(mirror, repo.RefreshInterval, m.Config.RefreshInterval) {
-		if result := runGit(ctx, "", "--git-dir", mirror, "fetch", "--prune"); result.err != nil {
-			return "", "", "", fmt.Errorf("fetch mirror for %s: %w stderr=%s", repo.ID, result.err, strings.TrimSpace(result.stderr))
-		}
+	lock := snapshotLock(filepath.Clean(mirror))
+	lock.Lock()
+	defer lock.Unlock()
+	if err := m.ensureMirror(ctx, repo, mirror); err != nil {
+		return "", "", "", err
 	}
-	rev := resolveRef(ctx, mirror, ref)
-	if rev.err != nil {
-		return "", "", "", fmt.Errorf("resolve %s %s: %w stderr=%s", repo.ID, ref, rev.err, strings.TrimSpace(rev.stderr))
-	}
-	commit := strings.TrimSpace(rev.stdout)
-	if !commitRE.MatchString(commit) {
-		return "", "", "", fmt.Errorf("resolve %s %s: invalid commit %q", repo.ID, ref, commit)
+	commit, err := resolveCommit(ctx, mirror, repo.ID, ref)
+	if err != nil {
+		return "", "", "", err
 	}
 	snapshot := filepath.Join(root, "snapshots", safeID(repo.ID), commit)
 	marker := filepath.Join(root, "snapshots", safeID(repo.ID), commit+".ready")
+	if err := ensureSnapshotCheckout(ctx, repo.ID, mirror, snapshot, marker, commit); err != nil {
+		return "", "", "", err
+	}
+	return snapshot, commit, mirror, nil
+}
+
+func (m Manager) ensureMirror(ctx context.Context, repo Repo, mirror string) error {
+	if _, err := os.Stat(mirror); errors.Is(err, os.ErrNotExist) {
+		if err := os.MkdirAll(filepath.Dir(mirror), 0o755); err != nil {
+			return fmt.Errorf("create mirror dir: %w", err)
+		}
+		if result := runGit(ctx, "", "clone", "--mirror", repo.Remote, mirror); result.err != nil {
+			return fmt.Errorf("clone mirror for %s: %w stderr=%s", repo.ID, result.err, strings.TrimSpace(result.stderr))
+		}
+	} else if err != nil {
+		return fmt.Errorf("stat mirror: %w", err)
+	} else if shouldRefresh(mirror, repo.RefreshInterval, m.Config.RefreshInterval) {
+		if result := runGit(ctx, "", "--git-dir", mirror, "fetch", "--prune"); result.err != nil {
+			return fmt.Errorf("fetch mirror for %s: %w stderr=%s", repo.ID, result.err, strings.TrimSpace(result.stderr))
+		}
+	}
+	return nil
+}
+
+func resolveCommit(ctx context.Context, mirror, repoID, ref string) (string, error) {
+	rev := resolveRef(ctx, mirror, ref)
+	if rev.err != nil {
+		return "", fmt.Errorf("resolve %s %s: %w stderr=%s", repoID, ref, rev.err, strings.TrimSpace(rev.stderr))
+	}
+	commit := strings.TrimSpace(rev.stdout)
+	if !commitRE.MatchString(commit) {
+		return "", fmt.Errorf("resolve %s %s: invalid commit %q", repoID, ref, commit)
+	}
+	return commit, nil
+}
+
+func ensureSnapshotCheckout(ctx context.Context, repoID, mirror, snapshot, marker, commit string) error {
 	if _, err := os.Stat(marker); err == nil {
-		return snapshot, commit, mirror, nil
+		return nil
 	}
 	if err := os.MkdirAll(snapshot, 0o755); err != nil {
-		return "", "", "", fmt.Errorf("create snapshot dir: %w", err)
+		return fmt.Errorf("create snapshot dir: %w", err)
 	}
 	checkout := runGit(ctx, "", "--git-dir", mirror, "--work-tree", snapshot, "checkout", "-f", commit)
 	if checkout.err != nil {
-		return "", "", "", fmt.Errorf("checkout snapshot for %s: %w stderr=%s", repo.ID, checkout.err, strings.TrimSpace(checkout.stderr))
+		return fmt.Errorf("checkout snapshot for %s: %w stderr=%s", repoID, checkout.err, strings.TrimSpace(checkout.stderr))
 	}
 	if err := os.MkdirAll(filepath.Dir(marker), 0o755); err != nil {
-		return "", "", "", fmt.Errorf("create snapshot marker dir: %w", err)
+		return fmt.Errorf("create snapshot marker dir: %w", err)
 	}
 	if err := os.WriteFile(marker, []byte(commit+"\n"), 0o444); err != nil {
-		return "", "", "", fmt.Errorf("write snapshot marker: %w", err)
+		return fmt.Errorf("write snapshot marker: %w", err)
 	}
-	return snapshot, commit, mirror, nil
+	return nil
 }
 
 func (m Manager) Exec(ctx context.Context, req ExecRequest) ExecResult {
@@ -468,40 +495,56 @@ func planFind(args []string, binding Binding) (execPlan, error) {
 		out = append(out, binding.Roots[binding.DefaultRepo])
 	}
 	for index < len(args) {
-		arg := args[index]
-		switch arg {
-		case "-maxdepth":
-			if index+1 >= len(args) {
-				return execPlan{}, deny("find -maxdepth requires a value")
-			}
-			if err := validatePositiveBounded(args[index+1], 10); err != nil {
-				return execPlan{}, err
-			}
-			out = append(out, arg, args[index+1])
-			index += 2
-		case "-type":
-			if index+1 >= len(args) {
-				return execPlan{}, deny("find -type requires a value")
-			}
-			if args[index+1] != "f" && args[index+1] != "d" {
-				return execPlan{}, deny("find -type only allows f or d")
-			}
-			out = append(out, arg, args[index+1])
-			index += 2
-		case "-name", "-iname":
-			if index+1 >= len(args) {
-				return execPlan{}, deny("find %s requires a pattern", arg)
-			}
-			if strings.Contains(args[index+1], "/") {
-				return execPlan{}, deny("find name patterns cannot contain slashes")
-			}
-			out = append(out, arg, args[index+1])
-			index += 2
-		default:
-			return execPlan{}, deny("unsupported find argument %q", arg)
+		next, err := appendFindPredicate(&out, args, index)
+		if err != nil {
+			return execPlan{}, err
 		}
+		index = next
 	}
 	return execPlan{Name: "/usr/bin/find", Args: out, Dir: binding.Roots[binding.DefaultRepo]}, nil
+}
+
+func appendFindPredicate(out *[]string, args []string, index int) (int, error) {
+	arg := args[index]
+	switch arg {
+	case "-maxdepth":
+		value, err := findValue(args, index, arg)
+		if err != nil {
+			return index, err
+		}
+		if err := validatePositiveBounded(value, 10); err != nil {
+			return index, err
+		}
+		*out = append(*out, arg, value)
+	case "-type":
+		value, err := findValue(args, index, arg)
+		if err != nil {
+			return index, err
+		}
+		if value != "f" && value != "d" {
+			return index, deny("find -type only allows f or d")
+		}
+		*out = append(*out, arg, value)
+	case "-name", "-iname":
+		value, err := findValue(args, index, arg)
+		if err != nil {
+			return index, err
+		}
+		if strings.Contains(value, "/") {
+			return index, deny("find name patterns cannot contain slashes")
+		}
+		*out = append(*out, arg, value)
+	default:
+		return index, deny("unsupported find argument %q", arg)
+	}
+	return index + 2, nil
+}
+
+func findValue(args []string, index int, flag string) (string, error) {
+	if index+1 >= len(args) {
+		return "", deny("find %s requires a value", flag)
+	}
+	return args[index+1], nil
 }
 
 func planSearch(name string, args []string, binding Binding) (execPlan, error) {
@@ -589,7 +632,12 @@ func planGit(args []string, binding Binding) (execPlan, error) {
 		}
 	case "show":
 		if len(args) == 2 && args[1] == "--name-only" {
-			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, args...), Dir: root}, nil
+			commit, err := boundCommit(binding)
+			if err != nil {
+				return execPlan{}, err
+			}
+			showArgs := []string{"show", "--name-only", commit}
+			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, showArgs...), Dir: root}, nil
 		}
 		if len(args) == 3 && args[1] == "--name-only" && safeGitRevision(args[2]) {
 			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, args...), Dir: root}, nil
@@ -600,6 +648,14 @@ func planGit(args []string, binding Binding) (execPlan, error) {
 		}
 	}
 	return execPlan{}, deny("unsupported git command")
+}
+
+func boundCommit(binding Binding) (string, error) {
+	commit := binding.Snapshots[binding.DefaultRepo]
+	if commit == "" {
+		return "", deny("default repo snapshot is not bound")
+	}
+	return commit, nil
 }
 
 func planGitGrep(args []string, binding Binding) (execPlan, error) {
@@ -839,6 +895,11 @@ func keysInOrder(ids []string, roots map[string]string) []string {
 		out = append(out, id)
 	}
 	return out
+}
+
+func snapshotLock(key string) *sync.Mutex {
+	value, _ := snapshotLocks.LoadOrStore(key, &sync.Mutex{})
+	return value.(*sync.Mutex)
 }
 
 func (m Manager) repo(id string) (Repo, bool) {
