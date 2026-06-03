@@ -15,6 +15,7 @@ delivery, a bundled local model runner in `localpager-agent/`, and a small
 
 ```text
 localpager                 validate config, show status, install services, test Discord
+localpager reposhell       run the read-only repository shell service and probes
 localpager-enqueue-github  enqueue GitHub issues and PRs once
 localpager-ingest-json     ingest one normalized item from JSON
 localpager-watch           poll source adapters and enqueue items
@@ -52,6 +53,9 @@ Notification policy is deployment config, not classifier logic:
     "schema": "~/.config/localpager/classification.schema.json",
     "prompt_template": "~/.config/localpager/classifier.prompt.md",
     "topic_taxonomy": "~/.config/localpager/topics.json",
+    "tools": ["bash", "final_json"],
+    "reposhell_default_repo": "localpager",
+    "reposhell_visible_repos": ["localpager"],
     "context": {
       "github": {
         "include_body": true,
@@ -72,6 +76,11 @@ Notification policy is deployment config, not classifier logic:
   }
 }
 ```
+
+When `classifier.tools` includes `bash`, run `localpager reposhell serve` with
+matching `reposhell` config. The model sees a familiar bash-shaped tool, but
+Localpager enforces a read-only command allowlist against pinned repository
+snapshots.
 
 If `notify_topics_any` is set, at least one classifier topic must match before a
 notification is created.
@@ -197,7 +206,8 @@ is the one-shot equivalent.
 ## Services
 
 Install compiled binaries and write user systemd units. The service installer
-writes `localpager-worker.service`, `localpager-watch.service`,
+writes `localpager-worker.service`, `localpager-reposhell.service`,
+`localpager-watch.service`,
 `localpager-enqueue-github.service`, and `localpager-enqueue-github.timer`.
 
 ```bash
