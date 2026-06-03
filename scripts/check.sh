@@ -11,8 +11,14 @@ if [[ -z "$golangci_lint" ]]; then
 fi
 
 go vet $packages
+cd reposhell
+go vet ./...
+cd ..
 "$golangci_lint" run
 go test $packages
+cd reposhell
+go test ./...
+cd ..
 ./scripts/check-go-coverage.sh
 make build
 

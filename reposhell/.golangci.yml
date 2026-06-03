@@ -1,0 +1,28 @@
+version: "2"
+
+run:
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - cyclop
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+
+  settings:
+    cyclop:
+      max-complexity: 15
+      package-average: 0
+  exclusions:
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+
+formatters:
+  enable:
+    - gofmt

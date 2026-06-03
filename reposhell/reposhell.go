@@ -26,8 +26,8 @@ const (
 	DefaultCommandTimeout  = 2 * time.Second
 	DefaultMaxOutputBytes  = 65536
 	DefaultSnapshotRetain  = 5
-	DefaultRoot            = "~/.local/state/localpager/reposhell"
-	DefaultSocket          = "~/.local/state/localpager/reposhell.sock"
+	DefaultRoot            = "~/.local/state/reposhell"
+	DefaultSocket          = "~/.local/state/reposhell/reposhell.sock"
 )
 
 var (
@@ -155,7 +155,7 @@ func (m Manager) EnsureSnapshot(ctx context.Context, repo Repo) (string, string,
 		return "", "", "", "", err
 	}
 	if root == "" {
-		root = filepath.Join(os.TempDir(), "localpager-reposhell")
+		root = filepath.Join(os.TempDir(), "reposhell")
 	}
 	mirror := filepath.Join(root, "mirrors", safeID(repo.ID)+".git")
 	lock := snapshotLock(filepath.Clean(mirror))
@@ -233,7 +233,7 @@ func (m Manager) GCSnapshots(ctx context.Context, protected map[string]map[strin
 		return err
 	}
 	if root == "" {
-		root = filepath.Join(os.TempDir(), "localpager-reposhell")
+		root = filepath.Join(os.TempDir(), "reposhell")
 	}
 	for _, repo := range m.Config.Repos {
 		if err := ctx.Err(); err != nil {

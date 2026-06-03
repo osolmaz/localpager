@@ -13,21 +13,23 @@ import (
 	"strings"
 	"time"
 
-	"github.com/osolmaz/localpager/internal/reposhell"
+	"github.com/osolmaz/reposhell"
 )
 
 const (
 	StandaloneDefaultConfig = "~/.config/reposhell/config.json"
-	LocalpagerDefaultConfig = "~/.config/localpager/config.json"
 	StandaloneDefaultRoot   = "~/.local/state/reposhell"
 	StandaloneDefaultSocket = "~/.local/state/reposhell/reposhell.sock"
 )
+
+type ConfigLoader func(path string, opts Options) (RuntimeConfig, error)
 
 type Options struct {
 	UsagePrefix       string
 	DefaultConfigPath string
 	DefaultRoot       string
 	DefaultSocket     string
+	LoadConfig        ConfigLoader
 }
 
 type RuntimeConfig struct {
@@ -43,15 +45,6 @@ func StandaloneOptions() Options {
 		DefaultConfigPath: StandaloneDefaultConfig,
 		DefaultRoot:       StandaloneDefaultRoot,
 		DefaultSocket:     StandaloneDefaultSocket,
-	}
-}
-
-func LocalpagerOptions() Options {
-	return Options{
-		UsagePrefix:       "localpager reposhell",
-		DefaultConfigPath: LocalpagerDefaultConfig,
-		DefaultRoot:       reposhell.DefaultRoot,
-		DefaultSocket:     reposhell.DefaultSocket,
 	}
 }
 
@@ -83,7 +76,7 @@ func runServe(args []string, stdout, stderr io.Writer, opts Options) int {
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	cfg, err := LoadConfig(*configPath, opts)
+	cfg, err := opts.LoadConfig(*configPath, opts)
 	if err != nil {
 		return fatal(stderr, err)
 	}
@@ -91,7 +84,7 @@ func runServe(args []string, stdout, stderr io.Writer, opts Options) int {
 	if *socket != "" {
 		socketPath = *socket
 	}
-	fmt.Fprintf(stdout, "reposhell_socket=%s\n", socketPath)
+	_, _ = fmt.Fprintf(stdout, "reposhell_socket=%s\n", socketPath)
 	manager := reposhell.NewManager(cfg.ManagerConfig)
 	if err := reposhell.NewServer(manager).ServeUnix(context.Background(), socketPath); err != nil {
 		return fatal(stderr, err)
@@ -115,7 +108,7 @@ func runExec(args []string, stdout, stderr io.Writer, opts Options) int {
 	if *command == "" {
 		return fatal(stderr, fmt.Errorf("--command is required"))
 	}
-	cfg, err := LoadConfig(*configPath, opts)
+	cfg, err := opts.LoadConfig(*configPath, opts)
 	if err != nil {
 		return fatal(stderr, err)
 	}
@@ -142,7 +135,7 @@ func runShell(args []string, stdin io.Reader, stdout, stderr io.Writer, opts Opt
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
-	cfg, err := LoadConfig(*configPath, opts)
+	cfg, err := opts.LoadConfig(*configPath, opts)
 	if err != nil {
 		return fatal(stderr, err)
 	}
@@ -152,14 +145,14 @@ func runShell(args []string, stdin io.Reader, stdout, stderr io.Writer, opts Opt
 	if err != nil {
 		return fatal(stderr, err)
 	}
-	fmt.Fprintf(stdout, "reposhell bound cwd=%s repos=%s\n", binding.CWD, strings.Join(binding.VisibleRepos, ","))
-	fmt.Fprintln(stdout, "type help for allowed commands; exit or quit to leave")
+	_, _ = fmt.Fprintf(stdout, "reposhell bound cwd=%s repos=%s\n", binding.CWD, strings.Join(binding.VisibleRepos, ","))
+	_, _ = fmt.Fprintln(stdout, "type help for allowed commands; exit or quit to leave")
 	scanner := bufio.NewScanner(stdin)
 	scanner.Buffer(make([]byte, 0, 4096), 1024*1024)
 	for {
-		fmt.Fprintf(stdout, "reposhell %s> ", binding.CWD)
+		_, _ = fmt.Fprintf(stdout, "reposhell %s> ", binding.CWD)
 		if !scanner.Scan() {
-			fmt.Fprintln(stdout)
+			_, _ = fmt.Fprintln(stdout)
 			break
 		}
 		line := strings.TrimSpace(scanner.Text())
@@ -175,7 +168,7 @@ func runShell(args []string, stdin io.Reader, stdout, stderr io.Writer, opts Opt
 		result := manager.Exec(context.Background(), reposhell.ExecRequest{Command: line, Binding: binding})
 		writeResult(stdout, stderr, result)
 		if result.ExitCode != 0 {
-			fmt.Fprintf(stderr, "exit_code=%d\n", result.ExitCode)
+			_, _ = fmt.Fprintf(stderr, "exit_code=%d\n", result.ExitCode)
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -193,7 +186,7 @@ func runStatus(args []string, stdout, stderr io.Writer, opts Options) int {
 	}
 	socketPath := *socket
 	if socketPath == "" {
-		cfg, err := LoadConfig(*configPath, opts)
+		cfg, err := opts.LoadConfig(*configPath, opts)
 		if err != nil {
 			return fatal(stderr, err)
 		}
@@ -208,10 +201,10 @@ func runStatus(args []string, stdout, stderr io.Writer, opts Options) int {
 }
 
 func printShellHelp(stdout io.Writer) {
-	fmt.Fprintln(stdout, "allowed: pwd, ls, find, rg, grep, sed -n, cat, head, tail, wc -l, git status --short, git show --name-only, git grep, git ls-files")
-	fmt.Fprintln(stdout, "search: rg -n -i \"lm studio\" or grep -R -n -i \"lm studio\" .")
-	fmt.Fprintln(stdout, "files: rg --files -g \"*.ts\" or git ls-files src")
-	fmt.Fprintln(stdout, "examples: rg -n reposhell README.md | sed is not allowed; use one simple command at a time")
+	_, _ = fmt.Fprintln(stdout, "allowed: pwd, ls, find, rg, grep, sed -n, cat, head, tail, wc -l, git status --short, git show --name-only, git grep, git ls-files")
+	_, _ = fmt.Fprintln(stdout, "search: rg -n -i \"lm studio\" or grep -R -n -i \"lm studio\" .")
+	_, _ = fmt.Fprintln(stdout, "files: rg --files -g \"*.ts\" or git ls-files src")
+	_, _ = fmt.Fprintln(stdout, "examples: rg -n reposhell README.md | sed is not allowed; use one simple command at a time")
 }
 
 func writeResult(stdout, stderr io.Writer, result reposhell.ExecResult) {
@@ -291,6 +284,9 @@ func withDefaults(opts Options) Options {
 	if opts.DefaultSocket == "" {
 		opts.DefaultSocket = StandaloneDefaultSocket
 	}
+	if opts.LoadConfig == nil {
+		opts.LoadConfig = LoadConfig
+	}
 	return opts
 }
 
@@ -301,10 +297,10 @@ func newFlagSet(name string, stderr io.Writer) *flag.FlagSet {
 }
 
 func usage(stderr io.Writer, opts Options) {
-	fmt.Fprintf(stderr, "usage: %s <serve|exec|shell|status> [flags]\n", opts.UsagePrefix)
+	_, _ = fmt.Fprintf(stderr, "usage: %s <serve|exec|shell|status> [flags]\n", opts.UsagePrefix)
 }
 
 func fatal(stderr io.Writer, err error) int {
-	fmt.Fprintln(stderr, err)
+	_, _ = fmt.Fprintln(stderr, err)
 	return 1
 }

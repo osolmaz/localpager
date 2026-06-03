@@ -6,22 +6,27 @@ import (
 	"os"
 	"time"
 
-	localconfig "github.com/osolmaz/localpager/internal/config"
-	"github.com/osolmaz/localpager/internal/reposhell"
+	"github.com/osolmaz/reposhell"
 )
 
-type fileConfig struct {
-	blockConfig
-
-	Reposhell  *blockConfig           `json:"reposhell"`
-	Classifier localconfig.Classifier `json:"classifier"`
+type blockConfig struct {
+	Enabled         bool         `json:"enabled"`
+	Root            string       `json:"root"`
+	Socket          string       `json:"socket"`
+	CommandTimeout  string       `json:"command_timeout"`
+	MaxOutputBytes  int64        `json:"max_output_bytes"`
+	RefreshInterval string       `json:"refresh_interval"`
+	SnapshotRetain  int          `json:"snapshot_retain"`
+	Repos           []repoConfig `json:"repos"`
+	DefaultRepo     string       `json:"default_repo"`
+	VisibleRepos    []string     `json:"visible_repos"`
 }
 
-type blockConfig struct {
-	localconfig.Reposhell
-
-	DefaultRepo  string   `json:"default_repo"`
-	VisibleRepos []string `json:"visible_repos"`
+type repoConfig struct {
+	ID              string `json:"id"`
+	Remote          string `json:"remote"`
+	DefaultRef      string `json:"default_ref"`
+	RefreshInterval string `json:"refresh_interval"`
 }
 
 func LoadConfig(path string, opts Options) (RuntimeConfig, error) {
@@ -35,21 +40,11 @@ func LoadConfig(path string, opts Options) (RuntimeConfig, error) {
 		return RuntimeConfig{}, fmt.Errorf("read config %s: %w", expandedPath, err)
 	}
 	defer func() { _ = file.Close() }()
-	var raw fileConfig
+	var raw blockConfig
 	if err := json.NewDecoder(file).Decode(&raw); err != nil {
 		return RuntimeConfig{}, fmt.Errorf("parse config %s: %w", expandedPath, err)
 	}
-	block := raw.blockConfig
-	if raw.Reposhell != nil {
-		block = *raw.Reposhell
-		if block.DefaultRepo == "" {
-			block.DefaultRepo = raw.Classifier.ReposhellDefaultRepo
-		}
-		if len(block.VisibleRepos) == 0 {
-			block.VisibleRepos = raw.Classifier.ReposhellVisibleRepos
-		}
-	}
-	return convertConfig(block, opts)
+	return convertConfig(raw, opts)
 }
 
 func convertConfig(cfg blockConfig, opts Options) (RuntimeConfig, error) {

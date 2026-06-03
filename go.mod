@@ -4,9 +4,11 @@ go 1.25.0
 
 require (
 	github.com/glebarez/sqlite v1.11.0
+	github.com/osolmaz/reposhell v0.0.0
 	gorm.io/gorm v1.31.1
-	mvdan.cc/sh/v3 v3.12.0
 )
+
+replace github.com/osolmaz/reposhell => ./reposhell
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
@@ -22,4 +24,5 @@ require (
 	modernc.org/mathutil v1.5.0 // indirect
 	modernc.org/memory v1.5.0 // indirect
 	modernc.org/sqlite v1.23.1 // indirect
+	mvdan.cc/sh/v3 v3.12.0 // indirect
 )

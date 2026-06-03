@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/osolmaz/localpager/internal/reposhellcli"
+	"github.com/osolmaz/reposhell/reposhellcli"
 )
 
 func main() {

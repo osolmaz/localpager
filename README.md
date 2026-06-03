@@ -81,7 +81,7 @@ Notification policy is deployment config, not classifier logic:
 When `classifier.tools` includes `bash`, run `reposhell serve` with matching
 `reposhell` config. The model sees a familiar bash-shaped tool, but Localpager
 enforces a read-only command allowlist against pinned repository snapshots. See
-[Reposhell](cmd/reposhell/README.md) for standalone setup, config, direct
+[Reposhell](reposhell/README.md) for standalone setup, config, direct
 commands, allowed command shapes, service mode, and troubleshooting.
 
 If `notify_topics_any` is set, at least one classifier topic must match before a
