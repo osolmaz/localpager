@@ -639,9 +639,6 @@ func planGit(args []string, binding Binding) (execPlan, error) {
 			showArgs := []string{"show", "--name-only", commit}
 			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, showArgs...), Dir: root}, nil
 		}
-		if len(args) == 3 && args[1] == "--name-only" && safeGitRevision(args[2]) {
-			return execPlan{Name: "/usr/bin/git", Args: appendGitWorkTreeArgs(gitDir, root, args...), Dir: root}, nil
-		}
 	case "grep":
 		if len(args) >= 2 {
 			return planGitGrep(args, binding)
@@ -784,10 +781,6 @@ func validateSedRange(raw string) error {
 		return deny("sed range must be positive and at most 1000 lines")
 	}
 	return nil
-}
-
-func safeGitRevision(raw string) bool {
-	return gitRevisionRE.MatchString(raw) && !strings.HasPrefix(raw, "-")
 }
 
 func shouldRefresh(mirror string, repoInterval, defaultInterval time.Duration) bool {
@@ -966,8 +959,7 @@ func (b *cappedBuffer) String() string {
 }
 
 var (
-	commitRE                = regexp.MustCompile(`^[0-9a-f]{40}$`)
-	sedRangeRE              = regexp.MustCompile(`^([0-9]+),([0-9]+)p$`)
-	gitRevisionRE           = regexp.MustCompile(`^[A-Za-z0-9_./:@+-]{1,128}$`)
-	_             io.Writer = (*cappedBuffer)(nil)
+	commitRE             = regexp.MustCompile(`^[0-9a-f]{40}$`)
+	sedRangeRE           = regexp.MustCompile(`^([0-9]+),([0-9]+)p$`)
+	_          io.Writer = (*cappedBuffer)(nil)
 )

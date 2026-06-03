@@ -41,7 +41,7 @@ func runReposhellServe(args []string) {
 	configPath := fs.String("config", "~/.config/localpager/config.json", "JSON config file path")
 	socket := fs.String("socket", "", "Unix socket path")
 	_ = fs.Parse(args)
-	cfg := loadConfig(*configPath)
+	cfg := loadConfig(mustExpand(*configPath))
 	readerConfig, err := app.ReposhellConfig(cfg)
 	if err != nil {
 		log.Fatal(err)
@@ -65,7 +65,7 @@ func runReposhellExec(args []string) {
 	if *command == "" {
 		log.Fatal("--command is required")
 	}
-	cfg := loadConfig(*configPath)
+	cfg := loadConfig(mustExpand(*configPath))
 	readerConfig, err := app.ReposhellConfig(cfg)
 	if err != nil {
 		log.Fatal(err)
@@ -95,8 +95,11 @@ func runReposhellStatus(args []string) {
 	configPath := fs.String("config", "~/.config/localpager/config.json", "JSON config file path")
 	socket := fs.String("socket", "", "Unix socket path")
 	_ = fs.Parse(args)
-	cfg := loadConfig(*configPath)
-	socketPath := valueOrDefault(*socket, app.ReposhellSocket(cfg))
+	socketPath := *socket
+	if socketPath == "" {
+		cfg := loadConfig(mustExpand(*configPath))
+		socketPath = app.ReposhellSocket(cfg)
+	}
 	body, err := reposhellRequest(socketPath, http.MethodGet, "/status", nil)
 	if err != nil {
 		log.Fatal(err)

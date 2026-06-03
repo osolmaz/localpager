@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -63,13 +64,23 @@ func (s *Server) ServeUnix(ctx context.Context, socketPath string) error {
 	if socketPath == "" {
 		return fmt.Errorf("reposhell socket path is required")
 	}
-	if err := os.MkdirAll(filepath.Dir(socketPath), 0o755); err != nil {
+	socketDir := filepath.Dir(socketPath)
+	if err := os.MkdirAll(socketDir, 0o700); err != nil {
 		return fmt.Errorf("create socket dir: %w", err)
 	}
+	if err := hardenSocketDir(socketDir); err != nil {
+		return err
+	}
 	_ = os.Remove(socketPath)
+	oldUmask := syscall.Umask(0o177)
 	listener, err := net.Listen("unix", socketPath)
+	syscall.Umask(oldUmask)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", socketPath, err)
+	}
+	if err := os.Chmod(socketPath, 0o600); err != nil {
+		_ = listener.Close()
+		return fmt.Errorf("restrict socket permissions: %w", err)
 	}
 	defer func() { _ = os.Remove(socketPath) }()
 	server := &http.Server{Handler: s.handler()}
@@ -81,6 +92,27 @@ func (s *Server) ServeUnix(ctx context.Context, socketPath string) error {
 	}()
 	if err := server.Serve(listener); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		return err
+	}
+	return nil
+}
+
+func hardenSocketDir(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("stat socket dir: %w", err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("socket parent is not a directory: %s", path)
+	}
+	mode := info.Mode()
+	if mode&os.ModeSticky != 0 {
+		return nil
+	}
+	if mode.Perm()&0o077 == 0 {
+		return nil
+	}
+	if err := os.Chmod(path, 0o700); err != nil {
+		return fmt.Errorf("restrict socket dir permissions: %w", err)
 	}
 	return nil
 }

@@ -121,6 +121,27 @@ func TestGitShowUsesBoundSnapshotCommit(t *testing.T) {
 	}
 }
 
+func TestGitShowRejectsOptionalRevision(t *testing.T) {
+	ctx := context.Background()
+	source := testGitRepo(t, map[string]string{"secret.txt": "secret\n"})
+	manager := NewManager(Config{
+		Root:  filepath.Join(t.TempDir(), "state"),
+		Repos: []Repo{{ID: "project", Remote: source, DefaultRef: "main"}},
+	})
+	binding, err := manager.Bind(ctx, "project", []string{"project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	result := manager.Exec(ctx, ExecRequest{Command: "git show --name-only HEAD:secret.txt", Binding: binding})
+	if result.PolicyError == "" {
+		t.Fatalf("PolicyError is empty: stdout=%q stderr=%q", result.Stdout, result.Stderr)
+	}
+	if strings.Contains(result.Stdout, "secret") {
+		t.Fatalf("Stdout leaked blob contents: %q", result.Stdout)
+	}
+}
+
 func TestExecRejectsUnsafeShellAndPathFeatures(t *testing.T) {
 	ctx := context.Background()
 	outside := filepath.Join(t.TempDir(), "outside.txt")
