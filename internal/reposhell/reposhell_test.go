@@ -1,4 +1,4 @@
-package reporeader
+package reposhell
 
 import (
 	"context"
@@ -14,7 +14,7 @@ import (
 func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 	ctx := context.Background()
 	source := testGitRepo(t, map[string]string{
-		"README.md":     "Localpager repo reader\nSecond line\n",
+		"README.md":     "Localpager reposhell\nSecond line\n",
 		"docs/note.txt": "tool_calling notes\n",
 	})
 	manager := NewManager(Config{
@@ -36,11 +36,11 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 		want    string
 	}{
 		{"pwd", "/repo/project\n"},
-		{"cat README.md", "Localpager repo reader"},
-		{"head -n 1 README.md", "Localpager repo reader\n"},
+		{"cat README.md", "Localpager reposhell"},
+		{"head -n 1 README.md", "Localpager reposhell\n"},
 		{"sed -n 2,2p README.md", "Second line\n"},
 		{"find . -maxdepth 2 -type f -name note.txt", "docs/note.txt"},
-		{"grep -n Local README.md", "1:Localpager repo reader\n"},
+		{"grep -n Local README.md", "1:Localpager reposhell\n"},
 		{"git grep -n tool_calling docs", "docs/note.txt:1:tool_calling notes\n"},
 		{"git show --name-only", "README.md"},
 	}
@@ -186,7 +186,7 @@ func TestExecCapsOutput(t *testing.T) {
 	if !result.Truncated {
 		t.Fatal("Truncated = false, want true")
 	}
-	if !strings.Contains(result.Stdout, "[repo-reader: output truncated]") {
+	if !strings.Contains(result.Stdout, "[reposhell: output truncated]") {
 		t.Fatalf("Stdout missing truncation marker: %q", result.Stdout)
 	}
 }

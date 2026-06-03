@@ -14,9 +14,9 @@ export type LocalpagerAgentOptions = {
   readonly maxTokens: number;
   readonly timeoutMs: number;
   readonly finalSchemaPath: string | undefined;
-  readonly repoReaderSocket: string | undefined;
-  readonly repoReaderDefaultRepo: string | undefined;
-  readonly repoReaderVisibleRepos: readonly string[];
+  readonly reposhellSocket: string | undefined;
+  readonly reposhellDefaultRepo: string | undefined;
+  readonly reposhellVisibleRepos: readonly string[];
   readonly status: boolean;
   readonly forwardedArgs: readonly string[];
 };
@@ -42,9 +42,9 @@ export function defaultOptions(): LocalpagerAgentOptions {
     maxTokens: envPositiveInteger("LOCALPAGER_AGENT_MAX_TOKENS", "8192"),
     timeoutMs: envPositiveInteger("LOCALPAGER_AGENT_TIMEOUT_MS", "3000"),
     finalSchemaPath: process.env["LOCALPAGER_AGENT_FINAL_SCHEMA"],
-    repoReaderSocket: process.env["LOCALPAGER_REPO_READER_SOCKET"],
-    repoReaderDefaultRepo: process.env["LOCALPAGER_REPO_READER_DEFAULT_REPO"],
-    repoReaderVisibleRepos: splitCSV(process.env["LOCALPAGER_REPO_READER_VISIBLE_REPOS"] ?? ""),
+    reposhellSocket: process.env["LOCALPAGER_REPOSHELL_SOCKET"],
+    reposhellDefaultRepo: process.env["LOCALPAGER_REPOSHELL_DEFAULT_REPO"],
+    reposhellVisibleRepos: splitCSV(process.env["LOCALPAGER_REPOSHELL_VISIBLE_REPOS"] ?? ""),
     status: false,
     forwardedArgs: []
   };
@@ -97,10 +97,10 @@ export function usage(): string {
     "  --timeout-ms <n>          /v1/models probe timeout",
     "  --final-schema <path>     force final schema output; requires Pi -p/--print",
     "  --schema <path>           alias for --final-schema",
-    "  --repo-reader-socket <p>  Unix socket for Localpager read-only bash",
-    "  --repo-reader-default-repo <id>",
+    "  --reposhell-socket <p>  Unix socket for Localpager read-only bash",
+    "  --reposhell-default-repo <id>",
     "                            default repo id for read-only bash",
-    "  --repo-reader-visible-repos <ids>",
+    "  --reposhell-visible-repos <ids>",
     "                            comma-separated repo ids visible to read-only bash",
     "  -h, --help                show this help",
     "",
@@ -147,14 +147,14 @@ const valueFlagUpdaters: Readonly<Record<string, OptionUpdater>> = {
   "--timeout-ms": (options, value) => ({ ...options, timeoutMs: parsePositiveInteger(value) }),
   "--final-schema": (options, value) => ({ ...options, finalSchemaPath: value }),
   "--schema": (options, value) => ({ ...options, finalSchemaPath: value }),
-  "--repo-reader-socket": (options, value) => ({ ...options, repoReaderSocket: value }),
-  "--repo-reader-default-repo": (options, value) => ({
+  "--reposhell-socket": (options, value) => ({ ...options, reposhellSocket: value }),
+  "--reposhell-default-repo": (options, value) => ({
     ...options,
-    repoReaderDefaultRepo: value
+    reposhellDefaultRepo: value
   }),
-  "--repo-reader-visible-repos": (options, value) => ({
+  "--reposhell-visible-repos": (options, value) => ({
     ...options,
-    repoReaderVisibleRepos: splitCSV(value)
+    reposhellVisibleRepos: splitCSV(value)
   })
 };
 

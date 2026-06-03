@@ -27,9 +27,9 @@ func main() {
 	flag.StringVar(&flags.classifierPromptTemplate, "classifier-prompt-template", "", "classifier prompt template path")
 	flag.StringVar(&flags.classifierTopicTaxonomy, "classifier-topic-taxonomy", "", "classifier topic taxonomy path")
 	flag.StringVar(&flags.classifierTools, "classifier-tools", "", "comma-separated classifier tool allowlist")
-	flag.StringVar(&flags.repoReaderSocket, "repo-reader-socket", "", "repo-reader Unix socket path")
-	flag.StringVar(&flags.repoReaderDefaultRepo, "repo-reader-default-repo", "", "default repo id for repo-reader bash tool")
-	flag.StringVar(&flags.repoReaderVisibleRepos, "repo-reader-visible-repos", "", "comma-separated visible repo ids for repo-reader bash tool")
+	flag.StringVar(&flags.reposhellSocket, "reposhell-socket", "", "reposhell Unix socket path")
+	flag.StringVar(&flags.reposhellDefaultRepo, "reposhell-default-repo", "", "default repo id for reposhell bash tool")
+	flag.StringVar(&flags.reposhellVisibleRepos, "reposhell-visible-repos", "", "comma-separated visible repo ids for reposhell bash tool")
 	flag.StringVar(&flags.githubBaseURL, "github-base-url", "https://api.github.com", "GitHub API base URL for classifier context")
 	flag.StringVar(&flags.githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token for classifier context")
 	flag.StringVar(&flags.model, "model", "", "optional localpager-agent model override")
@@ -85,9 +85,9 @@ func main() {
 		ClassifierPromptTemplate:   flags.classifierPromptTemplate,
 		ClassifierTopicTaxonomy:    flags.classifierTopicTaxonomy,
 		ClassifierTools:            app.SplitCSV(flags.classifierTools),
-		RepoReaderSocket:           flags.repoReaderSocket,
-		RepoReaderDefaultRepo:      flags.repoReaderDefaultRepo,
-		RepoReaderVisibleRepos:     app.SplitCSV(flags.repoReaderVisibleRepos),
+		ReposhellSocket:            flags.reposhellSocket,
+		ReposhellDefaultRepo:       flags.reposhellDefaultRepo,
+		ReposhellVisibleRepos:      app.SplitCSV(flags.reposhellVisibleRepos),
 		ClassifierContext:          classifierContextOptions(cfg, flags.githubBaseURL, flags.githubTokenEnv),
 		Model:                      flags.model,
 		AgentBaseURL:               flags.agentBaseURL,
@@ -130,9 +130,9 @@ type workerFlags struct {
 	classifierPromptTemplate   string
 	classifierTopicTaxonomy    string
 	classifierTools            string
-	repoReaderSocket           string
-	repoReaderDefaultRepo      string
-	repoReaderVisibleRepos     string
+	reposhellSocket            string
+	reposhellDefaultRepo       string
+	reposhellVisibleRepos      string
 	githubBaseURL              string
 	githubTokenEnv             string
 	model                      string
@@ -204,14 +204,14 @@ func (flags *workerFlags) applyClassifierToolConfig(cfg config.Config, setFlags 
 	if len(cfg.Classifier.Tools) > 0 && !config.FlagSet(setFlags, "classifier-tools") {
 		flags.classifierTools = strings.Join(cfg.Classifier.Tools, ",")
 	}
-	if cfg.RepoReader.Enabled && !config.FlagSet(setFlags, "repo-reader-socket") {
-		flags.repoReaderSocket = app.RepoReaderSocket(cfg)
+	if cfg.Reposhell.Enabled && !config.FlagSet(setFlags, "reposhell-socket") {
+		flags.reposhellSocket = app.ReposhellSocket(cfg)
 	}
-	if cfg.Classifier.RepoReaderDefaultRepo != "" && !config.FlagSet(setFlags, "repo-reader-default-repo") {
-		flags.repoReaderDefaultRepo = cfg.Classifier.RepoReaderDefaultRepo
+	if cfg.Classifier.ReposhellDefaultRepo != "" && !config.FlagSet(setFlags, "reposhell-default-repo") {
+		flags.reposhellDefaultRepo = cfg.Classifier.ReposhellDefaultRepo
 	}
-	if len(cfg.Classifier.RepoReaderVisibleRepos) > 0 && !config.FlagSet(setFlags, "repo-reader-visible-repos") {
-		flags.repoReaderVisibleRepos = strings.Join(cfg.Classifier.RepoReaderVisibleRepos, ",")
+	if len(cfg.Classifier.ReposhellVisibleRepos) > 0 && !config.FlagSet(setFlags, "reposhell-visible-repos") {
+		flags.reposhellVisibleRepos = strings.Join(cfg.Classifier.ReposhellVisibleRepos, ",")
 	}
 }
 

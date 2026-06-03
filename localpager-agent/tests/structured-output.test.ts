@@ -73,8 +73,8 @@ describe("structured output", () => {
       outputPath: "/tmp/final-output.json",
       instruction: "call final_json"
     };
-    const repoReaderRuntime = {
-      extensionPath: "/tmp/repo-reader-bash-extension.ts",
+    const reposhellRuntime = {
+      extensionPath: "/tmp/reposhell-bash-extension.ts",
       instruction: "use bash only if needed"
     };
     const plan = await createLaunchPlan(
@@ -85,7 +85,7 @@ describe("structured output", () => {
       runtimeConfig("/tmp/localpager-agent-state"),
       "gemma-4-e4b-it",
       runtime,
-      repoReaderRuntime
+      reposhellRuntime
     );
 
     expect(plan.finalSchemaOutputPath).toBe("/tmp/final-output.json");
@@ -97,7 +97,7 @@ describe("structured output", () => {
       "--thinking",
       "off",
       "--extension",
-      "/tmp/repo-reader-bash-extension.ts",
+      "/tmp/reposhell-bash-extension.ts",
       "--append-system-prompt",
       "use bash only if needed",
       "--extension",
@@ -127,7 +127,7 @@ describe("structured output", () => {
     expect(plan.args).toContain("final_json");
   });
 
-  it("rejects bash allowlist without repo-reader extension", async () => {
+  it("rejects bash allowlist without reposhell extension", async () => {
     await expect(
       createLaunchPlan(
         {
@@ -142,7 +142,7 @@ describe("structured output", () => {
           instruction: "call final_json"
         }
       )
-    ).rejects.toThrow("--tools bash requires --repo-reader-socket");
+    ).rejects.toThrow("--tools bash requires --reposhell-socket");
   });
 
   it("rejects schema mode when Pi tools are disabled", async () => {
@@ -214,9 +214,9 @@ function options(stateDir: string): LocalpagerAgentOptions {
     maxTokens: 8192,
     timeoutMs: 1000,
     finalSchemaPath: undefined,
-    repoReaderSocket: undefined,
-    repoReaderDefaultRepo: undefined,
-    repoReaderVisibleRepos: [],
+    reposhellSocket: undefined,
+    reposhellDefaultRepo: undefined,
+    reposhellVisibleRepos: [],
     status: false,
     forwardedArgs: []
   };

@@ -16,7 +16,7 @@ but is enforced by Localpager.
 ## Desired Shape
 
 ```text
-localpager repo-reader service
+localpager reposhell service
   - owns repo mirrors
   - keeps them fresh
   - creates pinned read-only snapshots
@@ -24,7 +24,7 @@ localpager repo-reader service
 
 localpager-agent Pi extension
   - registers a tool named bash
-  - sends the command string to repo-reader
+  - sends the command string to reposhell
   - returns stdout/stderr-shaped output
 
 classifier run
@@ -39,7 +39,7 @@ The production classifier should use an explicit tool allowlist:
 bash,final_json
 ```
 
-If repo reading is disabled, the classifier should use:
+If reposhell is disabled, the classifier should use:
 
 ```text
 final_json
@@ -47,15 +47,15 @@ final_json
 
 ## Configuration
 
-The repo reader should support multiple repositories, but each classifier profile
+The reposhell should support multiple repositories, but each classifier profile
 must choose which repos are visible.
 
 ```json
 {
-  "repo_reader": {
+  "reposhell": {
     "enabled": true,
-    "root": "~/.local/state/localpager/repo-reader",
-    "socket": "~/.local/state/localpager/repo-reader.sock",
+    "root": "~/.local/state/localpager/reposhell",
+    "socket": "~/.local/state/localpager/reposhell.sock",
     "repos": [
       {
         "id": "openclaw",
@@ -74,8 +74,8 @@ must choose which repos are visible.
     "max_output_bytes": 65536
   },
   "classifier": {
-    "repo_reader_default_repo": "openclaw",
-    "repo_reader_visible_repos": ["openclaw"],
+    "reposhell_default_repo": "openclaw",
+    "reposhell_visible_repos": ["openclaw"],
     "tools": ["bash", "final_json"]
   }
 }
@@ -96,7 +96,7 @@ Each classifier run should request a pinned view:
 }
 ```
 
-The repo reader returns a run binding:
+The reposhell returns a run binding:
 
 ```json
 {
@@ -121,7 +121,7 @@ The model should see a simple virtual layout:
 /repo/clawhub
 ```
 
-There is no real `/repo` mount. The repo reader maps those virtual roots to
+There is no real `/repo` mount. The reposhell maps those virtual roots to
 pinned snapshot directories under its state root.
 
 The default cwd should be the repo being classified:
@@ -203,7 +203,7 @@ rm -rf .
 
 ## Enforcement
 
-Use Go for the repo reader and command runner.
+Use Go for the reposhell and command runner.
 
 The command parser should reject complex shell syntax before validation. Prefer
 `mvdan.cc/sh/v3/syntax` if the dependency is acceptable, because it can parse
@@ -232,7 +232,7 @@ Path rules:
 Expose a Unix socket API under Localpager state:
 
 ```text
-~/.local/state/localpager/repo-reader.sock
+~/.local/state/localpager/reposhell.sock
 ```
 
 Minimum endpoints:
@@ -252,7 +252,7 @@ then call `Exec` for each `bash` tool invocation.
 The service owns mirrors and snapshots:
 
 ```text
-repo-reader/
+reposhell/
   mirrors/<repo-id>.git
   worktrees/<repo-id>/<commit-sha>/
   snapshots/<repo-id>/<commit-sha> -> worktree path
@@ -277,8 +277,8 @@ Add classifier tool configuration:
 {
   "classifier": {
     "tools": ["bash", "final_json"],
-    "repo_reader_default_repo": "openclaw",
-    "repo_reader_visible_repos": ["openclaw"]
+    "reposhell_default_repo": "openclaw",
+    "reposhell_visible_repos": ["openclaw"]
   }
 }
 ```
@@ -286,14 +286,14 @@ Add classifier tool configuration:
 `scripts/localpager-classifier` should pass an explicit tool allowlist to
 `localpager-agent`.
 
-When repo reading is enabled:
+When reposhell is enabled:
 
 ```text
 --tools bash,final_json
---extension <repo-reader-bash-extension>
+--extension <reposhell-bash-extension>
 ```
 
-When repo reading is disabled:
+When reposhell is disabled:
 
 ```text
 --tools final_json
@@ -310,7 +310,7 @@ Store enough metadata with each classifier result to audit what the model saw:
 
 ```json
 {
-  "repo_reader": {
+  "reposhell": {
     "default_repo": "openclaw",
     "visible_repos": ["openclaw"],
     "snapshots": {
@@ -328,10 +328,10 @@ large source snippets. Store them in classifier session artifacts if needed.
 
 ## Implementation Checklist
 
-- [x] Add `repo_reader` config structs.
-- [x] Add `classifier.tools`, `classifier.repo_reader_default_repo`, and
-  `classifier.repo_reader_visible_repos`.
-- [x] Add `localpager repo-reader serve`.
+- [x] Add `reposhell` config structs.
+- [x] Add `classifier.tools`, `classifier.reposhell_default_repo`, and
+  `classifier.reposhell_visible_repos`.
+- [x] Add `localpager reposhell serve`.
 - [x] Add mirror clone/fetch and snapshot pinning.
 - [x] Add the command parser and policy validator.
 - [x] Add read-only command execution with timeouts and output caps.
@@ -345,9 +345,9 @@ large source snippets. Store them in classifier session artifacts if needed.
 - [x] Add tests that a classifier run starts in the default repo cwd.
 - [x] Add tests for multiple visible repos and explicit `/repo/<id>` paths.
 - [x] Add service docs and an example config.
-- [x] Reject `--tools bash` unless the Localpager repo-reader extension is
+- [x] Reject `--tools bash` unless the Localpager reposhell extension is
   attached.
-- [ ] Persist repo-reader audit metadata on classifier results.
+- [ ] Persist reposhell audit metadata on classifier results.
 - [ ] Add snapshot garbage collection.
 
 ## Open Questions
@@ -358,5 +358,5 @@ large source snippets. Store them in classifier session artifacts if needed.
 - Should snapshots be filesystem read-only with permissions, or is policy-level
   read-only plus no write commands enough?
 - How many old snapshots should the service retain?
-- Should the repo reader support private repo credentials, or only already
+- Should the reposhell support private repo credentials, or only already
   accessible HTTPS remotes for now?

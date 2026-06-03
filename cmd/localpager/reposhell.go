@@ -15,47 +15,47 @@ import (
 	"time"
 
 	"github.com/osolmaz/localpager/internal/app"
-	"github.com/osolmaz/localpager/internal/reporeader"
+	"github.com/osolmaz/localpager/internal/reposhell"
 )
 
-func runRepoReader(args []string) {
+func runReposhell(args []string) {
 	if len(args) < 1 {
-		repoReaderUsage()
+		reposhellUsage()
 		os.Exit(2)
 	}
 	switch args[0] {
 	case "serve":
-		runRepoReaderServe(args[1:])
+		runReposhellServe(args[1:])
 	case "exec":
-		runRepoReaderExec(args[1:])
+		runReposhellExec(args[1:])
 	case "status":
-		runRepoReaderStatus(args[1:])
+		runReposhellStatus(args[1:])
 	default:
-		repoReaderUsage()
+		reposhellUsage()
 		os.Exit(2)
 	}
 }
 
-func runRepoReaderServe(args []string) {
-	fs := flag.NewFlagSet("repo-reader serve", flag.ExitOnError)
+func runReposhellServe(args []string) {
+	fs := flag.NewFlagSet("reposhell serve", flag.ExitOnError)
 	configPath := fs.String("config", "~/.config/localpager/config.json", "JSON config file path")
 	socket := fs.String("socket", "", "Unix socket path")
 	_ = fs.Parse(args)
 	cfg := loadConfig(*configPath)
-	readerConfig, err := app.RepoReaderConfig(cfg)
+	readerConfig, err := app.ReposhellConfig(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	socketPath := valueOrDefault(*socket, app.RepoReaderSocket(cfg))
-	app.Printf(os.Stdout, "repo_reader_socket=%s\n", socketPath)
-	manager := reporeader.NewManager(readerConfig)
-	if err := reporeader.NewServer(manager).ServeUnix(context.Background(), socketPath); err != nil {
+	socketPath := valueOrDefault(*socket, app.ReposhellSocket(cfg))
+	app.Printf(os.Stdout, "reposhell_socket=%s\n", socketPath)
+	manager := reposhell.NewManager(readerConfig)
+	if err := reposhell.NewServer(manager).ServeUnix(context.Background(), socketPath); err != nil {
 		log.Fatal(err)
 	}
 }
 
-func runRepoReaderExec(args []string) {
-	fs := flag.NewFlagSet("repo-reader exec", flag.ExitOnError)
+func runReposhellExec(args []string) {
+	fs := flag.NewFlagSet("reposhell exec", flag.ExitOnError)
 	configPath := fs.String("config", "~/.config/localpager/config.json", "JSON config file path")
 	defaultRepo := fs.String("repo", "", "default configured repo id")
 	command := fs.String("command", "", "read-only bash-shaped command")
@@ -66,21 +66,21 @@ func runRepoReaderExec(args []string) {
 		log.Fatal("--command is required")
 	}
 	cfg := loadConfig(*configPath)
-	readerConfig, err := app.RepoReaderConfig(cfg)
+	readerConfig, err := app.ReposhellConfig(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	repoID := valueOrDefault(*defaultRepo, cfg.Classifier.RepoReaderDefaultRepo)
+	repoID := valueOrDefault(*defaultRepo, cfg.Classifier.ReposhellDefaultRepo)
 	visibleRepos := []string(visible)
 	if len(visibleRepos) == 0 {
-		visibleRepos = cfg.Classifier.RepoReaderVisibleRepos
+		visibleRepos = cfg.Classifier.ReposhellVisibleRepos
 	}
-	manager := reporeader.NewManager(readerConfig)
+	manager := reposhell.NewManager(readerConfig)
 	binding, err := manager.Bind(context.Background(), repoID, visibleRepos)
 	if err != nil {
 		log.Fatal(err)
 	}
-	result := manager.Exec(context.Background(), reporeader.ExecRequest{Command: *command, Binding: binding})
+	result := manager.Exec(context.Background(), reposhell.ExecRequest{Command: *command, Binding: binding})
 	if result.Stdout != "" {
 		app.Printf(os.Stdout, "%s", result.Stdout)
 	}
@@ -90,21 +90,21 @@ func runRepoReaderExec(args []string) {
 	os.Exit(result.ExitCode)
 }
 
-func runRepoReaderStatus(args []string) {
-	fs := flag.NewFlagSet("repo-reader status", flag.ExitOnError)
+func runReposhellStatus(args []string) {
+	fs := flag.NewFlagSet("reposhell status", flag.ExitOnError)
 	configPath := fs.String("config", "~/.config/localpager/config.json", "JSON config file path")
 	socket := fs.String("socket", "", "Unix socket path")
 	_ = fs.Parse(args)
 	cfg := loadConfig(*configPath)
-	socketPath := valueOrDefault(*socket, app.RepoReaderSocket(cfg))
-	body, err := repoReaderRequest(socketPath, http.MethodGet, "/status", nil)
+	socketPath := valueOrDefault(*socket, app.ReposhellSocket(cfg))
+	body, err := reposhellRequest(socketPath, http.MethodGet, "/status", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	app.Printf(os.Stdout, "%s", body)
 }
 
-func repoReaderRequest(socketPath, method, path string, payload any) (string, error) {
+func reposhellRequest(socketPath, method, path string, payload any) (string, error) {
 	var body io.Reader
 	if payload != nil {
 		raw, err := json.Marshal(payload)
@@ -143,6 +143,6 @@ func repoReaderRequest(socketPath, method, path string, payload any) (string, er
 	return string(raw), nil
 }
 
-func repoReaderUsage() {
-	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager repo-reader <serve|exec|status> [flags]")
+func reposhellUsage() {
+	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager reposhell <serve|exec|status> [flags]")
 }

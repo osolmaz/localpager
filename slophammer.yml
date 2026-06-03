@@ -39,14 +39,14 @@ go:
         - internal/cli
         - internal/config
         - internal/localpager
-        - internal/reporeader
+        - internal/reposhell
         - internal/sources
         - internal/timing
     - from: internal/app
       allow:
         - internal/config
         - internal/localpager
-        - internal/reporeader
+        - internal/reposhell
         - internal/sources
     - from: internal/cli
       allow:
@@ -57,7 +57,7 @@ go:
     - from: internal/localpager
       allow:
         - internal/timing
-    - from: internal/reporeader
+    - from: internal/reposhell
       allow: []
     - from: internal/sources
       allow:

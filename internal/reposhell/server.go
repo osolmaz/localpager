@@ -1,4 +1,4 @@
-package reporeader
+package reposhell
 
 import (
 	"context"
@@ -61,7 +61,7 @@ func (s *Server) ServeUnix(ctx context.Context, socketPath string) error {
 		return err
 	}
 	if socketPath == "" {
-		return fmt.Errorf("repo reader socket path is required")
+		return fmt.Errorf("reposhell socket path is required")
 	}
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0o755); err != nil {
 		return fmt.Errorf("create socket dir: %w", err)

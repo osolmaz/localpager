@@ -5,33 +5,33 @@ import (
 	"time"
 
 	"github.com/osolmaz/localpager/internal/config"
-	"github.com/osolmaz/localpager/internal/reporeader"
+	"github.com/osolmaz/localpager/internal/reposhell"
 )
 
-func RepoReaderConfig(cfg config.Config) (reporeader.Config, error) {
-	reader := cfg.RepoReader
-	out := reporeader.Config{
+func ReposhellConfig(cfg config.Config) (reposhell.Config, error) {
+	reader := cfg.Reposhell
+	out := reposhell.Config{
 		Enabled:         reader.Enabled,
-		Root:            valueOrDefault(reader.Root, reporeader.DefaultRoot),
+		Root:            valueOrDefault(reader.Root, reposhell.DefaultRoot),
 		MaxOutputBytes:  reader.MaxOutputBytes,
-		RefreshInterval: reporeader.DefaultRefreshInterval,
+		RefreshInterval: reposhell.DefaultRefreshInterval,
 	}
 	if reader.CommandTimeout != "" {
 		duration, err := time.ParseDuration(reader.CommandTimeout)
 		if err != nil {
-			return out, fmt.Errorf("repo_reader.command_timeout: %w", err)
+			return out, fmt.Errorf("reposhell.command_timeout: %w", err)
 		}
 		out.CommandTimeout = duration
 	}
 	if reader.RefreshInterval != "" {
 		duration, err := time.ParseDuration(reader.RefreshInterval)
 		if err != nil {
-			return out, fmt.Errorf("repo_reader.refresh_interval: %w", err)
+			return out, fmt.Errorf("reposhell.refresh_interval: %w", err)
 		}
 		out.RefreshInterval = duration
 	}
 	for _, repo := range reader.Repos {
-		converted := reporeader.Repo{
+		converted := reposhell.Repo{
 			ID:         repo.ID,
 			Remote:     repo.Remote,
 			DefaultRef: repo.DefaultRef,
@@ -39,7 +39,7 @@ func RepoReaderConfig(cfg config.Config) (reporeader.Config, error) {
 		if repo.RefreshInterval != "" {
 			duration, err := time.ParseDuration(repo.RefreshInterval)
 			if err != nil {
-				return out, fmt.Errorf("repo_reader.repos[%s].refresh_interval: %w", repo.ID, err)
+				return out, fmt.Errorf("reposhell.repos[%s].refresh_interval: %w", repo.ID, err)
 			}
 			converted.RefreshInterval = duration
 		}
@@ -48,8 +48,8 @@ func RepoReaderConfig(cfg config.Config) (reporeader.Config, error) {
 	return out, nil
 }
 
-func RepoReaderSocket(cfg config.Config) string {
-	return valueOrDefault(cfg.RepoReader.Socket, reporeader.DefaultSocket)
+func ReposhellSocket(cfg config.Config) string {
+	return valueOrDefault(cfg.Reposhell.Socket, reposhell.DefaultSocket)
 }
 
 func valueOrDefault(value, fallback string) string {

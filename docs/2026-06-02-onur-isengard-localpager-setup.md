@@ -30,10 +30,10 @@ same time on this machine.
 - Topic taxonomy: `/home/bob/repos/localpager/examples/profiles/openclaw-routing-topics.json`
 - SQLite state: `/home/bob/.local/state/localpager/localpager.sqlite`
 - Classifier artifacts: `/home/bob/.local/state/localpager/classifier`
-- Repo-reader state: `/home/bob/.local/state/localpager/repo-reader`
-- Repo-reader socket: `/home/bob/.local/state/localpager/repo-reader.sock`
+- Reposhell state: `/home/bob/.local/state/localpager/reposhell`
+- Reposhell socket: `/home/bob/.local/state/localpager/reposhell.sock`
 - Service: `localpager-worker.service`
-- Repo-reader service: `localpager-repo-reader.service`
+- Reposhell service: `localpager-reposhell.service`
 - Enqueue timer: `localpager-enqueue-github.timer`
 
 Secrets live outside the repo. Do not commit `secrets.env`, tokens, SQLite
@@ -97,14 +97,14 @@ The OpenClaw GitHub context budget is:
 }
 ```
 
-The repo-reader setup is:
+The reposhell setup is:
 
 ```json
 {
-  "repo_reader": {
+  "reposhell": {
     "enabled": true,
-    "root": "~/.local/state/localpager/repo-reader",
-    "socket": "~/.local/state/localpager/repo-reader.sock",
+    "root": "~/.local/state/localpager/reposhell",
+    "socket": "~/.local/state/localpager/reposhell.sock",
     "refresh_interval": "24h",
     "command_timeout": "2s",
     "max_output_bytes": 65536,
@@ -119,17 +119,17 @@ The repo-reader setup is:
   },
   "classifier": {
     "tools": ["bash", "final_json"],
-    "repo_reader_default_repo": "openclaw",
-    "repo_reader_visible_repos": ["openclaw"]
+    "reposhell_default_repo": "openclaw",
+    "reposhell_visible_repos": ["openclaw"]
   }
 }
 ```
 
-Customize it by changing `repo_reader.repos` for the repositories the service
-syncs, then changing `classifier.repo_reader_default_repo` and
-`classifier.repo_reader_visible_repos` for the repos a classifier profile may
+Customize it by changing `reposhell.repos` for the repositories the service
+syncs, then changing `classifier.reposhell_default_repo` and
+`classifier.reposhell_visible_repos` for the repos a classifier profile may
 read. Keep `classifier.tools` at `["bash", "final_json"]` only when the
-repo-reader service is enabled and healthy. The default refresh interval is one
+reposhell service is enabled and healthy. The default refresh interval is one
 day; override it per repo only when a repo needs faster or slower updates.
 
 ## Verify State
@@ -141,8 +141,8 @@ lms ps
 localpager validate --config /home/bob/.config/localpager/config.json
 localpager status --config /home/bob/.config/localpager/config.json
 systemctl --user is-active localpager-worker.service localpager-enqueue-github.timer
-systemctl --user is-active localpager-repo-reader.service
-localpager repo-reader status --config /home/bob/.config/localpager/config.json
+systemctl --user is-active localpager-reposhell.service
+localpager reposhell status --config /home/bob/.config/localpager/config.json
 pgrep -af 'ds4|deepseek' || true
 ```
 
@@ -151,8 +151,8 @@ Expected:
 - `lms ps` reports Gemma with `CONTEXT 131072` and `PARALLEL 3`.
 - `localpager validate` reports `config_ok=true`.
 - `localpager status` reports `agent_context_window=131072`.
-- The worker, repo-reader service, and enqueue timer are `active`.
-- `localpager repo-reader status` returns JSON rather than a socket error.
+- The worker, reposhell service, and enqueue timer are `active`.
+- `localpager reposhell status` returns JSON rather than a socket error.
 - The `pgrep` command does not show a real DS4/DeepSeek server process.
 
 ## Change Model Context Or Parallelism

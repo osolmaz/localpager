@@ -1757,16 +1757,16 @@ JSON
 			SourceRef: "example/repo#1",
 		},
 	}, WorkerOptions{
-		ClassifierCommand:      classifier,
-		Model:                  "gemma-4-e4b-it",
-		AgentBaseURL:           "http://127.0.0.1:1234/v1",
-		AgentContextWindow:     8192,
-		AgentMaxTokens:         768,
-		AgentTimeoutMS:         5000,
-		ClassifierTools:        []string{"bash", "final_json"},
-		RepoReaderSocket:       "/tmp/localpager.sock",
-		RepoReaderDefaultRepo:  "openclaw",
-		RepoReaderVisibleRepos: []string{"openclaw", "clawhub"},
+		ClassifierCommand:     classifier,
+		Model:                 "gemma-4-e4b-it",
+		AgentBaseURL:          "http://127.0.0.1:1234/v1",
+		AgentContextWindow:    8192,
+		AgentMaxTokens:        768,
+		AgentTimeoutMS:        5000,
+		ClassifierTools:       []string{"bash", "final_json"},
+		ReposhellSocket:       "/tmp/localpager.sock",
+		ReposhellDefaultRepo:  "openclaw",
+		ReposhellVisibleRepos: []string{"openclaw", "clawhub"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1787,11 +1787,11 @@ JSON
 		"5000",
 		"--tools",
 		"bash,final_json",
-		"--repo-reader-socket",
+		"--reposhell-socket",
 		"/tmp/localpager.sock",
-		"--repo-reader-default-repo",
+		"--reposhell-default-repo",
 		"openclaw",
-		"--repo-reader-visible-repos",
+		"--reposhell-visible-repos",
 		"openclaw,clawhub",
 	} {
 		if !containsString(got, want) {

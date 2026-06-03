@@ -30,20 +30,20 @@ describe("localpager-agent option parsing", () => {
     );
   });
 
-  it("parses repo-reader flags as localpager-agent options", () => {
+  it("parses reposhell flags as localpager-agent options", () => {
     const options = parseLocalpagerAgentArgs([
-      "--repo-reader-socket",
+      "--reposhell-socket",
       "/tmp/localpager.sock",
-      "--repo-reader-default-repo",
+      "--reposhell-default-repo",
       "openclaw",
-      "--repo-reader-visible-repos",
+      "--reposhell-visible-repos",
       "openclaw,clawhub",
       "-p",
       "classify"
     ]);
-    expect(options.repoReaderSocket).toBe("/tmp/localpager.sock");
-    expect(options.repoReaderDefaultRepo).toBe("openclaw");
-    expect(options.repoReaderVisibleRepos).toEqual(["openclaw", "clawhub"]);
+    expect(options.reposhellSocket).toBe("/tmp/localpager.sock");
+    expect(options.reposhellDefaultRepo).toBe("openclaw");
+    expect(options.reposhellVisibleRepos).toEqual(["openclaw", "clawhub"]);
     expect(options.forwardedArgs).toEqual(["-p", "classify"]);
   });
 });

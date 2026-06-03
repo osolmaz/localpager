@@ -32,8 +32,8 @@ func main() {
 		runInstallService(os.Args[2:])
 	case "requeue-jobs":
 		runRequeueJobs(os.Args[2:])
-	case "repo-reader":
-		runRepoReader(os.Args[2:])
+	case "reposhell":
+		runReposhell(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -175,8 +175,8 @@ func runInstallService(args []string) {
 		"localpager-worker.service": commandUnit(sharedUnit.withCommand(
 			"Localpager worker", "simple", filepath.Join(expandedBinDir, "localpager-worker"), "Restart=always\nRestartSec=10s\n",
 		)),
-		"localpager-repo-reader.service": commandUnit(sharedUnit.withCommand(
-			"Localpager repo reader", "simple", filepath.Join(expandedBinDir, "localpager")+" repo-reader serve", "Restart=always\nRestartSec=10s\n",
+		"localpager-reposhell.service": commandUnit(sharedUnit.withCommand(
+			"Localpager reposhell", "simple", filepath.Join(expandedBinDir, "localpager")+" reposhell serve", "Restart=always\nRestartSec=10s\n",
 		)),
 		"localpager-watch.service": commandUnit(sharedUnit.withCommand(
 			"Localpager source watcher", "simple", filepath.Join(expandedBinDir, "localpager-watch"), "Restart=always\nRestartSec=10s\n",
@@ -324,5 +324,5 @@ func mustExpand(path string) string {
 }
 
 func usage() {
-	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service|requeue-jobs|repo-reader> [flags]")
+	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service|requeue-jobs|reposhell> [flags]")
 }

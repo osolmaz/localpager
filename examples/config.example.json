@@ -22,8 +22,8 @@
     "prompt_template": "./prompts/github-relevance-classifier.md",
     "topic_taxonomy": "./examples/profiles/openclaw-routing-topics.json",
     "tools": ["bash", "final_json"],
-    "repo_reader_default_repo": "localpager",
-    "repo_reader_visible_repos": ["localpager"],
+    "reposhell_default_repo": "localpager",
+    "reposhell_visible_repos": ["localpager"],
     "context": {
       "github": {
         "include_body": true,
@@ -38,10 +38,10 @@
       }
     }
   },
-  "repo_reader": {
+  "reposhell": {
     "enabled": true,
-    "root": "~/.local/state/localpager/repo-reader",
-    "socket": "~/.local/state/localpager/repo-reader.sock",
+    "root": "~/.local/state/localpager/reposhell",
+    "socket": "~/.local/state/localpager/reposhell.sock",
     "refresh_interval": "24h",
     "command_timeout": "2s",
     "max_output_bytes": 65536,

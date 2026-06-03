@@ -3,28 +3,28 @@ import path from "node:path";
 
 import type { LocalpagerAgentOptions } from "../agent/options.js";
 
-export type RepoReaderRuntime = {
+export type ReposhellRuntime = {
   readonly extensionPath: string;
   readonly instruction: string;
 };
 
-export async function createRepoReaderRuntime(
+export async function createReposhellRuntime(
   options: LocalpagerAgentOptions
-): Promise<RepoReaderRuntime | undefined> {
-  if (options.repoReaderSocket === undefined) {
+): Promise<ReposhellRuntime | undefined> {
+  if (options.reposhellSocket === undefined) {
     return undefined;
   }
-  if (options.repoReaderDefaultRepo === undefined) {
-    throw new Error("--repo-reader-default-repo is required when --repo-reader-socket is set");
+  if (options.reposhellDefaultRepo === undefined) {
+    throw new Error("--reposhell-default-repo is required when --reposhell-socket is set");
   }
   const runtimeDir = await createRuntimeDir(options.stateDir);
-  const extensionPath = path.join(runtimeDir, "repo-reader-bash-extension.ts");
+  const extensionPath = path.join(runtimeDir, "reposhell-bash-extension.ts");
   await writeFile(
     extensionPath,
     extensionSource(
-      options.repoReaderSocket,
-      options.repoReaderDefaultRepo,
-      options.repoReaderVisibleRepos
+      options.reposhellSocket,
+      options.reposhellDefaultRepo,
+      options.reposhellVisibleRepos
     ),
     "utf8"
   );
@@ -40,7 +40,7 @@ export async function createRepoReaderRuntime(
 }
 
 async function createRuntimeDir(stateDir: string): Promise<string> {
-  const root = path.join(stateDir, "repo-reader");
+  const root = path.join(stateDir, "reposhell");
   await mkdir(root, { recursive: true });
   return await mkdtemp(path.join(root, "run-"));
 }
@@ -69,7 +69,7 @@ function extensionSource(
     "  truncated?: boolean;",
     "};",
     "",
-    "export default function localpagerRepoReaderBashExtension(pi: ExtensionAPI): void {",
+    "export default function localpagerReposhellBashExtension(pi: ExtensionAPI): void {",
     "  pi.registerTool({",
     '    name: "bash",',
     '    label: "Bash",',
@@ -133,7 +133,7 @@ function extensionSource(
     '        res.on("end", () => {',
     '          const raw = Buffer.concat(chunks).toString("utf8");',
     "          if ((res.statusCode ?? 500) < 200 || (res.statusCode ?? 500) >= 300) {",
-    "            reject(new Error(`repo-reader ${path} failed: ${raw}`));",
+    "            reject(new Error(`reposhell ${path} failed: ${raw}`));",
     "            return;",
     "          }",
     "          resolve(JSON.parse(raw) as T);",

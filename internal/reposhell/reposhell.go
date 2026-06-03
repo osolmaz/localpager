@@ -1,4 +1,4 @@
-package reporeader
+package reposhell
 
 import (
 	"bytes"
@@ -23,12 +23,12 @@ const (
 	DefaultRefreshInterval = 24 * time.Hour
 	DefaultCommandTimeout  = 2 * time.Second
 	DefaultMaxOutputBytes  = 65536
-	DefaultRoot            = "~/.local/state/localpager/repo-reader"
-	DefaultSocket          = "~/.local/state/localpager/repo-reader.sock"
+	DefaultRoot            = "~/.local/state/localpager/reposhell"
+	DefaultSocket          = "~/.local/state/localpager/reposhell.sock"
 )
 
 var (
-	ErrPolicy     = errors.New("repo reader policy denied command")
+	ErrPolicy     = errors.New("reposhell policy denied command")
 	snapshotLocks sync.Map
 )
 
@@ -144,7 +144,7 @@ func (m Manager) EnsureSnapshot(ctx context.Context, repo Repo) (string, string,
 		return "", "", "", err
 	}
 	if root == "" {
-		root = filepath.Join(os.TempDir(), "localpager-repo-reader")
+		root = filepath.Join(os.TempDir(), "localpager-reposhell")
 	}
 	mirror := filepath.Join(root, "mirrors", safeID(repo.ID)+".git")
 	lock := snapshotLock(filepath.Clean(mirror))
@@ -262,7 +262,7 @@ func (m Manager) Exec(ctx context.Context, req ExecRequest) ExecResult {
 		Truncated: stdout.truncated || stderr.truncated,
 	}
 	if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
-		result.Stderr = appendLine(result.Stderr, "repo-reader: command timed out")
+		result.Stderr = appendLine(result.Stderr, "reposhell: command timed out")
 		result.ExitCode = 124
 	}
 	return result
@@ -315,7 +315,7 @@ func parseCommand(command string) ([]string, error) {
 		return nil, deny("empty command")
 	}
 	parser := syntax.NewParser()
-	file, err := parser.Parse(strings.NewReader(command), "repo-reader-command")
+	file, err := parser.Parse(strings.NewReader(command), "reposhell-command")
 	if err != nil {
 		return nil, deny("parse command: %v", err)
 	}
@@ -962,7 +962,7 @@ func (b *cappedBuffer) String() string {
 	if !strings.HasSuffix(out, "\n") {
 		out += "\n"
 	}
-	return out + "[repo-reader: output truncated]\n"
+	return out + "[reposhell: output truncated]\n"
 }
 
 var (

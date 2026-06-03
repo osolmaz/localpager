@@ -3,7 +3,7 @@ import type { StdioOptions } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 
 import type { LocalpagerAgentOptions } from "../agent/options.js";
-import type { RepoReaderRuntime } from "../repo-reader/bash-extension.js";
+import type { ReposhellRuntime } from "../reposhell/bash-extension.js";
 import type { FinalSchemaRuntime } from "../structured/final-schema.js";
 import type { RuntimeConfig } from "./config.js";
 
@@ -19,13 +19,13 @@ export async function createLaunchPlan(
   runtimeConfig: RuntimeConfig,
   model: string,
   finalSchemaRuntime?: FinalSchemaRuntime,
-  repoReaderRuntime?: RepoReaderRuntime
+  reposhellRuntime?: ReposhellRuntime
 ): Promise<LaunchPlan> {
   await mkdir(options.sessionDir, { recursive: true });
   const forwardedArgs =
     finalSchemaRuntime === undefined
       ? [...options.forwardedArgs]
-      : structuredOutputArgs(options.forwardedArgs, finalSchemaRuntime, repoReaderRuntime);
+      : structuredOutputArgs(options.forwardedArgs, finalSchemaRuntime, reposhellRuntime);
   return {
     command: options.piCommand,
     args: [
@@ -72,7 +72,7 @@ export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {
 function structuredOutputArgs(
   forwardedArgs: readonly string[],
   runtime: FinalSchemaRuntime,
-  repoReaderRuntime: RepoReaderRuntime | undefined
+  reposhellRuntime: ReposhellRuntime | undefined
 ): string[] {
   if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
     throw new Error("--final-schema cannot be used with --no-tools");
@@ -83,15 +83,15 @@ function structuredOutputArgs(
   if (!hasPrintMode(forwardedArgs)) {
     throw new Error("--final-schema requires Pi print mode (-p or --print)");
   }
-  const args = ensureAllowedTools(forwardedArgs, repoReaderRuntime !== undefined);
+  const args = ensureAllowedTools(forwardedArgs, reposhellRuntime !== undefined);
   const extensions =
-    repoReaderRuntime === undefined
+    reposhellRuntime === undefined
       ? []
       : [
           "--extension",
-          repoReaderRuntime.extensionPath,
+          reposhellRuntime.extensionPath,
           "--append-system-prompt",
-          repoReaderRuntime.instruction
+          reposhellRuntime.instruction
         ];
   return [
     ...extensions,
@@ -111,18 +111,18 @@ function hasPrintMode(args: readonly string[]): boolean {
   return args.includes("--print") || args.includes("-p");
 }
 
-function ensureAllowedTools(args: readonly string[], repoReaderEnabled: boolean): string[] {
+function ensureAllowedTools(args: readonly string[], reposhellEnabled: boolean): string[] {
   const next = [...args];
   const index = toolsFlagIndex(next);
   if (index === -1) {
-    return ["--tools", repoReaderEnabled ? "bash,final_json" : "final_json", ...next];
+    return ["--tools", reposhellEnabled ? "bash,final_json" : "final_json", ...next];
   }
   const flag = next[index];
   const value = next[index + 1];
   if (flag === undefined || value === undefined) {
     throw new Error(`${flag ?? "--tools"} requires a value`);
   }
-  next[index + 1] = normalizeTools(value, repoReaderEnabled).join(",");
+  next[index + 1] = normalizeTools(value, reposhellEnabled).join(",");
   return next;
 }
 
@@ -130,15 +130,15 @@ function toolsFlagIndex(args: readonly string[]): number {
   return args.findIndex((arg) => arg === "--tools" || arg === "-t");
 }
 
-function normalizeTools(value: string, repoReaderEnabled: boolean): string[] {
+function normalizeTools(value: string, reposhellEnabled: boolean): string[] {
   const tools = value
     .split(",")
     .map((tool) => tool.trim())
     .filter((tool) => tool.length > 0);
-  if (tools.includes("bash") && !repoReaderEnabled) {
-    throw new Error("--tools bash requires --repo-reader-socket");
+  if (tools.includes("bash") && !reposhellEnabled) {
+    throw new Error("--tools bash requires --reposhell-socket");
   }
-  if (repoReaderEnabled && !tools.includes("bash")) {
+  if (reposhellEnabled && !tools.includes("bash")) {
     tools.push("bash");
   }
   if (!tools.includes("final_json")) {
