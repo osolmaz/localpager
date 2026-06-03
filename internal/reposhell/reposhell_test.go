@@ -42,6 +42,7 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 		{"sed -n 2,2p README.md", "Second line\n"},
 		{"find . -maxdepth 2 -type f -name note.txt", "docs/note.txt"},
 		{"grep -n Local README.md", "1:Localpager reposhell\n"},
+		{"grep -R -n tool_calling docs", "docs/note.txt:1:tool_calling notes\n"},
 		{"grep -- -n dash.txt", "-n\n"},
 		{"git grep -n tool_calling docs", "docs/note.txt:1:tool_calling notes\n"},
 		{"git show --name-only", "README.md"},
@@ -237,6 +238,14 @@ func TestExecRejectsUnsafeShellAndPathFeatures(t *testing.T) {
 				t.Fatalf("PolicyError is empty: exit=%d stdout=%q stderr=%q", result.ExitCode, result.Stdout, result.Stderr)
 			}
 		})
+	}
+
+	result := manager.Exec(ctx, ExecRequest{Command: "grep -R -n secret .", Binding: binding})
+	if result.PolicyError != "" {
+		t.Fatalf("PolicyError = %q", result.PolicyError)
+	}
+	if strings.Contains(result.Stdout, "secret") || strings.Contains(result.Stderr, "secret") {
+		t.Fatalf("recursive grep followed symlink: stdout=%q stderr=%q", result.Stdout, result.Stderr)
 	}
 }
 

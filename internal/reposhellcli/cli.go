@@ -209,6 +209,7 @@ func runStatus(args []string, stdout, stderr io.Writer, opts Options) int {
 
 func printShellHelp(stdout io.Writer) {
 	fmt.Fprintln(stdout, "allowed: pwd, ls, find, rg, grep, sed -n, cat, head, git status --short, git show --name-only, git grep")
+	fmt.Fprintln(stdout, "search: rg -n -i \"lm studio\" or grep -R -n -i \"lm studio\" .")
 	fmt.Fprintln(stdout, "examples: rg -n reposhell README.md | sed is not allowed; use one simple command at a time")
 }
 

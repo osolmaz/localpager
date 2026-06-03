@@ -21,7 +21,9 @@ Use this context as source of truth, but for this test run you should make one
 concise read-only `bash` call when repo files can provide relevant evidence.
 Prefer `pwd`, `ls`, `find`, `rg`, `grep`, `sed -n`, `cat`, `head`, `git show
 --name-only`, or `git grep`. Keep the command small and do not use `bash` for
-anything except reading/searching repo files.
+anything except reading/searching repo files. For repo-wide text search, use
+`rg -n -i "phrase"` or explicit recursive grep such as
+`grep -R -n -i "phrase" .`.
 
 ## Allowed Topics
 

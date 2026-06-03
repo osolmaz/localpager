@@ -606,6 +606,14 @@ func appendSearchFlag(out *[]string, args []string, isGrep bool) (int, error) {
 	case "-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-w", "--word-regexp", "-l", "--files-with-matches":
 		*out = append(*out, arg)
 		return 1, nil
+	case "-R", "-r", "--recursive":
+		if !isGrep {
+			return 0, deny("unsupported search flag %q", arg)
+		}
+		*out = append(*out, "-r", "-I")
+		return 1, nil
+	case "--dereference-recursive":
+		return 0, deny("unsupported search flag %q", arg)
 	case "-S", "--smart-case":
 		if isGrep {
 			return 0, deny("unsupported grep flag %q", arg)
