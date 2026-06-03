@@ -56,6 +56,9 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.command, func(t *testing.T) {
+			if strings.HasPrefix(tc.command, "rg ") && !reposhellPathHasBinary("rg") {
+				t.Skip("rg is not available in reposhell PATH")
+			}
 			result := manager.Exec(ctx, ExecRequest{Command: tc.command, Binding: binding})
 			if result.PolicyError != "" {
 				t.Fatalf("PolicyError = %q", result.PolicyError)
@@ -71,6 +74,16 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 			}
 		})
 	}
+}
+
+func reposhellPathHasBinary(name string) bool {
+	for _, dir := range []string{"/usr/bin", "/bin"} {
+		info, err := os.Stat(filepath.Join(dir, name))
+		if err == nil && !info.IsDir() && info.Mode().Perm()&0o111 != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func TestExecSupportsVisibleReposAndDefaultRepo(t *testing.T) {
