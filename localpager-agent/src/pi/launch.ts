@@ -137,10 +137,17 @@ type ToolOptions = {
 
 function ensureAllowedTools(args: readonly string[], options: ToolOptions): string[] {
   const next = [...args];
-  const index = toolsFlagIndex(next);
-  if (index === -1) {
+  const indexes = toolsFlagIndexes(next);
+  if (indexes.length === 0) {
     const tools = defaultTools(options);
     return tools.length === 0 ? next : ["--tools", tools.join(","), ...next];
+  }
+  if (indexes.length > 1) {
+    throw new Error("duplicate --tools flags are not supported");
+  }
+  const index = indexes[0];
+  if (index === undefined) {
+    throw new Error("--tools requires a value");
   }
   const flag = next[index];
   const value = next[index + 1];
@@ -151,8 +158,8 @@ function ensureAllowedTools(args: readonly string[], options: ToolOptions): stri
   return next;
 }
 
-function toolsFlagIndex(args: readonly string[]): number {
-  return args.findIndex((arg) => arg === "--tools" || arg === "-t");
+function toolsFlagIndexes(args: readonly string[]): number[] {
+  return args.flatMap((arg, index) => (arg === "--tools" || arg === "-t" ? [index] : []));
 }
 
 function defaultTools(options: ToolOptions): string[] {

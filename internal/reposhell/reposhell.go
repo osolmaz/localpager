@@ -3,6 +3,7 @@ package reposhell
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -562,6 +563,7 @@ func planSearch(name string, args []string, binding Binding) (execPlan, error) {
 	for index < len(args) {
 		arg := args[index]
 		if arg == "--" {
+			out = append(out, "--")
 			index++
 			break
 		}
@@ -900,15 +902,7 @@ func virtualizeOutput(body string, binding Binding) string {
 }
 
 func safeID(id string) string {
-	var b strings.Builder
-	for _, r := range id {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' || r == '.' {
-			b.WriteRune(r)
-		} else {
-			b.WriteByte('_')
-		}
-	}
-	return b.String()
+	return hex.EncodeToString([]byte(id))
 }
 
 func keysInOrder(ids []string, roots map[string]string) []string {

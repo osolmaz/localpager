@@ -16,6 +16,7 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 	source := testGitRepo(t, map[string]string{
 		"README.md":     "Localpager reposhell\nSecond line\n",
 		"docs/note.txt": "tool_calling notes\n",
+		"dash.txt":      "-n\n",
 	})
 	manager := NewManager(Config{
 		Root:            filepath.Join(t.TempDir(), "state"),
@@ -41,6 +42,7 @@ func TestExecAllowsReadOnlyCommandsInVirtualRepo(t *testing.T) {
 		{"sed -n 2,2p README.md", "Second line\n"},
 		{"find . -maxdepth 2 -type f -name note.txt", "docs/note.txt"},
 		{"grep -n Local README.md", "1:Localpager reposhell\n"},
+		{"grep -- -n dash.txt", "-n\n"},
 		{"git grep -n tool_calling docs", "docs/note.txt:1:tool_calling notes\n"},
 		{"git show --name-only", "README.md"},
 	}
@@ -179,6 +181,12 @@ func TestGitShowRejectsOptionalRevision(t *testing.T) {
 	}
 	if strings.Contains(result.Stdout, "secret") {
 		t.Fatalf("Stdout leaked blob contents: %q", result.Stdout)
+	}
+}
+
+func TestSafeIDIsCollisionFreeForSimilarRepoIDs(t *testing.T) {
+	if safeID("foo/bar") == safeID("foo_bar") {
+		t.Fatal("safeID collided for distinct repo IDs")
 	}
 }
 

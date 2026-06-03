@@ -176,6 +176,24 @@ describe("structured output", () => {
     ).rejects.toThrow("--tools bash requires --reposhell-socket");
   });
 
+  it("rejects duplicate tool allowlist flags", async () => {
+    await expect(
+      createLaunchPlan(
+        {
+          ...options("/tmp/localpager-agent-state"),
+          forwardedArgs: ["--tools", "final_json", "-t", "bash", "-p", "classify"]
+        },
+        runtimeConfig("/tmp/localpager-agent-state"),
+        "gemma-4-e4b-it",
+        {
+          extensionPath: "/tmp/final-json-extension.ts",
+          outputPath: "/tmp/final-output.json",
+          instruction: "call final_json"
+        }
+      )
+    ).rejects.toThrow("duplicate --tools flags");
+  });
+
   it("rejects schema mode when Pi tools are disabled", async () => {
     await expect(
       createLaunchPlan(
