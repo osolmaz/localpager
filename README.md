@@ -78,22 +78,11 @@ Notification policy is deployment config, not classifier logic:
 }
 ```
 
-When `classifier.tools` includes `bash`, run `reposhell serve` with
-matching `reposhell` config. The model sees a familiar bash-shaped tool, but
-Localpager enforces a read-only command allowlist against pinned repository
-snapshots.
-
-You can also use reposhell directly without Localpager:
-
-```bash
-reposhell exec --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager --command 'rg -n reposhell README.md'
-reposhell exec --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager --command 'rg --files -g "*.ts"'
-reposhell exec --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager --command 'grep -R -n -i "lm studio" .'
-reposhell shell --config ~/.config/localpager/config.json --repo localpager --visible-repo localpager
-```
-
-Inside `reposhell shell`, type one read-only command per line. Use `help` for
-the allowed command shapes and `exit` or `quit` to leave.
+When `classifier.tools` includes `bash`, run `reposhell serve` with matching
+`reposhell` config. The model sees a familiar bash-shaped tool, but Localpager
+enforces a read-only command allowlist against pinned repository snapshots. See
+[Reposhell](cmd/reposhell/README.md) for standalone setup, config, direct
+commands, allowed command shapes, service mode, and troubleshooting.
 
 If `notify_topics_any` is set, at least one classifier topic must match before a
 notification is created.
