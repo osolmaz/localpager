@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+mode="open"
+
+if [[ "${1:-}" == "--print" ]]; then
+  mode="print"
+  shift
+fi
+
+if [[ $# -gt 1 ]]; then
+  echo "usage: localpager-agent-session [--print] [session-dir-or-jsonl]" >&2
+  exit 2
+fi
+
+target="${1:-}"
+if [[ -z "$target" ]]; then
+  target="$(find "${HOME:-/tmp}/.local/state/localpager/classifier/sessions" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' 2>/dev/null | sort -nr | awk 'NR == 1 {print $2}')"
+fi
+
+if [[ -z "$target" ]]; then
+  echo "no classifier session found" >&2
+  exit 2
+fi
+
+if [[ -d "$target" ]]; then
+  session_dir="$target"
+  session_file="$(find "$target" -maxdepth 1 -type f -name '*.jsonl' -printf '%T@ %p\n' | sort -nr | awk 'NR == 1 {print $2}')"
+else
+  session_file="$target"
+  session_dir="$(dirname "$session_file")"
+fi
+
+if [[ -z "${session_file:-}" || ! -f "$session_file" ]]; then
+  echo "missing session jsonl under: $target" >&2
+  exit 2
+fi
+
+if [[ "$mode" == "open" ]]; then
+  exec npm --prefix "$root/localpager-agent" run -s localpager-agent -- \
+    --session-dir "$session_dir" \
+    -- --session "$session_file"
+fi
+
+node - "$session_file" <<'NODE'
+import fs from "node:fs";
+
+const sessionFile = process.argv[2];
+const lines = fs.readFileSync(sessionFile, "utf8").split(/\r?\n/).filter(Boolean);
+console.log(`session_file: ${sessionFile}`);
+for (const line of lines) {
+  let entry;
+  try {
+    entry = JSON.parse(line);
+  } catch {
+    continue;
+  }
+  const message = entry.message;
+  if (!message || !Array.isArray(message.content)) continue;
+  const timestamp = entry.timestamp ? ` ${entry.timestamp}` : "";
+  console.log(`\n## ${message.role}${timestamp}`);
+  for (const part of message.content) {
+    if (part.type === "text") {
+      console.log(part.text);
+    } else if (part.type === "toolCall") {
+      console.log(`[tool_call] ${part.name}`);
+      console.log(JSON.stringify(part.arguments ?? {}, null, 2));
+    } else {
+      const label = part.type ? `[${part.type}]` : "[content]";
+      console.log(label);
+      console.log(JSON.stringify(part, null, 2));
+    }
+  }
+  if (message.role === "toolResult") {
+    const details = message.details ?? {};
+    if (details.stdout) {
+      console.log("[stdout]");
+      console.log(details.stdout);
+    }
+    if (details.stderr) {
+      console.log("[stderr]");
+      console.log(details.stderr);
+    }
+    if (details.exit_code !== undefined) {
+      console.log(`[exit_code] ${details.exit_code}`);
+    }
+  }
+}
+NODE

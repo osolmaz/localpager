@@ -22,6 +22,18 @@ Primary local dataset folder:
 /home/bob/oc/openclaw-classification-dataset
 ```
 
+Canonical Hugging Face dataset:
+
+```text
+osolmaz/openclaw-classification-dataset
+```
+
+URL:
+
+```text
+https://huggingface.co/datasets/osolmaz/openclaw-classification-dataset
+```
+
 Important files in that folder:
 
 - `seed.jsonl`: original 638-row curated dataset.
@@ -37,7 +49,7 @@ Important files in that folder:
   improving Gemma precision.
 - `benchmark-runs/`: benchmark configs, summaries, and per-row results.
 
-Hugging Face upload staging:
+Hugging Face upload staging for `osolmaz/openclaw-classification-dataset`:
 
 ```text
 /home/bob/oc/openclaw-classification-dataset/hf-ds4-upload
@@ -111,11 +123,11 @@ Recorded config:
 
 ```json
 {
-  "input_path": "/home/bob/openclaw-classification-dataset/seed.jsonl",
-  "output_dir": "/home/bob/openclaw-classification-dataset/deepseek-localagent",
+  "input_path": "/home/bob/oc/openclaw-classification-dataset/seed.jsonl",
+  "output_dir": "/home/bob/oc/openclaw-classification-dataset/deepseek-localagent",
   "schema_path": "/home/bob/clawd-notifier-impl/schemas/github-interest-classifier.schema.json",
   "policy_path": "/home/bob/clawd-notifier-impl/skills/openclaw-maintainer/github-classifier-policy.md",
-  "topic_keywords_path": "/home/bob/openclaw-classification-dataset/topic_keywords.json",
+  "topic_keywords_path": "/home/bob/oc/openclaw-classification-dataset/topic_keywords.json",
   "localagent_command": "/home/bob/.nvm/versions/node/v22.22.0/bin/localagent",
   "base_url": "http://127.0.0.1:8000/v1",
   "model": "deepseek-v4-pro",
@@ -168,13 +180,13 @@ CLI probe timeout stayed at the default 5000 ms.
 Resume command recorded by the generator:
 
 ```bash
-node /home/bob/openclaw-classification-dataset/generate_deepseek_localagent_dataset.mjs
+node /home/bob/oc/openclaw-classification-dataset/generate_deepseek_localagent_dataset.mjs
 ```
 
 Retry command:
 
 ```bash
-node /home/bob/openclaw-classification-dataset/generate_deepseek_localagent_dataset.mjs --retry-errors
+node /home/bob/oc/openclaw-classification-dataset/generate_deepseek_localagent_dataset.mjs --retry-errors
 ```
 
 ## DS4 Prompt Shape
@@ -294,8 +306,8 @@ The benchmark measured:
 For DS4-as-ground-truth scoring, the benchmark used:
 
 ```bash
-node /home/bob/openclaw-classification-dataset/benchmark_model_comparison.mjs \
-  --dataset-file /home/bob/openclaw-classification-dataset/hf-ds4-upload/ds4.jsonl \
+node /home/bob/oc/openclaw-classification-dataset/benchmark_model_comparison.mjs \
+  --dataset-file /home/bob/oc/openclaw-classification-dataset/hf-ds4-upload/ds4.jsonl \
   --expected-source ds4 \
   --models gemma \
   --sample regression
@@ -362,7 +374,7 @@ Config highlights:
 
 ```json
 {
-  "dataset_file": "/home/bob/openclaw-classification-dataset/hf-ds4-upload/ds4.jsonl",
+  "dataset_file": "/home/bob/oc/openclaw-classification-dataset/hf-ds4-upload/ds4.jsonl",
   "expected_source": "ds4",
   "row_count_total": 638,
   "row_count_evaluated": 30,

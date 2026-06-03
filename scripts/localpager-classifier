@@ -172,10 +172,30 @@ if [[ ! -d "$agent_dir/node_modules" ]]; then
 fi
 
 state_dir="${LOCALPAGER_CLASSIFIER_STATE_DIR:-${HOME:-/tmp}/.local/state/localpager/classifier}"
-mkdir -p "$state_dir/prompts" "$state_dir/schemas" "$state_dir/sessions"
+mkdir -p "$state_dir/contexts" "$state_dir/prompts" "$state_dir/schemas" "$state_dir/sessions"
 prompt_path="$state_dir/prompts/$(date -u +%Y%m%dT%H%M%SZ)-$$.md"
 schema_path="$state_dir/schemas/$(date -u +%Y%m%dT%H%M%SZ)-$$.json"
 session_dir="$state_dir/sessions/$(date -u +%Y%m%dT%H%M%SZ)-$$"
+if [[ -z "$github_context_file" ]]; then
+  github_context_file="$state_dir/contexts/$(date -u +%Y%m%dT%H%M%SZ)-$$.md"
+  localpager_bin="${LOCALPAGER_BIN:-$root/bin/localpager}"
+  if [[ ! -x "$localpager_bin" ]]; then
+    localpager_bin="$(command -v localpager || true)"
+  fi
+  if [[ -z "$localpager_bin" ]]; then
+    echo "missing localpager binary; run: go build -o $root/bin/localpager ./cmd/localpager" >&2
+    exit 2
+  fi
+  render_context_args=(
+    render-context "$target"
+    --output "$github_context_file"
+  )
+  localpager_config="${LOCALPAGER_CONFIG:-${HOME:-}/.config/localpager/config.json}"
+  if [[ -n "$localpager_config" && -f "$localpager_config" ]]; then
+    render_context_args+=(--config "$localpager_config")
+  fi
+  "$localpager_bin" "${render_context_args[@]}"
+fi
 
 render_args=(
   "$root/scripts/localpager-render-profile.mjs"

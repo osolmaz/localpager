@@ -58,6 +58,94 @@ func DefaultClassifierContextOptions() ClassifierContextOptions {
 	}
 }
 
+func RenderGitHubTargetContext(ctx context.Context, target string, opts ClassifierContextOptions) (string, error) {
+	repo, number, err := parseGitHubTarget(target)
+	if err != nil {
+		return "", err
+	}
+	var issue struct {
+		HTMLURL string `json:"html_url"`
+		Title   string `json:"title"`
+		State   string `json:"state"`
+		Body    string `json:"body"`
+		User    struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		Labels []struct {
+			Name string `json:"name"`
+		} `json:"labels"`
+		PullRequest *struct{} `json:"pull_request"`
+	}
+	if err := githubJSON(ctx, opts, fmt.Sprintf("/repos/%s/issues/%d", repo, number), &issue); err != nil {
+		return "", fmt.Errorf("github item unavailable: %w", err)
+	}
+	labels := make([]string, 0, len(issue.Labels))
+	for _, label := range issue.Labels {
+		labels = append(labels, label.Name)
+	}
+	labelsJSON, err := json.Marshal(compactStrings(labels))
+	if err != nil {
+		return "", err
+	}
+	itemType := "github_issue"
+	urlSuffix := "issues"
+	if issue.PullRequest != nil {
+		itemType = "github_pr"
+		urlSuffix = "pull"
+	}
+	ref := fmt.Sprintf("%s#%d", repo, number)
+	sourceURL := issue.HTMLURL
+	if sourceURL == "" {
+		sourceURL = fmt.Sprintf("https://github.com/%s/%s/%d", repo, urlSuffix, number)
+	}
+	metadataJSON, err := json.Marshal(map[string]any{
+		"repo":   repo,
+		"number": number,
+	})
+	if err != nil {
+		return "", err
+	}
+	return renderClassifierContext(ctx, Item{
+		SourceKind:   "github",
+		SourceRef:    ref,
+		SourceURL:    stringPtrOrNil(sourceURL),
+		Type:         stringPtr(itemType),
+		Ref:          stringPtr(ref),
+		Title:        stringPtrOrNil(issue.Title),
+		Body:         stringPtrOrNil(issue.Body),
+		LabelsJSON:   stringPtrOrNil(string(labelsJSON)),
+		State:        stringPtrOrNil(issue.State),
+		Author:       stringPtrOrNil(issue.User.Login),
+		MetadataJSON: stringPtr(string(metadataJSON)),
+	}, opts), nil
+}
+
+func parseGitHubTarget(target string) (string, int, error) {
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return "", 0, fmt.Errorf("github target is empty")
+	}
+	if repo, number := parseRepoNumber(target); repo != "" && number != 0 {
+		return repo, number, nil
+	}
+	parsed, err := url.Parse(target)
+	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
+		return "", 0, fmt.Errorf("unsupported github target %q; use owner/repo#number or a GitHub issue/PR URL", target)
+	}
+	if parsed.Host != "github.com" && parsed.Host != "www.github.com" {
+		return "", 0, fmt.Errorf("unsupported github host %q", parsed.Host)
+	}
+	parts := compactStrings(strings.Split(strings.Trim(parsed.Path, "/"), "/"))
+	if len(parts) < 4 || (parts[2] != "issues" && parts[2] != "pull") {
+		return "", 0, fmt.Errorf("unsupported github target %q; use owner/repo#number or a GitHub issue/PR URL", target)
+	}
+	number, err := strconv.Atoi(parts[3])
+	if err != nil || number == 0 {
+		return "", 0, fmt.Errorf("unsupported github target %q; issue/PR number is invalid", target)
+	}
+	return parts[0] + "/" + parts[1], number, nil
+}
+
 func renderClassifierContext(ctx context.Context, item Item, opts ClassifierContextOptions) string {
 	opts = normalizeClassifierContextOptions(opts)
 	meta := githubItemMetadata(item)

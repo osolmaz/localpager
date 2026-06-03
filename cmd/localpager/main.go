@@ -32,12 +32,75 @@ func main() {
 		runInstallService(os.Args[2:])
 	case "requeue-jobs":
 		runRequeueJobs(os.Args[2:])
+	case "render-context":
+		runRenderContext(os.Args[2:])
 	case "reposhell":
 		runReposhell(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
 	}
+}
+
+func runRenderContext(args []string) {
+	fs := flag.NewFlagSet("render-context", flag.ExitOnError)
+	configPath := fs.String("config", "", "JSON config file path")
+	outputPath := fs.String("output", "", "write rendered context to this path instead of stdout")
+	githubBaseURL := fs.String("github-base-url", "https://api.github.com", "GitHub API base URL")
+	githubTokenEnv := fs.String("github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token")
+	maxBodyChars := fs.Int("max-body-chars", 0, "maximum GitHub body characters")
+	maxCommentsChars := fs.Int("max-comments-chars", 0, "maximum GitHub comments characters")
+	maxChangedFilesChars := fs.Int("max-changed-files-chars", 0, "maximum changed-files characters")
+	maxDiffChars := fs.Int("max-diff-chars", 0, "maximum diff characters")
+	target := ""
+	parseArgs := args
+	targetFirst := false
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		target = args[0]
+		parseArgs = args[1:]
+		targetFirst = true
+	}
+	_ = fs.Parse(parseArgs)
+	if target == "" && fs.NArg() == 1 {
+		target = fs.Arg(0)
+	}
+	if target == "" || (targetFirst && fs.NArg() != 0) || (!targetFirst && fs.NArg() != 1) {
+		_, _ = fmt.Fprintln(os.Stderr, "usage: localpager render-context <github-url-or-owner/repo#number> [flags]")
+		os.Exit(2)
+	}
+	setFlags := app.SeenFlags(fs)
+	cfg := loadConfig(*configPath)
+	app.ApplyGitHubConfig(githubBaseURL, githubTokenEnv, cfg, setFlags)
+	opts := localpagerContextOptionsFromConfig(cfg, *githubBaseURL, *githubTokenEnv)
+	if *maxBodyChars > 0 {
+		opts.MaxBodyChars = *maxBodyChars
+	}
+	if *maxCommentsChars > 0 {
+		opts.MaxCommentsChars = *maxCommentsChars
+	}
+	if *maxChangedFilesChars > 0 {
+		opts.MaxChangedFilesChars = *maxChangedFilesChars
+	}
+	if *maxDiffChars > 0 {
+		opts.MaxDiffChars = *maxDiffChars
+	}
+
+	rendered, err := localpager.RenderGitHubTargetContext(context.Background(), target, opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if *outputPath == "" {
+		app.Println(os.Stdout, rendered)
+		return
+	}
+	expandedOutput := mustExpand(*outputPath)
+	if err := os.MkdirAll(filepath.Dir(expandedOutput), 0o755); err != nil {
+		log.Fatal(err)
+	}
+	if err := os.WriteFile(expandedOutput, []byte(rendered+"\n"), 0o644); err != nil {
+		log.Fatal(err)
+	}
+	app.Printf(os.Stderr, "github_context: %s\n", expandedOutput)
 }
 
 func runRequeueJobs(args []string) {
@@ -176,7 +239,7 @@ func runInstallService(args []string) {
 			"Localpager worker", "simple", filepath.Join(expandedBinDir, "localpager-worker"), "Restart=always\nRestartSec=10s\n",
 		)),
 		"localpager-reposhell.service": commandUnit(sharedUnit.withCommand(
-			"Localpager reposhell", "simple", filepath.Join(expandedBinDir, "reposhell")+" serve", "Restart=always\nRestartSec=10s\n",
+			"Localpager reposhell", "simple", filepath.Join(expandedBinDir, "localpager")+" reposhell serve", "Restart=always\nRestartSec=10s\n",
 		)),
 		"localpager-watch.service": commandUnit(sharedUnit.withCommand(
 			"Localpager source watcher", "simple", filepath.Join(expandedBinDir, "localpager-watch"), "Restart=always\nRestartSec=10s\n",
@@ -296,6 +359,41 @@ func valueOrDefault(value, fallback string) string {
 	return value
 }
 
+func localpagerContextOptionsFromConfig(cfg config.Config, githubBaseURL string, githubTokenEnv string) localpager.ClassifierContextOptions {
+	github := cfg.Classifier.Context.GitHub
+	opts := localpager.DefaultClassifierContextOptions()
+	opts.IncludeBody = boolValue(github.IncludeBody, opts.IncludeBody)
+	opts.IncludeLabels = boolValue(github.IncludeLabels, opts.IncludeLabels)
+	opts.IncludeComments = boolValue(github.IncludeComments, opts.IncludeComments)
+	opts.IncludeChangedFiles = boolValue(github.IncludeChangedFiles, opts.IncludeChangedFiles)
+	opts.IncludeDiff = boolValue(github.IncludeDiff, opts.IncludeDiff)
+	if github.MaxBodyChars > 0 {
+		opts.MaxBodyChars = github.MaxBodyChars
+	}
+	if github.MaxCommentsChars > 0 {
+		opts.MaxCommentsChars = github.MaxCommentsChars
+	}
+	if github.MaxChangedFilesChars > 0 {
+		opts.MaxChangedFilesChars = github.MaxChangedFilesChars
+	}
+	if github.MaxDiffChars > 0 {
+		opts.MaxDiffChars = github.MaxDiffChars
+	}
+	opts.GitHubBaseURL = githubBaseURL
+	if githubTokenEnv == "" {
+		githubTokenEnv = "GITHUB_TOKEN"
+	}
+	opts.GitHubToken = os.Getenv(githubTokenEnv)
+	return opts
+}
+
+func boolValue(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
+}
+
 func defaultServicePath() string {
 	pathValue := strings.TrimSpace(os.Getenv("PATH"))
 	if pathValue == "" {
@@ -324,5 +422,5 @@ func mustExpand(path string) string {
 }
 
 func usage() {
-	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service|requeue-jobs|reposhell> [flags]")
+	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service|requeue-jobs|render-context|reposhell> [flags]")
 }
