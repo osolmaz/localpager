@@ -207,19 +207,20 @@ is the one-shot equivalent.
 
 Install compiled binaries and write user systemd units. The service installer
 writes `localpager-worker.service`, `localpager-reposhell.service`,
-`localpager-watch.service`,
-`localpager-enqueue-github.service`, and `localpager-enqueue-github.timer`.
+`localpager-watch.service`, `localpager-enqueue-github.service`, and
+`localpager-enqueue-github.timer`.
 
 ```bash
 make install
 localpager install-service --config ~/.config/localpager/config.json --work-dir "$PWD"
 systemctl --user daemon-reload
-systemctl --user enable --now localpager-worker.service localpager-enqueue-github.timer
+systemctl --user enable --now localpager-reposhell.service localpager-worker.service localpager-enqueue-github.timer
 ```
 
 That setup runs the worker continuously and enqueues GitHub issues and pull
 requests on the timer. Enable `localpager-watch.service` instead if you want
-continuous source polling.
+continuous source polling. If your classifier profile does not expose `bash`,
+you can leave `localpager-reposhell.service` disabled.
 
 Check state:
 
