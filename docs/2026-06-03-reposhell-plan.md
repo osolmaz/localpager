@@ -71,7 +71,8 @@ must choose which repos are visible.
       }
     ],
     "command_timeout": "2s",
-    "max_output_bytes": 65536
+    "max_output_bytes": 65536,
+    "snapshot_retain": 5
   },
   "classifier": {
     "reposhell_default_repo": "openclaw",
@@ -354,7 +355,7 @@ large source snippets. Store them in classifier session artifacts if needed.
 - [x] Reject `--tools bash` unless the Localpager reposhell extension is
   attached.
 - [ ] Persist reposhell audit metadata on classifier results.
-- [ ] Add snapshot garbage collection.
+- [x] Add snapshot garbage collection.
 
 ## Open Questions
 
@@ -363,6 +364,8 @@ large source snippets. Store them in classifier session artifacts if needed.
 - Should `rg` allow multiline and PCRE flags, or keep to the default engine?
 - Should snapshots be filesystem read-only with permissions, or is policy-level
   read-only plus no write commands enough?
-- How many old snapshots should the service retain?
+- Answered: by default the service retains five completed snapshots per repo
+  plus any snapshots pinned by active runs. Deployments can set
+  `reposhell.snapshot_retain`.
 - Should the reposhell support private repo credentials, or only already
   accessible HTTPS remotes for now?

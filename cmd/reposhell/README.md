@@ -42,6 +42,7 @@ Create a config like this:
   "refresh_interval": "24h",
   "command_timeout": "2s",
   "max_output_bytes": 65536,
+  "snapshot_retain": 5,
   "repos": [
     {
       "id": "localpager",
@@ -72,6 +73,8 @@ Config fields:
 - `refresh_interval`: default mirror fetch interval. The default is `24h`.
 - `command_timeout`: maximum command runtime. The default is `2s`.
 - `max_output_bytes`: stdout and stderr cap. The default is `65536`.
+- `snapshot_retain`: completed snapshots to retain per repo, in addition to
+  snapshots currently bound to active service runs. The default is `5`.
 - `repos[].id`: stable repo id used in `/repo/<id>` paths.
 - `repos[].remote`: Git remote URL or `file://` URL.
 - `repos[].default_ref`: ref to snapshot. The default is `origin/main`.
@@ -79,7 +82,10 @@ Config fields:
 
 Reposhell stores snapshots under its own `root`; it does not read directly from
 your working checkout after the snapshot is made. Mirrors are fetched when a run
-binds to a repo and the configured refresh interval has elapsed.
+binds to a repo and the configured refresh interval has elapsed. In service
+mode, completed snapshots beyond the `snapshot_retain` count are
+garbage-collected after binds, but snapshots currently attached to active runs
+are kept.
 
 ## Direct Use
 
@@ -246,6 +252,7 @@ Localpager configs usually place reposhell settings inside a `reposhell` block:
     "refresh_interval": "24h",
     "command_timeout": "2s",
     "max_output_bytes": 65536,
+    "snapshot_retain": 5,
     "repos": [
       {
         "id": "localpager",
@@ -299,4 +306,6 @@ grep -R -n -i "lm studio" .
 ```
 
 If the snapshot is stale, reduce `refresh_interval` or remove the mirror under
-`root/mirrors/<repo>.git` and bind again.
+`root/mirrors/<repo>.git` and bind again. If snapshot storage grows too large,
+lower `snapshot_retain`; active service runs keep their pinned snapshots even
+when they are older than the retention window.

@@ -93,6 +93,7 @@ type Reposhell struct {
 	CommandTimeout  string          `json:"command_timeout"`
 	MaxOutputBytes  int64           `json:"max_output_bytes"`
 	RefreshInterval string          `json:"refresh_interval"`
+	SnapshotRetain  int             `json:"snapshot_retain"`
 	Repos           []ReposhellRepo `json:"repos"`
 }
 

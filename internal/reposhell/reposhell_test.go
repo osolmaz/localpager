@@ -184,6 +184,51 @@ func TestGitCommandsUseBoundSnapshotIndex(t *testing.T) {
 	}
 }
 
+func TestGCSnapshotsKeepsProtectedAndNewestSnapshots(t *testing.T) {
+	ctx := context.Background()
+	source := testGitRepo(t, map[string]string{"old.txt": "old\n"})
+	state := filepath.Join(t.TempDir(), "state")
+	manager := NewManager(Config{
+		Root:           state,
+		SnapshotRetain: 1,
+		Repos:          []Repo{{ID: "project", Remote: source, DefaultRef: "main"}},
+	})
+
+	oldBinding, err := manager.Bind(ctx, "project", []string{"project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	oldCommit := oldBinding.Snapshots["project"]
+	setSnapshotMarkerTime(t, state, "project", oldCommit, time.Now().Add(-3*time.Hour))
+
+	addGitFile(t, source, "middle.txt", "middle\n")
+	git(t, "", "--git-dir", oldBinding.GitDirs["project"], "fetch", "--prune")
+	middleBinding, err := manager.Bind(ctx, "project", []string{"project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	middleCommit := middleBinding.Snapshots["project"]
+	setSnapshotMarkerTime(t, state, "project", middleCommit, time.Now().Add(-2*time.Hour))
+
+	addGitFile(t, source, "new.txt", "new\n")
+	git(t, "", "--git-dir", middleBinding.GitDirs["project"], "fetch", "--prune")
+	newBinding, err := manager.Bind(ctx, "project", []string{"project"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	newCommit := newBinding.Snapshots["project"]
+	setSnapshotMarkerTime(t, state, "project", newCommit, time.Now().Add(-time.Hour))
+
+	protected := map[string]map[string]bool{"project": {oldCommit: true}}
+	if err := manager.GCSnapshots(ctx, protected); err != nil {
+		t.Fatal(err)
+	}
+
+	assertSnapshotExists(t, state, "project", oldCommit)
+	assertSnapshotExists(t, state, "project", newCommit)
+	assertSnapshotRemoved(t, state, "project", middleCommit)
+}
+
 func TestGitShowRejectsOptionalRevision(t *testing.T) {
 	ctx := context.Background()
 	source := testGitRepo(t, map[string]string{"secret.txt": "secret\n"})
@@ -320,6 +365,56 @@ func testGitRepo(t *testing.T, files map[string]string) string {
 	git(t, dir, "add", ".")
 	git(t, dir, "commit", "-m", "initial")
 	return dir
+}
+
+func addGitFile(t *testing.T, dir, name, body string) {
+	t.Helper()
+	path := filepath.Join(dir, filepath.FromSlash(name))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	git(t, dir, "add", filepath.FromSlash(name))
+	git(t, dir, "commit", "-m", "add "+name)
+}
+
+func setSnapshotMarkerTime(t *testing.T, state, repoID, commit string, when time.Time) {
+	t.Helper()
+	marker := filepath.Join(state, "snapshots", safeID(repoID), commit+".ready")
+	if err := os.Chtimes(marker, when, when); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func assertSnapshotExists(t *testing.T, state, repoID, commit string) {
+	t.Helper()
+	for _, path := range snapshotPaths(state, repoID, commit) {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("snapshot path %s missing: %v", path, err)
+		}
+	}
+}
+
+func assertSnapshotRemoved(t *testing.T, state, repoID, commit string) {
+	t.Helper()
+	for _, path := range snapshotPaths(state, repoID, commit) {
+		if _, err := os.Stat(path); err == nil {
+			t.Fatalf("snapshot path %s still exists", path)
+		} else if !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("stat snapshot path %s: %v", path, err)
+		}
+	}
+}
+
+func snapshotPaths(state, repoID, commit string) []string {
+	root := filepath.Join(state, "snapshots", safeID(repoID))
+	return []string{
+		filepath.Join(root, commit),
+		filepath.Join(root, commit+".index"),
+		filepath.Join(root, commit+".ready"),
+	}
 }
 
 func git(t *testing.T, dir string, args ...string) {

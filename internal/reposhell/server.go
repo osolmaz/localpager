@@ -158,7 +158,9 @@ func (s *Server) handleBind(w http.ResponseWriter, r *http.Request) {
 	s.pruneExpiredBindingsLocked(time.Now())
 	s.bindings[runID] = binding
 	s.bindingCreated[runID] = time.Now()
+	protected := s.protectedSnapshotsLocked()
 	s.mu.Unlock()
+	_ = s.manager.GCSnapshots(r.Context(), protected)
 	writeJSON(w, http.StatusOK, BindResponse{
 		RunID:        runID,
 		CWD:          binding.CWD,
@@ -231,6 +233,19 @@ func (s *Server) pruneExpiredBindingsLocked(now time.Time) {
 			delete(s.bindings, id)
 		}
 	}
+}
+
+func (s *Server) protectedSnapshotsLocked() map[string]map[string]bool {
+	protected := map[string]map[string]bool{}
+	for _, binding := range s.bindings {
+		for repoID, commit := range binding.Snapshots {
+			if protected[repoID] == nil {
+				protected[repoID] = map[string]bool{}
+			}
+			protected[repoID][commit] = true
+		}
+	}
+	return protected
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

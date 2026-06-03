@@ -66,6 +66,7 @@ func convertConfig(cfg blockConfig, opts Options) (RuntimeConfig, error) {
 		Root:            cfg.Root,
 		MaxOutputBytes:  cfg.MaxOutputBytes,
 		RefreshInterval: refreshInterval,
+		SnapshotRetain:  cfg.SnapshotRetain,
 	}
 	if manager.Root == "" {
 		manager.Root = opts.DefaultRoot

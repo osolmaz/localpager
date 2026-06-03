@@ -70,6 +70,7 @@ func TestLoadConfigAcceptsLocalpagerNestedReposhell(t *testing.T) {
   "reposhell": {
     "root": "` + filepath.ToSlash(filepath.Join(dir, "state")) + `",
     "socket": "` + filepath.ToSlash(filepath.Join(dir, "reposhell.sock")) + `",
+    "snapshot_retain": 3,
     "repos": [{"id": "project", "remote": "` + filepath.ToSlash(repoRoot) + `", "default_ref": "` + head + `"}]
   }
 }`
@@ -89,6 +90,9 @@ func TestLoadConfigAcceptsLocalpagerNestedReposhell(t *testing.T) {
 	}
 	if cfg.Socket != filepath.Join(dir, "reposhell.sock") {
 		t.Fatalf("Socket = %q", cfg.Socket)
+	}
+	if cfg.ManagerConfig.SnapshotRetain != 3 {
+		t.Fatalf("SnapshotRetain = %d, want 3", cfg.ManagerConfig.SnapshotRetain)
 	}
 }
 
