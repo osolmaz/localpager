@@ -558,6 +558,7 @@ func planSearch(name string, args []string, binding Binding) (execPlan, error) {
 	if len(args) == 0 {
 		return execPlan{}, deny("%s requires a pattern", filepath.Base(name))
 	}
+	isGrep := filepath.Base(name) == "grep"
 	out := []string{}
 	index := 0
 	for index < len(args) {
@@ -570,7 +571,7 @@ func planSearch(name string, args []string, binding Binding) (execPlan, error) {
 		if !strings.HasPrefix(arg, "-") || arg == "-" {
 			break
 		}
-		consumed, err := appendSearchFlag(&out, args[index:])
+		consumed, err := appendSearchFlag(&out, args[index:], isGrep)
 		if err != nil {
 			return execPlan{}, err
 		}
@@ -579,8 +580,12 @@ func planSearch(name string, args []string, binding Binding) (execPlan, error) {
 	if index >= len(args) {
 		return execPlan{}, deny("%s requires a pattern", filepath.Base(name))
 	}
-	out = append(out, args[index])
+	pattern := args[index]
 	index++
+	if index == len(args) && isGrep {
+		return execPlan{}, deny("grep requires an explicit file or directory path; use rg for repo-wide search")
+	}
+	out = append(out, pattern)
 	if index == len(args) {
 		out = append(out, binding.Roots[binding.DefaultRepo])
 	} else {
@@ -595,10 +600,16 @@ func planSearch(name string, args []string, binding Binding) (execPlan, error) {
 	return execPlan{Name: name, Args: out, Dir: binding.Roots[binding.DefaultRepo]}, nil
 }
 
-func appendSearchFlag(out *[]string, args []string) (int, error) {
+func appendSearchFlag(out *[]string, args []string, isGrep bool) (int, error) {
 	arg := args[0]
 	switch arg {
-	case "-n", "--line-number", "-i", "--ignore-case", "-S", "--smart-case", "-F", "--fixed-strings", "-w", "--word-regexp", "-l", "--files-with-matches":
+	case "-n", "--line-number", "-i", "--ignore-case", "-F", "--fixed-strings", "-w", "--word-regexp", "-l", "--files-with-matches":
+		*out = append(*out, arg)
+		return 1, nil
+	case "-S", "--smart-case":
+		if isGrep {
+			return 0, deny("unsupported grep flag %q", arg)
+		}
 		*out = append(*out, arg)
 		return 1, nil
 	case "-C", "-A", "-B", "--context", "--after-context", "--before-context":

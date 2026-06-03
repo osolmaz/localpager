@@ -228,6 +228,7 @@ func TestExecRejectsUnsafeShellAndPathFeatures(t *testing.T) {
 		"cat `pwd`",
 		"FOO=bar cat README.md",
 		"cat secret-link",
+		"grep hello",
 	}
 	for _, command := range denied {
 		t.Run(command, func(t *testing.T) {
