@@ -14,6 +14,9 @@ export type LocalpagerAgentOptions = {
   readonly maxTokens: number;
   readonly timeoutMs: number;
   readonly finalSchemaPath: string | undefined;
+  readonly reposhellSocket: string | undefined;
+  readonly reposhellDefaultRepo: string | undefined;
+  readonly reposhellVisibleRepos: readonly string[];
   readonly status: boolean;
   readonly forwardedArgs: readonly string[];
 };
@@ -39,6 +42,9 @@ export function defaultOptions(): LocalpagerAgentOptions {
     maxTokens: envPositiveInteger("LOCALPAGER_AGENT_MAX_TOKENS", "8192"),
     timeoutMs: envPositiveInteger("LOCALPAGER_AGENT_TIMEOUT_MS", "3000"),
     finalSchemaPath: process.env["LOCALPAGER_AGENT_FINAL_SCHEMA"],
+    reposhellSocket: process.env["LOCALPAGER_REPOSHELL_SOCKET"],
+    reposhellDefaultRepo: process.env["LOCALPAGER_REPOSHELL_DEFAULT_REPO"],
+    reposhellVisibleRepos: splitCSV(process.env["LOCALPAGER_REPOSHELL_VISIBLE_REPOS"] ?? ""),
     status: false,
     forwardedArgs: []
   };
@@ -91,6 +97,11 @@ export function usage(): string {
     "  --timeout-ms <n>          /v1/models probe timeout",
     "  --final-schema <path>     force final schema output; requires Pi -p/--print",
     "  --schema <path>           alias for --final-schema",
+    "  --reposhell-socket <p>  Unix socket for Localpager read-only bash",
+    "  --reposhell-default-repo <id>",
+    "                            default repo id for read-only bash",
+    "  --reposhell-visible-repos <ids>",
+    "                            comma-separated repo ids visible to read-only bash",
     "  -h, --help                show this help",
     "",
     "examples:",
@@ -135,7 +146,16 @@ const valueFlagUpdaters: Readonly<Record<string, OptionUpdater>> = {
   "--max-tokens": (options, value) => ({ ...options, maxTokens: parsePositiveInteger(value) }),
   "--timeout-ms": (options, value) => ({ ...options, timeoutMs: parsePositiveInteger(value) }),
   "--final-schema": (options, value) => ({ ...options, finalSchemaPath: value }),
-  "--schema": (options, value) => ({ ...options, finalSchemaPath: value })
+  "--schema": (options, value) => ({ ...options, finalSchemaPath: value }),
+  "--reposhell-socket": (options, value) => ({ ...options, reposhellSocket: value }),
+  "--reposhell-default-repo": (options, value) => ({
+    ...options,
+    reposhellDefaultRepo: value
+  }),
+  "--reposhell-visible-repos": (options, value) => ({
+    ...options,
+    reposhellVisibleRepos: splitCSV(value)
+  })
 };
 
 function parseValueFlag(
@@ -184,4 +204,11 @@ function parsePositiveInteger(value: string): number {
     throw new Error(`expected a positive integer, got ${value}`);
   }
   return Number.parseInt(value, 10);
+}
+
+function splitCSV(value: string): string[] {
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
 }

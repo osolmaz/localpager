@@ -18,6 +18,18 @@ func (values *MultiFlag) Set(value string) error {
 	return nil
 }
 
+func SplitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	result := make([]string, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			result = append(result, part)
+		}
+	}
+	return result
+}
+
 func SeenFlags(fs *flag.FlagSet) map[string]bool {
 	flags := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) {

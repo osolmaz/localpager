@@ -3,12 +3,13 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
 func TestLoadReadsConfigFile(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
-	if err := os.WriteFile(path, []byte(`{"repo":"example/repo","classifier":{"schema":"schema.json","prompt_template":"prompt.md","topic_taxonomy":"topics.json","context":{"github":{"include_body":true,"include_diff":false,"max_body_chars":1200}}},"worker":{"send_discord":true,"notify_topics_any":["local_models"],"agent_base_url":"http://127.0.0.1:1234/v1","agent_context_window":8192,"agent_max_tokens":768,"agent_timeout_ms":5000,"model_unavailable_retry_delay":"5m"}}`), 0o644); err != nil {
+	if err := os.WriteFile(path, []byte(`{"repo":"example/repo","classifier":{"schema":"schema.json","prompt_template":"prompt.md","topic_taxonomy":"topics.json","tools":["bash","final_json"],"reposhell_default_repo":"example","reposhell_visible_repos":["example"],"context":{"github":{"include_body":true,"include_diff":false,"max_body_chars":1200}}},"reposhell":{"enabled":true,"root":"~/.local/state/localpager/reposhell","socket":"~/.local/state/localpager/reposhell.sock","command_timeout":"2s","refresh_interval":"24h","max_output_bytes":65536,"repos":[{"id":"example","remote":"https://github.com/example/repo.git","default_ref":"origin/main","refresh_interval":"24h"}]},"worker":{"send_discord":true,"notify_topics_any":["local_models"],"agent_base_url":"http://127.0.0.1:1234/v1","agent_context_window":8192,"agent_max_tokens":768,"agent_timeout_ms":5000,"model_unavailable_retry_delay":"5m"}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := Load(path)
@@ -29,6 +30,18 @@ func TestLoadReadsConfigFile(t *testing.T) {
 	}
 	if cfg.Classifier.TopicTaxonomy != "topics.json" {
 		t.Fatalf("Classifier.TopicTaxonomy = %q, want topics.json", cfg.Classifier.TopicTaxonomy)
+	}
+	if got := strings.Join(cfg.Classifier.Tools, ","); got != "bash,final_json" {
+		t.Fatalf("Classifier.Tools = %q, want bash,final_json", got)
+	}
+	if cfg.Classifier.ReposhellDefaultRepo != "example" {
+		t.Fatalf("Classifier.ReposhellDefaultRepo = %q, want example", cfg.Classifier.ReposhellDefaultRepo)
+	}
+	if cfg.Reposhell.Socket != "~/.local/state/localpager/reposhell.sock" {
+		t.Fatalf("Reposhell.Socket = %q", cfg.Reposhell.Socket)
+	}
+	if len(cfg.Reposhell.Repos) != 1 || cfg.Reposhell.Repos[0].RefreshInterval != "24h" {
+		t.Fatalf("Reposhell.Repos = %#v", cfg.Reposhell.Repos)
 	}
 	if cfg.Classifier.Context.GitHub.IncludeBody == nil || !*cfg.Classifier.Context.GitHub.IncludeBody {
 		t.Fatalf("Classifier.Context.GitHub.IncludeBody = %v, want true", cfg.Classifier.Context.GitHub.IncludeBody)

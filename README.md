@@ -15,10 +15,12 @@ delivery, a bundled local model runner in `localpager-agent/`, and a small
 
 ```text
 localpager                 validate config, show status, install services, test Discord
+localpager reposhell       compatibility wrapper for the standalone reposhell CLI
 localpager-enqueue-github  enqueue GitHub issues and PRs once
 localpager-ingest-json     ingest one normalized item from JSON
 localpager-watch           poll source adapters and enqueue items
 localpager-worker          run classifier jobs and send notifications
+reposhell                  standalone read-only repository shell service, exec, and shell
 ```
 
 ## Classifier Contract
@@ -52,6 +54,9 @@ Notification policy is deployment config, not classifier logic:
     "schema": "~/.config/localpager/classification.schema.json",
     "prompt_template": "~/.config/localpager/classifier.prompt.md",
     "topic_taxonomy": "~/.config/localpager/topics.json",
+    "tools": ["bash", "final_json"],
+    "reposhell_default_repo": "localpager",
+    "reposhell_visible_repos": ["localpager"],
     "context": {
       "github": {
         "include_body": true,
@@ -72,6 +77,12 @@ Notification policy is deployment config, not classifier logic:
   }
 }
 ```
+
+When `classifier.tools` includes `bash`, run `reposhell serve` with matching
+`reposhell` config. The model sees a familiar bash-shaped tool, but Localpager
+enforces a read-only command allowlist against pinned repository snapshots. See
+[Reposhell](cmd/reposhell/README.md) for standalone setup, config, direct
+commands, allowed command shapes, service mode, and troubleshooting.
 
 If `notify_topics_any` is set, at least one classifier topic must match before a
 notification is created.
@@ -197,25 +208,28 @@ is the one-shot equivalent.
 ## Services
 
 Install compiled binaries and write user systemd units. The service installer
-writes `localpager-worker.service`, `localpager-watch.service`,
-`localpager-enqueue-github.service`, and `localpager-enqueue-github.timer`.
+writes `localpager-worker.service`, `localpager-reposhell.service`,
+`localpager-watch.service`, `localpager-enqueue-github.service`, and
+`localpager-enqueue-github.timer`.
 
 ```bash
 make install
 localpager install-service --config ~/.config/localpager/config.json --work-dir "$PWD"
 systemctl --user daemon-reload
-systemctl --user enable --now localpager-worker.service localpager-enqueue-github.timer
+systemctl --user enable --now localpager-reposhell.service localpager-worker.service localpager-enqueue-github.timer
 ```
 
 That setup runs the worker continuously and enqueues GitHub issues and pull
 requests on the timer. Enable `localpager-watch.service` instead if you want
-continuous source polling.
+continuous source polling. If your classifier profile does not expose `bash`,
+you can leave `localpager-reposhell.service` disabled.
 
 Check state:
 
 ```bash
 localpager status --config ~/.config/localpager/config.json
 localpager test-discord --config ~/.config/localpager/config.json
+reposhell status --config ~/.config/localpager/config.json
 ```
 
 ## Runtime State

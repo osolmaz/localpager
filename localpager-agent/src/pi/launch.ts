@@ -3,6 +3,7 @@ import type { StdioOptions } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 
 import type { LocalpagerAgentOptions } from "../agent/options.js";
+import type { ReposhellRuntime } from "../reposhell/bash-extension.js";
 import type { FinalSchemaRuntime } from "../structured/final-schema.js";
 import type { RuntimeConfig } from "./config.js";
 
@@ -17,13 +18,14 @@ export async function createLaunchPlan(
   options: LocalpagerAgentOptions,
   runtimeConfig: RuntimeConfig,
   model: string,
-  finalSchemaRuntime?: FinalSchemaRuntime
+  finalSchemaRuntime?: FinalSchemaRuntime,
+  reposhellRuntime?: ReposhellRuntime
 ): Promise<LaunchPlan> {
   await mkdir(options.sessionDir, { recursive: true });
   const forwardedArgs =
     finalSchemaRuntime === undefined
-      ? [...options.forwardedArgs]
-      : structuredOutputArgs(options.forwardedArgs, finalSchemaRuntime);
+      ? plainOutputArgs(options.forwardedArgs, reposhellRuntime)
+      : structuredOutputArgs(options.forwardedArgs, finalSchemaRuntime, reposhellRuntime);
   return {
     command: options.piCommand,
     args: [
@@ -69,7 +71,8 @@ export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {
 
 function structuredOutputArgs(
   forwardedArgs: readonly string[],
-  runtime: FinalSchemaRuntime
+  runtime: FinalSchemaRuntime,
+  reposhellRuntime: ReposhellRuntime | undefined
 ): string[] {
   if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
     throw new Error("--final-schema cannot be used with --no-tools");
@@ -80,13 +83,43 @@ function structuredOutputArgs(
   if (!hasPrintMode(forwardedArgs)) {
     throw new Error("--final-schema requires Pi print mode (-p or --print)");
   }
+  const args = ensureAllowedTools(forwardedArgs, {
+    reposhellEnabled: reposhellRuntime !== undefined,
+    finalJsonRequired: true
+  });
   return [
+    ...reposhellExtensionArgs(reposhellRuntime),
     "--extension",
     runtime.extensionPath,
     "--append-system-prompt",
     runtime.instruction,
-    ...ensureFinalJsonToolAllowed(forwardedArgs)
+    ...args
   ];
+}
+
+function plainOutputArgs(
+  forwardedArgs: readonly string[],
+  reposhellRuntime: ReposhellRuntime | undefined
+): string[] {
+  if (reposhellRuntime === undefined) {
+    return [...forwardedArgs];
+  }
+  if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
+    throw new Error("--reposhell-socket cannot be used with --no-tools");
+  }
+  return [
+    ...reposhellExtensionArgs(reposhellRuntime),
+    ...ensureAllowedTools(forwardedArgs, {
+      reposhellEnabled: true,
+      finalJsonRequired: false
+    })
+  ];
+}
+
+function reposhellExtensionArgs(runtime: ReposhellRuntime | undefined): string[] {
+  return runtime === undefined
+    ? []
+    : ["--extension", runtime.extensionPath, "--append-system-prompt", runtime.instruction];
 }
 
 function hasRpcMode(args: readonly string[]): boolean {
@@ -97,27 +130,64 @@ function hasPrintMode(args: readonly string[]): boolean {
   return args.includes("--print") || args.includes("-p");
 }
 
-function ensureFinalJsonToolAllowed(args: readonly string[]): string[] {
+type ToolOptions = {
+  readonly reposhellEnabled: boolean;
+  readonly finalJsonRequired: boolean;
+};
+
+function ensureAllowedTools(args: readonly string[], options: ToolOptions): string[] {
   const next = [...args];
-  for (let index = 0; index < next.length; index += 1) {
-    const arg = next[index];
-    if (arg !== "--tools" && arg !== "-t") {
-      continue;
-    }
-    const value = next[index + 1];
-    if (value === undefined) {
-      throw new Error(`${arg} requires a value`);
-    }
-    const tools = value
-      .split(",")
-      .map((tool) => tool.trim())
-      .filter((tool) => tool.length > 0);
-    if (!tools.includes("final_json")) {
-      tools.push("final_json");
-    }
-    next[index + 1] = tools.join(",");
+  const indexes = toolsFlagIndexes(next);
+  if (indexes.length === 0) {
+    const tools = defaultTools(options);
+    return tools.length === 0 ? next : ["--tools", tools.join(","), ...next];
   }
+  if (indexes.length > 1) {
+    throw new Error("duplicate --tools flags are not supported");
+  }
+  const index = indexes[0];
+  if (index === undefined) {
+    throw new Error("--tools requires a value");
+  }
+  const flag = next[index];
+  const value = next[index + 1];
+  if (flag === undefined || value === undefined) {
+    throw new Error(`${flag ?? "--tools"} requires a value`);
+  }
+  next[index + 1] = normalizeTools(value, options).join(",");
   return next;
+}
+
+function toolsFlagIndexes(args: readonly string[]): number[] {
+  return args.flatMap((arg, index) => (arg === "--tools" || arg === "-t" ? [index] : []));
+}
+
+function defaultTools(options: ToolOptions): string[] {
+  const tools: string[] = [];
+  if (options.reposhellEnabled) {
+    tools.push("bash");
+  }
+  if (options.finalJsonRequired) {
+    tools.push("final_json");
+  }
+  return tools;
+}
+
+function normalizeTools(value: string, options: ToolOptions): string[] {
+  const tools = value
+    .split(",")
+    .map((tool) => tool.trim())
+    .filter((tool) => tool.length > 0);
+  if (tools.includes("bash") && !options.reposhellEnabled) {
+    throw new Error("--tools bash requires --reposhell-socket");
+  }
+  if (options.reposhellEnabled && !tools.includes("bash")) {
+    tools.push("bash");
+  }
+  if (options.finalJsonRequired && !tools.includes("final_json")) {
+    tools.push("final_json");
+  }
+  return tools;
 }
 
 function shellCommand(command: string, args: readonly string[]): string {

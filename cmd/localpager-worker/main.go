@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/osolmaz/localpager/internal/app"
 	"github.com/osolmaz/localpager/internal/config"
@@ -25,6 +26,10 @@ func main() {
 	flag.StringVar(&flags.classifierSchema, "classifier-schema", "", "classifier JSON schema path")
 	flag.StringVar(&flags.classifierPromptTemplate, "classifier-prompt-template", "", "classifier prompt template path")
 	flag.StringVar(&flags.classifierTopicTaxonomy, "classifier-topic-taxonomy", "", "classifier topic taxonomy path")
+	flag.StringVar(&flags.classifierTools, "classifier-tools", "", "comma-separated classifier tool allowlist")
+	flag.StringVar(&flags.reposhellSocket, "reposhell-socket", "", "reposhell Unix socket path")
+	flag.StringVar(&flags.reposhellDefaultRepo, "reposhell-default-repo", "", "default repo id for reposhell bash tool")
+	flag.StringVar(&flags.reposhellVisibleRepos, "reposhell-visible-repos", "", "comma-separated visible repo ids for reposhell bash tool")
 	flag.StringVar(&flags.githubBaseURL, "github-base-url", "https://api.github.com", "GitHub API base URL for classifier context")
 	flag.StringVar(&flags.githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token for classifier context")
 	flag.StringVar(&flags.model, "model", "", "optional localpager-agent model override")
@@ -79,6 +84,10 @@ func main() {
 		ClassifierSchema:           flags.classifierSchema,
 		ClassifierPromptTemplate:   flags.classifierPromptTemplate,
 		ClassifierTopicTaxonomy:    flags.classifierTopicTaxonomy,
+		ClassifierTools:            app.SplitCSV(flags.classifierTools),
+		ReposhellSocket:            flags.reposhellSocket,
+		ReposhellDefaultRepo:       flags.reposhellDefaultRepo,
+		ReposhellVisibleRepos:      app.SplitCSV(flags.reposhellVisibleRepos),
 		ClassifierContext:          classifierContextOptions(cfg, flags.githubBaseURL, flags.githubTokenEnv),
 		Model:                      flags.model,
 		AgentBaseURL:               flags.agentBaseURL,
@@ -120,6 +129,10 @@ type workerFlags struct {
 	classifierSchema           string
 	classifierPromptTemplate   string
 	classifierTopicTaxonomy    string
+	classifierTools            string
+	reposhellSocket            string
+	reposhellDefaultRepo       string
+	reposhellVisibleRepos      string
 	githubBaseURL              string
 	githubTokenEnv             string
 	model                      string
@@ -180,10 +193,26 @@ func (flags *workerFlags) applyClassifierConfig(cfg config.Config, setFlags map[
 	if cfg.Classifier.TopicTaxonomy != "" && !config.FlagSet(setFlags, "classifier-topic-taxonomy") {
 		flags.classifierTopicTaxonomy = cfg.Classifier.TopicTaxonomy
 	}
+	flags.applyClassifierToolConfig(cfg, setFlags)
 	if cfg.Worker.Model != "" && !config.FlagSet(setFlags, "model") {
 		flags.model = cfg.Worker.Model
 	}
 	flags.applyAgentConfig(cfg, setFlags)
+}
+
+func (flags *workerFlags) applyClassifierToolConfig(cfg config.Config, setFlags map[string]bool) {
+	if len(cfg.Classifier.Tools) > 0 && !config.FlagSet(setFlags, "classifier-tools") {
+		flags.classifierTools = strings.Join(cfg.Classifier.Tools, ",")
+	}
+	if cfg.Reposhell.Enabled && !config.FlagSet(setFlags, "reposhell-socket") {
+		flags.reposhellSocket = app.ReposhellSocket(cfg)
+	}
+	if cfg.Classifier.ReposhellDefaultRepo != "" && !config.FlagSet(setFlags, "reposhell-default-repo") {
+		flags.reposhellDefaultRepo = cfg.Classifier.ReposhellDefaultRepo
+	}
+	if len(cfg.Classifier.ReposhellVisibleRepos) > 0 && !config.FlagSet(setFlags, "reposhell-visible-repos") {
+		flags.reposhellVisibleRepos = strings.Join(cfg.Classifier.ReposhellVisibleRepos, ",")
+	}
 }
 
 func (flags *workerFlags) applyAgentConfig(cfg config.Config, setFlags map[string]bool) {

@@ -17,6 +17,12 @@ Use the GitHub context as the source of truth. If the context says a section is
 missing, unavailable, selected, or truncated, classify from the available context
 and mention that limit in `caveats`.
 
+You may have a read-only `bash` tool rooted at the repository. Use it only when
+the GitHub context is ambiguous or missing repo evidence needed for the routing
+decision. Prefer short commands such as `pwd`, `ls`, `find`, `rg`, `grep`,
+`sed -n`, `cat`, `head`, `git show --name-only`, or `git grep`. Do not call
+`bash` when the provided GitHub context is enough.
+
 Return the final answer by calling the final JSON tool. Do not include prose
 outside the final JSON.
 

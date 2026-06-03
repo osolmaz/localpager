@@ -36,6 +36,18 @@ func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (Cla
 	if opts.ClassifierTopicTaxonomy != "" {
 		args = append(args, "--topic-taxonomy", opts.ClassifierTopicTaxonomy)
 	}
+	if len(opts.ClassifierTools) > 0 {
+		args = append(args, "--tools", strings.Join(opts.ClassifierTools, ","))
+	}
+	if opts.ReposhellSocket != "" {
+		args = append(args, "--reposhell-socket", opts.ReposhellSocket)
+	}
+	if opts.ReposhellDefaultRepo != "" {
+		args = append(args, "--reposhell-default-repo", opts.ReposhellDefaultRepo)
+	}
+	if len(opts.ReposhellVisibleRepos) > 0 {
+		args = append(args, "--reposhell-visible-repos", strings.Join(opts.ReposhellVisibleRepos, ","))
+	}
 	contextPath, err := writeClassifierContextFile(jobCtx, job.Item, opts.ClassifierContext)
 	if err != nil {
 		return ClassifierOutput{}, "", "", "", err

@@ -32,6 +32,8 @@ func main() {
 		runInstallService(os.Args[2:])
 	case "requeue-jobs":
 		runRequeueJobs(os.Args[2:])
+	case "reposhell":
+		runReposhell(os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -53,7 +55,7 @@ func runRequeueJobs(args []string) {
 	}
 	defer app.ClosePool(pool)
 	count, err := localpager.RequeueJobs(ctx, pool, localpager.RequeueJobsOptions{
-		Statuses:          splitCSV(*statuses),
+		Statuses:          app.SplitCSV(*statuses),
 		LastErrorContains: *lastErrorContains,
 		DryRun:            *dryRun,
 	})
@@ -173,6 +175,9 @@ func runInstallService(args []string) {
 		"localpager-worker.service": commandUnit(sharedUnit.withCommand(
 			"Localpager worker", "simple", filepath.Join(expandedBinDir, "localpager-worker"), "Restart=always\nRestartSec=10s\n",
 		)),
+		"localpager-reposhell.service": commandUnit(sharedUnit.withCommand(
+			"Localpager reposhell", "simple", filepath.Join(expandedBinDir, "reposhell")+" serve", "Restart=always\nRestartSec=10s\n",
+		)),
 		"localpager-watch.service": commandUnit(sharedUnit.withCommand(
 			"Localpager source watcher", "simple", filepath.Join(expandedBinDir, "localpager-watch"), "Restart=always\nRestartSec=10s\n",
 		)),
@@ -291,18 +296,6 @@ func valueOrDefault(value, fallback string) string {
 	return value
 }
 
-func splitCSV(value string) []string {
-	parts := strings.Split(value, ",")
-	result := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part != "" {
-			result = append(result, part)
-		}
-	}
-	return result
-}
-
 func defaultServicePath() string {
 	pathValue := strings.TrimSpace(os.Getenv("PATH"))
 	if pathValue == "" {
@@ -331,5 +324,5 @@ func mustExpand(path string) string {
 }
 
 func usage() {
-	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service|requeue-jobs> [flags]")
+	_, _ = fmt.Fprintln(os.Stderr, "usage: localpager <validate|status|test-discord|install-service|requeue-jobs|reposhell> [flags]")
 }

@@ -8,6 +8,8 @@ export type FinalSchemaRuntime = {
   readonly instruction: string;
 };
 
+const missingOutputMessage = "final_json was not called; no structured output was captured";
+
 export async function createFinalSchemaRuntime(
   schemaPath: string,
   stateDir: string
@@ -34,11 +36,15 @@ export async function readFinalSchemaOutput(outputPath: string): Promise<string>
   try {
     await access(outputPath, constants.R_OK);
   } catch {
-    throw new Error("final_json was not called; no structured output was captured");
+    throw new Error(missingOutputMessage);
   }
   const raw = await readFile(outputPath, "utf8");
   const parsed = JSON.parse(raw) as unknown;
   return JSON.stringify(parsed, null, 2) + "\n";
+}
+
+export function isMissingFinalSchemaOutputError(error: unknown): boolean {
+  return error instanceof Error && error.message === missingOutputMessage;
 }
 
 function parseSchema(raw: string, schemaPath: string): unknown {

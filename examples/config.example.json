@@ -21,6 +21,9 @@
     "schema": "./schemas/classification.schema.json",
     "prompt_template": "./prompts/github-relevance-classifier.md",
     "topic_taxonomy": "./examples/profiles/openclaw-routing-topics.json",
+    "tools": ["bash", "final_json"],
+    "reposhell_default_repo": "localpager",
+    "reposhell_visible_repos": ["localpager"],
     "context": {
       "github": {
         "include_body": true,
@@ -34,6 +37,22 @@
         "max_diff_chars": 1200
       }
     }
+  },
+  "reposhell": {
+    "enabled": true,
+    "root": "~/.local/state/localpager/reposhell",
+    "socket": "~/.local/state/localpager/reposhell.sock",
+    "refresh_interval": "24h",
+    "command_timeout": "2s",
+    "max_output_bytes": 65536,
+    "repos": [
+      {
+        "id": "localpager",
+        "remote": "https://github.com/osolmaz/localpager.git",
+        "default_ref": "origin/main",
+        "refresh_interval": "24h"
+      }
+    ]
   },
   "worker": {
     "max_concurrency": 1,

@@ -1,10 +1,19 @@
 import { errorMessage, fail, ok, type CommandResult } from "../common/result.js";
 import { parseLocalpagerAgentArgs, usage } from "../agent/options.js";
+import type { LocalpagerAgentOptions } from "../agent/options.js";
 import { resolveLocalModel } from "../llm/openai.js";
 import { writeRuntimeConfig } from "../pi/config.js";
 import type { RuntimeConfig } from "../pi/config.js";
 import { createLaunchPlan, execLaunchPlan } from "../pi/launch.js";
-import { createFinalSchemaRuntime, readFinalSchemaOutput } from "../structured/final-schema.js";
+import { createReposhellRuntime } from "../reposhell/bash-extension.js";
+import type { ReposhellRuntime } from "../reposhell/bash-extension.js";
+import {
+  createFinalSchemaRuntime,
+  isMissingFinalSchemaOutputError,
+  readFinalSchemaOutput
+} from "../structured/final-schema.js";
+import type { FinalSchemaRuntime } from "../structured/final-schema.js";
+import { findFinalJsonRecoveryCandidate, recoveryForwardedArgs } from "../structured/recovery.js";
 
 export async function run(args: readonly string[]): Promise<CommandResult> {
   try {
@@ -24,12 +33,28 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
       options.finalSchemaPath === undefined
         ? undefined
         : await createFinalSchemaRuntime(options.finalSchemaPath, options.stateDir);
-    const plan = await createLaunchPlan(options, runtimeConfig, resolved.model, finalSchemaRuntime);
+    const reposhellRuntime = await createReposhellRuntime(options);
+    const startedAtMs = Date.now();
+    const plan = await createLaunchPlan(
+      options,
+      runtimeConfig,
+      resolved.model,
+      finalSchemaRuntime,
+      reposhellRuntime
+    );
     const code = await execLaunchPlan(plan);
     if (code !== 0 || plan.finalSchemaOutputPath === undefined) {
       return { code, stdout: "", stderr: "" };
     }
-    return ok(await readFinalSchemaOutput(plan.finalSchemaOutputPath));
+    return await readFinalSchemaResult(
+      plan.finalSchemaOutputPath,
+      options,
+      runtimeConfig,
+      resolved.model,
+      finalSchemaRuntime,
+      reposhellRuntime,
+      startedAtMs
+    );
   } catch (error) {
     return fail(`localpager-agent: ${errorMessage(error)}`);
   }
@@ -40,6 +65,66 @@ type ResolvedModel = {
   readonly availableModels: readonly string[];
   readonly contextWindow?: number;
 };
+
+async function readFinalSchemaResult(
+  outputPath: string,
+  options: LocalpagerAgentOptions,
+  runtimeConfig: RuntimeConfig,
+  model: string,
+  finalSchemaRuntime: FinalSchemaRuntime | undefined,
+  reposhellRuntime: ReposhellRuntime | undefined,
+  startedAtMs: number
+): Promise<CommandResult> {
+  try {
+    return ok(await readFinalSchemaOutput(outputPath));
+  } catch (error) {
+    if (!isMissingFinalSchemaOutputError(error) || finalSchemaRuntime === undefined) {
+      throw error;
+    }
+    return await recoverFinalSchemaResult(
+      options,
+      runtimeConfig,
+      model,
+      finalSchemaRuntime,
+      reposhellRuntime,
+      startedAtMs,
+      outputPath
+    );
+  }
+}
+
+async function recoverFinalSchemaResult(
+  options: LocalpagerAgentOptions,
+  runtimeConfig: RuntimeConfig,
+  model: string,
+  finalSchemaRuntime: FinalSchemaRuntime,
+  reposhellRuntime: ReposhellRuntime | undefined,
+  startedAtMs: number,
+  outputPath: string
+): Promise<CommandResult> {
+  const candidate = await findFinalJsonRecoveryCandidate(options, startedAtMs);
+  if (candidate === undefined) {
+    throw new Error("final_json was not called; no structured output was captured");
+  }
+  const recoveryPlan = await createLaunchPlan(
+    {
+      ...options,
+      forwardedArgs: recoveryForwardedArgs(
+        options.forwardedArgs,
+        candidate.sessionPath,
+        candidate.payload
+      )
+    },
+    runtimeConfig,
+    model,
+    finalSchemaRuntime,
+    reposhellRuntime
+  );
+  const code = await execLaunchPlan(recoveryPlan);
+  return code === 0
+    ? ok(await readFinalSchemaOutput(outputPath))
+    : { code, stdout: "", stderr: "" };
+}
 
 function statusOutput(
   options: ReturnType<typeof parseLocalpagerAgentArgs>,

@@ -30,7 +30,10 @@ same time on this machine.
 - Topic taxonomy: `/home/bob/repos/localpager/examples/profiles/openclaw-routing-topics.json`
 - SQLite state: `/home/bob/.local/state/localpager/localpager.sqlite`
 - Classifier artifacts: `/home/bob/.local/state/localpager/classifier`
+- Reposhell state: `/home/bob/.local/state/localpager/reposhell`
+- Reposhell socket: `/home/bob/.local/state/localpager/reposhell.sock`
 - Service: `localpager-worker.service`
+- Reposhell service: `localpager-reposhell.service`
 - Enqueue timer: `localpager-enqueue-github.timer`
 
 Secrets live outside the repo. Do not commit `secrets.env`, tokens, SQLite
@@ -94,6 +97,41 @@ The OpenClaw GitHub context budget is:
 }
 ```
 
+The reposhell setup is:
+
+```json
+{
+  "reposhell": {
+    "enabled": true,
+    "root": "~/.local/state/localpager/reposhell",
+    "socket": "~/.local/state/localpager/reposhell.sock",
+    "refresh_interval": "24h",
+    "command_timeout": "2s",
+    "max_output_bytes": 65536,
+    "repos": [
+      {
+        "id": "openclaw",
+        "remote": "https://github.com/openclaw/openclaw.git",
+        "default_ref": "origin/main",
+        "refresh_interval": "24h"
+      }
+    ]
+  },
+  "classifier": {
+    "tools": ["bash", "final_json"],
+    "reposhell_default_repo": "openclaw",
+    "reposhell_visible_repos": ["openclaw"]
+  }
+}
+```
+
+Customize it by changing `reposhell.repos` for the repositories the service
+syncs, then changing `classifier.reposhell_default_repo` and
+`classifier.reposhell_visible_repos` for the repos a classifier profile may
+read. Keep `classifier.tools` at `["bash", "final_json"]` only when the
+reposhell service is enabled and healthy. The default refresh interval is one
+day; override it per repo only when a repo needs faster or slower updates.
+
 ## Verify State
 
 Run:
@@ -103,6 +141,9 @@ lms ps
 localpager validate --config /home/bob/.config/localpager/config.json
 localpager status --config /home/bob/.config/localpager/config.json
 systemctl --user is-active localpager-worker.service localpager-enqueue-github.timer
+systemctl --user is-active localpager-reposhell.service
+reposhell status --config /home/bob/.config/localpager/config.json
+reposhell shell --config /home/bob/.config/localpager/config.json --repo openclaw --visible-repo openclaw
 pgrep -af 'ds4|deepseek' || true
 ```
 
@@ -111,7 +152,10 @@ Expected:
 - `lms ps` reports Gemma with `CONTEXT 131072` and `PARALLEL 3`.
 - `localpager validate` reports `config_ok=true`.
 - `localpager status` reports `agent_context_window=131072`.
-- Both systemd units are `active`.
+- The worker, reposhell service, and enqueue timer are `active`.
+- `reposhell status` returns JSON rather than a socket error.
+- `reposhell shell` opens an interactive read-only prompt rooted at
+  `/repo/openclaw`; type `exit` to leave.
 - The `pgrep` command does not show a real DS4/DeepSeek server process.
 
 ## Change Model Context Or Parallelism
