@@ -29,6 +29,10 @@ https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset
 
 Important remote artifacts:
 
+- Canonical flat prompt folder:
+  `prompts/`
+- Prompt folder README:
+  `prompts/README.md`
 - Original DS4 generation prompt:
   `prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md`
 - Representative original DS4 runtime prompt:
@@ -46,7 +50,7 @@ Important remote artifacts:
 - Final v8 prompt experiment:
   `prompt-experiments/ds4-precision/routing-intent-v8-fp-table.md`
 - Final Localpager/Gemma production prompt:
-  `prompt-snapshots/localpager-openclaw-routing-v8-production.prompt.md`
+  `prompts/localpager-openclaw-routing-v8-production.prompt.md`
 - Full-dataset seed-vs-v7 comparison:
   `prompt-experiments/ds4-precision/full-638-20260601-093700/comparison-note.md`
 

@@ -75,6 +75,10 @@ Prompt snapshots:
 
 Remote prompt provenance:
 
+- Canonical flat prompt folder:
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/tree/main/prompts>
+- Prompt folder README:
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/README.md>
 - Original DS4 generation prompt:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md>
 - Representative original DS4 runtime prompt:
@@ -90,7 +94,7 @@ Remote prompt provenance:
 - Gemma v8 prompt experiment:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-experiments/ds4-precision/routing-intent-v8-fp-table.md>
 - Final Localpager/Gemma production prompt:
-  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/localpager-openclaw-routing-v8-production.prompt.md>
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/localpager-openclaw-routing-v8-production.prompt.md>
 - Full-dataset prompt comparison:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-experiments/ds4-precision/full-638-20260601-093700/comparison-note.md>
 
