@@ -36,6 +36,28 @@ Topic definitions and cue words:
 
 __TOPIC_DESCRIPTIONS__
 
+Before final output, delete `local_model_providers` unless the item explicitly
+centers a local, self-hosted, or user-declared OpenAI-compatible backend such as
+LM Studio, Ollama, vLLM, LocalAI, llama.cpp, Atomic Chat, localhost/LAN, or
+private inference servers. Never use it for hosted provider catalog updates,
+static model catalog entries, hosted provider manifests, hosted model
+availability, hosted OAuth/keychain issues, usage/billing UI,
+provider-specific TTS/speech/image behavior, or hosted API behavior.
+Hosted model catalog updates are `model_releases` and sometimes `config`; never
+add `local_model_providers` as a secondary label for Anthropic/Claude CLI,
+OpenAI, Gemini/Vertex, Copilot, Kimi/Moonshot, or Volcengine static catalog
+entries.
+Hosted provider usage, balance, quota, cost, billing, and status-display work is
+`telemetry_usage` or `ui_tui`; never add `local_model_providers` for
+Kimi/Moonshot, Anthropic, OpenAI, Gemini/Vertex, Copilot, Volcengine, MiniMax,
+or ElevenLabs usage/billing UI.
+
+Use `local_models` only for concrete local/offline model execution. Do not use
+it just because an item mentions a model ID, model catalog, model list, static
+model entry, provider manifest, or hosted provider availability. Keep it for
+local-model compatibility, local-model lean filtering, and local-model runtime
+crashes.
+
 Choose the smallest useful topic set. Prefer zero or one topic, add a second
 only when the item would be misrouted without it, and use `caveats` for missing
 or limited evidence.

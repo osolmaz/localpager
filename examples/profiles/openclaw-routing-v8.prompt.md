@@ -98,6 +98,38 @@ Enum discipline:
 - Chat UI display/status/footer behavior routes to `ui_tui` only when the
   user-facing interface is central.
 
+## Hard Local Model Filters
+
+Before final output, delete `local_model_providers` unless the item explicitly
+centers a local, self-hosted, or user-declared OpenAI-compatible backend: LM
+Studio, Ollama, vLLM, LocalAI, llama.cpp, Atomic Chat, localhost/LAN, or private
+inference servers.
+
+Never output `local_model_providers` for hosted provider catalog updates, static
+model catalog entries, hosted provider manifests, hosted model availability,
+hosted OAuth/keychain issues, usage/billing UI, provider-specific
+TTS/speech/image behavior, or hosted API behavior. Anthropic, Claude CLI,
+OpenAI, Gemini/Vertex, Copilot, Kimi/Moonshot, Volcengine, MiniMax, and
+ElevenLabs provider/catalog changes are not `local_model_providers` unless the
+item is centrally about a local/self-hosted endpoint.
+
+Hosted model catalog updates are `model_releases` and sometimes `config`; never
+add `local_model_providers` as a secondary label for Anthropic/Claude CLI,
+OpenAI, Gemini/Vertex, Copilot, Kimi/Moonshot, or Volcengine static catalog
+entries.
+
+Hosted provider usage, balance, quota, cost, billing, and status-display work is
+`telemetry_usage` or `ui_tui`; never add `local_model_providers` for
+Kimi/Moonshot, Anthropic, OpenAI, Gemini/Vertex, Copilot, Volcengine, MiniMax,
+or ElevenLabs usage/billing UI.
+
+Use `local_models` only for concrete local/offline model execution: LM Studio,
+Ollama, llama.cpp, GGUF, MLX, local GPU/VRAM, local fallback, or local
+open-weight inference. Do not use `local_models` just because an item mentions
+a model ID, model catalog, model list, static model entry, provider manifest,
+or hosted provider availability. Keep `local_models` for local-model
+compatibility, local-model lean filtering, and local-model runtime crashes.
+
 ## Over-Label Guardrails
 
 - `api_surface`: external API, CLI, or HTTP contracts only. Not internal
@@ -107,8 +139,10 @@ Enum discipline:
   stuck state, data loss, cleanup, or recovery. Not a generic bug tag.
 - `sessions`: session lifecycle/state/storage/identity only. Not every item
   mentioning session context or files.
-- `local_model_providers`: provider setup/routing/auth/discovery/compatibility
-  only. Not every local endpoint issue.
+- `local_model_providers`: local/self-hosted provider
+  setup/routing/auth/discovery/compatibility only. Delete it for hosted provider
+  catalogs, hosted provider manifests, hosted auth, hosted usage UI, or
+  provider-specific TTS/image behavior.
 - `config`: configuration behavior itself, not any feature with an option.
 - `docs` and `tests_ci`: only when docs or test tooling is the subject.
 
@@ -136,7 +170,7 @@ Enum discipline:
 - Do not use `local_model_providers` for base URL normalization,
   OpenRouter/OpenAI-compatible endpoint fixes, endpoint lifecycle, streaming,
   usage chunks, or vLLM/TGI/LocalAI serving. Use `model_serving` unless provider
-  setup/auth/discovery/routing is central.
+  setup/auth/discovery/routing for a local/self-hosted backend is central.
 - Do not use `notifications` for named Discord/Telegram/Slack/Zulip/Feishu
   behavior, ACP final/pre-tool text preservation, delivery fallback recovery, or
   outbound recovery correctness. Use `chat_integrations` for named chat surfaces
