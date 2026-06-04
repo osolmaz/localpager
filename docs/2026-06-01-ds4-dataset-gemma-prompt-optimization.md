@@ -25,13 +25,13 @@ Primary local dataset folder:
 Canonical Hugging Face dataset:
 
 ```text
-osolmaz/openclaw-classification-dataset
+dutifuldev/openclaw-classification-dataset
 ```
 
 URL:
 
 ```text
-https://huggingface.co/datasets/osolmaz/openclaw-classification-dataset
+https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset
 ```
 
 Important files in that folder:
@@ -49,7 +49,7 @@ Important files in that folder:
   improving Gemma precision.
 - `benchmark-runs/`: benchmark configs, summaries, and per-row results.
 
-Hugging Face upload staging for `osolmaz/openclaw-classification-dataset`:
+Hugging Face upload staging for `dutifuldev/openclaw-classification-dataset`:
 
 ```text
 /home/bob/oc/openclaw-classification-dataset/hf-ds4-upload
