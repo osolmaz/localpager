@@ -33,7 +33,7 @@ Important remote artifacts:
   `prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md`
 - Representative original DS4 runtime prompt:
   `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md`
-- Original DS4 runtime template:
+- DS4 runtime template rendered by the original generator from a placeholder seed row:
   `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-template.md`
 - Rendered DS4 runtime prompt example:
   `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-example-0001.md`

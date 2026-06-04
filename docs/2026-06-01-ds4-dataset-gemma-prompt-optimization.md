@@ -79,7 +79,7 @@ Remote prompt provenance:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md>
 - Representative original DS4 runtime prompt:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md>
-- DS4 runtime placeholder template:
+- DS4 runtime template rendered by the original generator from a placeholder seed row:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-template.md>
 - Rendered DS4 runtime prompt example:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-example-0001.md>
