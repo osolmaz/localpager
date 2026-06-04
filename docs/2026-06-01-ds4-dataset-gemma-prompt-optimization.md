@@ -55,7 +55,7 @@ Hugging Face upload staging for `dutifuldev/openclaw-classification-dataset`:
 /home/bob/oc/openclaw-classification-dataset/hf-ds4-upload
 ```
 
-That staging directory has these 638-line files:
+That staging directory has these 742-line files:
 
 - `codex-batch.jsonl`: original dataset generated with Codex in batched mode.
 - `ds4.jsonl`: same rows plus `deepseek_localagent.output`.
@@ -68,6 +68,19 @@ Prompt snapshots:
 - `prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md`
 - `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md`
 - `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl`
+
+Remote prompt provenance:
+
+- Original DS4 generation prompt:
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md>
+- Representative original DS4 runtime prompt:
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md>
+- Rendered DS4 runtime prompts:
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl>
+- Gemma v8 prompt experiment:
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-experiments/ds4-precision/routing-intent-v8-fp-table.md>
+- Full-dataset prompt comparison:
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-experiments/ds4-precision/full-638-20260601-093700/comparison-note.md>
 
 ## Dataset Lineage
 
