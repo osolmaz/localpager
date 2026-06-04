@@ -16,6 +16,8 @@ prompt experiment metrics live in the Hugging Face dataset.
   `examples/profiles/openclaw-routing-v8.prompt.md`
 - Production topic taxonomy:
   `examples/profiles/openclaw-routing-topics.json`
+- Hugging Face snapshot of the production prompt:
+  `prompt-snapshots/localpager-openclaw-routing-v8-production.prompt.md`
 
 ## Dataset Provenance
 
@@ -41,6 +43,8 @@ Important remote artifacts:
   `prompt-experiments/ds4-precision/`
 - Final v8 prompt experiment:
   `prompt-experiments/ds4-precision/routing-intent-v8-fp-table.md`
+- Final Localpager/Gemma production prompt:
+  `prompt-snapshots/localpager-openclaw-routing-v8-production.prompt.md`
 - Full-dataset seed-vs-v7 comparison:
   `prompt-experiments/ds4-precision/full-638-20260601-093700/comparison-note.md`
 
