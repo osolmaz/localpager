@@ -39,6 +39,8 @@ Important remote artifacts:
   `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-example-0001.md`
 - Rendered DS4 runtime prompts:
   `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl`
+- DS4 generator script:
+  `scripts/generate_deepseek_localagent_dataset.mjs`
 - Gemma prompt candidates and metrics:
   `prompt-experiments/ds4-precision/`
 - Final v8 prompt experiment:

@@ -71,6 +71,7 @@ Prompt snapshots:
 - `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md`
 - `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl`
 - `prompt-snapshots/localpager-openclaw-routing-v8-production.prompt.md`
+- `scripts/generate_deepseek_localagent_dataset.mjs`
 
 Remote prompt provenance:
 
@@ -78,12 +79,14 @@ Remote prompt provenance:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md>
 - Representative original DS4 runtime prompt:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md>
-- DS4 runtime prompt template:
+- DS4 runtime placeholder template:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-template.md>
 - Rendered DS4 runtime prompt example:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-example-0001.md>
 - Rendered DS4 runtime prompts:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl>
+- DS4 generator script that produced the rendered prompts:
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/scripts/generate_deepseek_localagent_dataset.mjs>
 - Gemma v8 prompt experiment:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-experiments/ds4-precision/routing-intent-v8-fp-table.md>
 - Final Localpager/Gemma production prompt:
