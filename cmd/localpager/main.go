@@ -43,15 +43,48 @@ func main() {
 }
 
 func runRenderContext(args []string) {
+	flags, target, setFlags := parseRenderContextFlags(args)
+	cfg := loadConfig(flags.configPath)
+	app.ApplyGitHubConfig(&flags.githubBaseURL, &flags.githubTokenEnv, cfg, setFlags)
+	opts := localpagerContextOptionsFromConfig(cfg, flags.githubBaseURL, flags.githubTokenEnv)
+	applyRenderContextLimits(&opts, flags)
+
+	rendered, err := localpager.RenderGitHubTargetContext(context.Background(), target, opts)
+	if err != nil {
+		log.Fatal(err)
+	}
+	writeRenderedContext(rendered, flags.outputPath)
+}
+
+type renderContextFlags struct {
+	configPath           string
+	outputPath           string
+	githubBaseURL        string
+	githubTokenEnv       string
+	maxBodyChars         int
+	maxCommentsChars     int
+	maxChangedFilesChars int
+	maxDiffChars         int
+}
+
+func parseRenderContextFlags(args []string) (renderContextFlags, string, map[string]bool) {
+	var flags renderContextFlags
 	fs := flag.NewFlagSet("render-context", flag.ExitOnError)
-	configPath := fs.String("config", "", "JSON config file path")
-	outputPath := fs.String("output", "", "write rendered context to this path instead of stdout")
-	githubBaseURL := fs.String("github-base-url", "https://api.github.com", "GitHub API base URL")
-	githubTokenEnv := fs.String("github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token")
-	maxBodyChars := fs.Int("max-body-chars", 0, "maximum GitHub body characters")
-	maxCommentsChars := fs.Int("max-comments-chars", 0, "maximum GitHub comments characters")
-	maxChangedFilesChars := fs.Int("max-changed-files-chars", 0, "maximum changed-files characters")
-	maxDiffChars := fs.Int("max-diff-chars", 0, "maximum diff characters")
+	fs.StringVar(&flags.configPath, "config", "", "JSON config file path")
+	fs.StringVar(&flags.outputPath, "output", "", "write rendered context to this path instead of stdout")
+	fs.StringVar(&flags.githubBaseURL, "github-base-url", "https://api.github.com", "GitHub API base URL")
+	fs.StringVar(&flags.githubTokenEnv, "github-token-env", "GITHUB_TOKEN", "environment variable containing GitHub token")
+	fs.IntVar(&flags.maxBodyChars, "max-body-chars", 0, "maximum GitHub body characters")
+	fs.IntVar(&flags.maxCommentsChars, "max-comments-chars", 0, "maximum GitHub comments characters")
+	fs.IntVar(&flags.maxChangedFilesChars, "max-changed-files-chars", 0, "maximum changed-files characters")
+	fs.IntVar(&flags.maxDiffChars, "max-diff-chars", 0, "maximum diff characters")
+	target, parseArgs, targetFirst := renderContextTargetArgs(args)
+	_ = fs.Parse(parseArgs)
+	target = resolveRenderContextTarget(target, targetFirst, fs)
+	return flags, target, app.SeenFlags(fs)
+}
+
+func renderContextTargetArgs(args []string) (string, []string, bool) {
 	target := ""
 	parseArgs := args
 	targetFirst := false
@@ -60,7 +93,10 @@ func runRenderContext(args []string) {
 		parseArgs = args[1:]
 		targetFirst = true
 	}
-	_ = fs.Parse(parseArgs)
+	return target, parseArgs, targetFirst
+}
+
+func resolveRenderContextTarget(target string, targetFirst bool, fs *flag.FlagSet) string {
 	if target == "" && fs.NArg() == 1 {
 		target = fs.Arg(0)
 	}
@@ -68,32 +104,30 @@ func runRenderContext(args []string) {
 		_, _ = fmt.Fprintln(os.Stderr, "usage: localpager render-context <github-url-or-owner/repo#number> [flags]")
 		os.Exit(2)
 	}
-	setFlags := app.SeenFlags(fs)
-	cfg := loadConfig(*configPath)
-	app.ApplyGitHubConfig(githubBaseURL, githubTokenEnv, cfg, setFlags)
-	opts := localpagerContextOptionsFromConfig(cfg, *githubBaseURL, *githubTokenEnv)
-	if *maxBodyChars > 0 {
-		opts.MaxBodyChars = *maxBodyChars
-	}
-	if *maxCommentsChars > 0 {
-		opts.MaxCommentsChars = *maxCommentsChars
-	}
-	if *maxChangedFilesChars > 0 {
-		opts.MaxChangedFilesChars = *maxChangedFilesChars
-	}
-	if *maxDiffChars > 0 {
-		opts.MaxDiffChars = *maxDiffChars
-	}
+	return target
+}
 
-	rendered, err := localpager.RenderGitHubTargetContext(context.Background(), target, opts)
-	if err != nil {
-		log.Fatal(err)
+func applyRenderContextLimits(opts *localpager.ClassifierContextOptions, flags renderContextFlags) {
+	if flags.maxBodyChars > 0 {
+		opts.MaxBodyChars = flags.maxBodyChars
 	}
-	if *outputPath == "" {
+	if flags.maxCommentsChars > 0 {
+		opts.MaxCommentsChars = flags.maxCommentsChars
+	}
+	if flags.maxChangedFilesChars > 0 {
+		opts.MaxChangedFilesChars = flags.maxChangedFilesChars
+	}
+	if flags.maxDiffChars > 0 {
+		opts.MaxDiffChars = flags.maxDiffChars
+	}
+}
+
+func writeRenderedContext(rendered string, outputPath string) {
+	if outputPath == "" {
 		app.Println(os.Stdout, rendered)
 		return
 	}
-	expandedOutput := mustExpand(*outputPath)
+	expandedOutput := mustExpand(outputPath)
 	if err := os.MkdirAll(filepath.Dir(expandedOutput), 0o755); err != nil {
 		log.Fatal(err)
 	}
