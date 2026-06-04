@@ -31,6 +31,8 @@ Important remote artifacts:
   `prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md`
 - Representative original DS4 runtime prompt:
   `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md`
+- Reconstructed original DS4 runtime template:
+  `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-template.md`
 - Rendered DS4 runtime prompts:
   `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl`
 - Gemma prompt candidates and metrics:
