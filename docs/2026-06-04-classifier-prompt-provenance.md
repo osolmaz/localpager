@@ -17,7 +17,7 @@ prompt experiment metrics live in the Hugging Face dataset.
 - Production topic taxonomy:
   `examples/profiles/openclaw-routing-topics.json`
 - Hugging Face snapshot of the production prompt:
-  `prompt-snapshots/localpager-openclaw-routing-v8-production.prompt.md`
+  `prompts/localpager-openclaw-routing-v8-production.prompt.md`
 
 ## Dataset Provenance
 
@@ -29,26 +29,27 @@ https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset
 
 Important remote artifacts:
 
-- Canonical flat prompt folder:
+- Cutover prompt folder:
   `prompts/`
 - Prompt folder README:
   `prompts/README.md`
 - Original DS4 generation prompt:
-  `prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md`
+  `prompts/2026-05-30-ds4-generation-prompt.md`
 - Representative original DS4 runtime prompt:
-  `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md`
+  `prompts/2026-05-30-ds4-runtime-rendered-row-0001.md`
 - DS4 runtime template rendered by the original generator from a placeholder seed row:
-  `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-template.md`
+  `prompts/2026-05-30-ds4-runtime-template-placeholder.md`
 - Rendered DS4 runtime prompt example:
-  `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-example-0001.md`
+  `prompts/2026-05-30-ds4-runtime-example-row-0001.md`
 - Rendered DS4 runtime prompts:
-  `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl`
+  `prompts/2026-05-30-ds4-runtime-rendered-prompts.jsonl`
 - DS4 generator script:
   `scripts/generate_deepseek_localagent_dataset.mjs`
 - Gemma prompt candidates and metrics:
-  `prompt-experiments/ds4-precision/`
+  `prompts/` for prompt files and `prompt-experiments/ds4-precision/` for
+  metrics.
 - Final v8 prompt experiment:
-  `prompt-experiments/ds4-precision/routing-intent-v8-fp-table.md`
+  `prompts/gemma-routing-intent-v8-fp-table.md`
 - Final Localpager/Gemma production prompt:
   `prompts/localpager-openclaw-routing-v8-production.prompt.md`
 - Full-dataset seed-vs-v7 comparison:

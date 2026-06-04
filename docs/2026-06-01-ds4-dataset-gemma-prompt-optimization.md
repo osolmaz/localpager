@@ -44,9 +44,10 @@ Important files in that folder:
 - `generate_deepseek_localagent_dataset.mjs`: DS4 dataset generation script.
 - `benchmark_model_comparison.mjs`: Gemma, DS4, and Codex comparison script.
 - `benchmark_ds4_concurrency.mjs`: local DS4 server throughput probe.
-- `prompt-snapshots/`: recovered and saved prompt snapshots.
-- `manual-prompt-experiments/ds4-precision/`: prompt-only iterations for
-  improving Gemma precision.
+- `prompts/`: cutover folder for prompt snapshots, candidates, and
+  prompt-bearing artifacts.
+- `prompt-experiments/ds4-precision/`: prompt-run metrics and comparison
+  artifacts.
 - `benchmark-runs/`: benchmark configs, summaries, and per-row results.
 
 Hugging Face upload staging for `dutifuldev/openclaw-classification-dataset`:
@@ -62,15 +63,13 @@ That staging directory has these 742-line files:
 - `ds4-outputs.jsonl`: raw DS4 per-row output records.
 - `regression-set.json`, `row.schema.json`, `topic_keywords.json`.
 
-Prompt snapshots:
+Prompt inventory:
 
-- `prompt-snapshots/2026-05-29-classifier-prompt.md`
-- `prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md`
-- `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-template.md`
-- `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-example-0001.md`
-- `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md`
-- `prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl`
-- `prompt-snapshots/localpager-openclaw-routing-v8-production.prompt.md`
+- `prompts/README.md`
+- `prompts/localpager-openclaw-routing-v8-production.prompt.md`
+- `prompts/2026-05-30-ds4-runtime-template-placeholder.md`
+- `prompts/2026-05-30-ds4-runtime-rendered-row-0001.md`
+- `prompts/2026-05-30-ds4-runtime-rendered-prompts.jsonl`
 - `scripts/generate_deepseek_localagent_dataset.mjs`
 
 Remote prompt provenance:
@@ -80,19 +79,19 @@ Remote prompt provenance:
 - Prompt folder README:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/README.md>
 - Original DS4 generation prompt:
-  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-generation-prompt.md>
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/2026-05-30-ds4-generation-prompt.md>
 - Representative original DS4 runtime prompt:
-  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompt-0001.md>
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/2026-05-30-ds4-runtime-rendered-row-0001.md>
 - DS4 runtime template rendered by the original generator from a placeholder seed row:
-  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-template.md>
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/2026-05-30-ds4-runtime-template-placeholder.md>
 - Rendered DS4 runtime prompt example:
-  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-example-0001.md>
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/2026-05-30-ds4-runtime-example-row-0001.md>
 - Rendered DS4 runtime prompts:
-  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-snapshots/2026-05-30-deepseek-localagent-runtime-prompts.jsonl>
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/2026-05-30-ds4-runtime-rendered-prompts.jsonl>
 - DS4 generator script that produced the rendered prompts:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/scripts/generate_deepseek_localagent_dataset.mjs>
 - Gemma v8 prompt experiment:
-  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-experiments/ds4-precision/routing-intent-v8-fp-table.md>
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/gemma-routing-intent-v8-fp-table.md>
 - Final Localpager/Gemma production prompt:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/localpager-openclaw-routing-v8-production.prompt.md>
 - Full-dataset prompt comparison:
@@ -470,13 +469,13 @@ pressure that improved Gemma without adding custom classifier logic.
 
 ## Prompt Iteration Timeline
 
-All prompt-only candidates are in:
+Prompt candidates are now cut over to:
 
 ```text
-/home/bob/oc/openclaw-classification-dataset/manual-prompt-experiments/ds4-precision
+/home/bob/oc/openclaw-classification-dataset/prompts
 ```
 
-The files are small policy fragments. They were tested by swapping them into
+The `gemma-*.md` files are small policy fragments. They were tested by swapping them into
 the classifier policy/prompt and rerunning representative rows or regression
 checks. The useful progression was:
 
