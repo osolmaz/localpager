@@ -118,8 +118,8 @@ The OpenClaw routing prompt lives at
 OpenClaw topic keyword taxonomy in
 `examples/profiles/openclaw-routing-topics.json`. That checked-in taxonomy was
 copied from the Hugging Face dataset
-`osolmaz/openclaw-classification-dataset`:
-<https://huggingface.co/datasets/osolmaz/openclaw-classification-dataset>.
+`dutifuldev/openclaw-classification-dataset`:
+<https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset>.
 The Localpager profile and dataset labels use the same allowed topic IDs and
 keyword hints.
 That prompt is the production translation of the DS4/Gemma v8 routing policy:
