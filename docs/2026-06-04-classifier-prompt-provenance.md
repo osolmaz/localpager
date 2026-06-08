@@ -52,8 +52,8 @@ Important remote artifacts:
   `prompts/gemma-routing-intent-v8-fp-table.md`
 - Final Localpager/Gemma production prompt:
   `prompts/localpager-openclaw-routing-v8-production.prompt.md`
-- Full-dataset seed-vs-v7 comparison:
-  `prompt-experiments/ds4-precision/full-638-20260601-093700/comparison-note.md`
+- DS4 precision prompt experiments:
+  `prompt-experiments/ds4-precision/`
 
 ## Rule
 

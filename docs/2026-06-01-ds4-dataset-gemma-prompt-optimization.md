@@ -36,7 +36,8 @@ https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset
 
 Important files in that folder:
 
-- `seed.jsonl`: original 638-row curated dataset.
+- `archive/seed-old.jsonl`: archived original seed labels. These labels are
+  inaccurate and must not be used for benchmarking or training.
 - `row.schema.json`: dataset row schema.
 - `topic_keywords.json`: topic taxonomy and keyword hints.
 - `github-interest-classifier.openai.schema.json`: OpenAI-compatible schema
@@ -50,17 +51,13 @@ Important files in that folder:
   artifacts.
 - `benchmark-runs/`: benchmark configs, summaries, and per-row results.
 
-Hugging Face upload staging for `dutifuldev/openclaw-classification-dataset`:
+The local dataset folder mirrors the public Hugging Face dataset layout:
 
-```text
-/home/bob/oc/openclaw-classification-dataset/hf-ds4-upload
-```
-
-That staging directory has these 742-line files:
-
-- `codex-batch.jsonl`: original dataset generated with Codex in batched mode.
-- `ds4.jsonl`: same rows plus `deepseek_localagent.output`.
+- `ds4.jsonl`: DS4-labeled view with top-level `topics_of_interest`,
+  `description`, and `caveats`.
 - `ds4-outputs.jsonl`: raw DS4 per-row output records.
+- `archive/codex-batch.jsonl`: archived Codex batched labels. These labels are
+  inaccurate and must not be used for benchmarking or training.
 - `regression-set.json`, `row.schema.json`, `topic_keywords.json`.
 
 Prompt inventory:
@@ -95,19 +92,23 @@ Remote prompt provenance:
 - Final Localpager/Gemma production prompt:
   <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompts/localpager-openclaw-routing-v8-production.prompt.md>
 - Full-dataset prompt comparison:
-  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/prompt-experiments/ds4-precision/full-638-20260601-093700/comparison-note.md>
+  <https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/tree/main/prompt-experiments/ds4-precision>
 
 ## Dataset Lineage
 
-The dataset had two layers.
+The dataset has two public views.
 
-First, there was an original 638-row dataset produced with Codex in batched
-mode. That became `seed.jsonl` locally and `codex-batch.jsonl` in the upload
-staging directory.
+The original label view was produced with Codex in batched mode. Those labels
+are now archived as `archive/seed-old.jsonl` and
+`archive/codex-batch.jsonl`. They are kept only for lineage and auditability;
+they are inaccurate and must not be used for benchmarking or training.
 
-Second, every row was reclassified through a fully local DS4 run. Those DS4
-outputs were not used to delete the original labels. They were attached as a new
-field:
+The DS4 label view reclassifies the same GitHub items through a fully local DS4
+run. The current public `ds4.jsonl` promotes the DS4 output to top-level
+`topics_of_interest`, `description`, and `caveats`.
+
+Raw DS4 run output is kept separately in `ds4-outputs.jsonl`. Older local
+experiment files used a nested field shaped like this:
 
 ```json
 {
@@ -137,7 +138,7 @@ DS4 output is the topic set and the short explanation/caveats; `interest` and
 
 The DS4 upload naming was deliberately generic:
 
-- original batched dataset: `codex-batch.jsonl`
+- archived original batched dataset: `archive/codex-batch.jsonl`
 - DS4-augmented dataset: `ds4.jsonl`
 - raw DS4 outputs: `ds4-outputs.jsonl`
 
@@ -151,7 +152,7 @@ Recorded config:
 
 ```json
 {
-  "input_path": "/home/bob/oc/openclaw-classification-dataset/seed.jsonl",
+  "input_path": "/home/bob/oc/openclaw-classification-dataset/archive/seed-old.jsonl",
   "output_dir": "/home/bob/oc/openclaw-classification-dataset/deepseek-localagent",
   "schema_path": "/home/bob/clawd-notifier-impl/schemas/github-interest-classifier.schema.json",
   "policy_path": "/home/bob/clawd-notifier-impl/skills/openclaw-maintainer/github-classifier-policy.md",
@@ -178,9 +179,6 @@ Final progress:
 {
   "startedAt": "2026-05-29T01:40:37.742Z",
   "updatedAt": "2026-05-29T13:51:48.011Z",
-  "totalRows": 638,
-  "selectedRows": 638,
-  "completedRows": 638,
   "errorRows": 0,
   "done": true,
   "model": "deepseek-v4-pro",
@@ -290,7 +288,7 @@ not act like a hidden instruction.
 
 Prompt recovery details:
 
-- 638 runtime prompts were recovered from saved localagent session transcripts.
+- Runtime prompts were recovered from saved localagent session transcripts.
 - runtime prompt JSONL SHA-256:
   `7dadd6a48b26dddc806eb544711b8f4c552054c814b2ac6107e93d53055d8ff4`
 - first sample prompt SHA-256:
@@ -312,7 +310,7 @@ codex: codex CLI with model gpt-5.5
 Default benchmark settings:
 
 - sample: `regression`
-- limit: 80, but the regression manifest had 30 rows
+- limit: 80
 - max tokens: 768
 - temperature: 0
 - concurrency: 1
@@ -335,7 +333,7 @@ For DS4-as-ground-truth scoring, the benchmark used:
 
 ```bash
 node /home/bob/oc/openclaw-classification-dataset/benchmark_model_comparison.mjs \
-  --dataset-file /home/bob/oc/openclaw-classification-dataset/hf-ds4-upload/ds4.jsonl \
+  --dataset-file /home/bob/oc/openclaw-classification-dataset/ds4.jsonl \
   --expected-source ds4 \
   --models gemma \
   --sample regression
@@ -363,8 +361,8 @@ The practical rule was to use concurrency 1 for repeatable scoring.
 
 ## Initial Regression Benchmark
 
-The initial model comparison used the original 638-row dataset and the 30-row
-regression sample.
+The initial model comparison used the original dataset and the regression
+sample.
 
 Run directory:
 
@@ -402,10 +400,8 @@ Config highlights:
 
 ```json
 {
-  "dataset_file": "/home/bob/oc/openclaw-classification-dataset/hf-ds4-upload/ds4.jsonl",
+  "dataset_file": "/home/bob/oc/openclaw-classification-dataset/ds4.jsonl",
   "expected_source": "ds4",
-  "row_count_total": 638,
-  "row_count_evaluated": 30,
   "sample": "regression",
   "models": [
     {
@@ -708,7 +704,7 @@ The useful parts to preserve in Localpager documentation and future scripts are:
 - the full local-only generation config
 - the exact prompt snapshot
 - the recovered runtime prompts
-- the 638-row completion and 0-error status
+- the completion and 0-error status
 - the DS4 output JSONL separate from the DS4-augmented dataset
 - benchmark configs and summaries
 - per-row largest misses
