@@ -5,6 +5,7 @@ import { resolveLocalModel } from "../llm/openai.js";
 import { writeRuntimeConfig } from "../pi/config.js";
 import type { RuntimeConfig } from "../pi/config.js";
 import { createLaunchPlan, execLaunchPlan } from "../pi/launch.js";
+import { promptForwardedArgs } from "../prompts/template.js";
 import { createReposhellRuntime } from "../reposhell/bash-extension.js";
 import type { ReposhellRuntime } from "../reposhell/bash-extension.js";
 import {
@@ -29,14 +30,18 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
       return ok(statusOutput(options, resolved, runtimeConfig));
     }
 
+    const runOptions = {
+      ...options,
+      forwardedArgs: await promptForwardedArgs(options)
+    };
     const finalSchemaRuntime =
-      options.finalSchemaPath === undefined
+      runOptions.finalSchemaPath === undefined
         ? undefined
-        : await createFinalSchemaRuntime(options.finalSchemaPath, options.stateDir);
-    const reposhellRuntime = await createReposhellRuntime(options);
+        : await createFinalSchemaRuntime(runOptions.finalSchemaPath, runOptions.stateDir);
+    const reposhellRuntime = await createReposhellRuntime(runOptions);
     const startedAtMs = Date.now();
     const plan = await createLaunchPlan(
-      options,
+      runOptions,
       runtimeConfig,
       resolved.model,
       finalSchemaRuntime,
@@ -48,7 +53,7 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
     }
     return await readFinalSchemaResult(
       plan.finalSchemaOutputPath,
-      options,
+      runOptions,
       runtimeConfig,
       resolved.model,
       finalSchemaRuntime,

@@ -1,0 +1,5 @@
+{
+  "criterion": "The item is release-blocking.",
+  "item": "The release candidate crashes during startup on a clean install.",
+  "guidance": "Prefer a conservative label when the supplied item lacks enough evidence."
+}

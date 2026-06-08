@@ -70,11 +70,47 @@ Point at a different OpenAI-compatible local server:
 localpager-agent --base-url http://127.0.0.1:8000/v1 -p "review the src directory"
 ```
 
+Render a maintained prompt template instead of passing the prompt inline:
+
+```bash
+localpager-agent \
+  --prompt-template ./examples/prompts/binary-classifier.hbs \
+  --prompt-vars-file ./examples/prompts/binary-classifier.vars.json
+```
+
 Pass a Pi flag that localpager-agent also owns after `--`:
 
 ```bash
 localpager-agent --model gemma-4-e4b-it -- --model some-pi-level-value
 ```
+
+## Prompt Templates
+
+Use `--prompt-template <path>` when a workflow needs a maintained prompt file
+instead of ad hoc inline text. Localpager Agent renders the template, then passes
+the rendered prompt to Pi as `-p <rendered prompt>`.
+
+Template variables come from JSON object files and optional inline overrides:
+
+```bash
+localpager-agent \
+  --prompt-template ./examples/prompts/binary-classifier.hbs \
+  --prompt-vars-file ./examples/prompts/binary-classifier.vars.json \
+  --prompt-var criterion="The item is a release blocker" \
+  --write-rendered-prompt /tmp/localpager-rendered.prompt.txt
+```
+
+Supported template syntax is intentionally small:
+
+- `{{name}}` and `{{{name}}}` insert a variable value.
+- Non-string JSON values are rendered with `JSON.stringify(value, null, 2)`.
+- `{{#if name}}...{{/if}}` includes a block when the variable is truthy.
+- Missing required variables fail the run.
+
+`--prompt-vars-file` can be repeated. Later files override earlier files, and
+`--prompt-var key=value` overrides file values. `--prompt-template` cannot be
+combined with Pi `-p` or `--print`, because the template itself supplies the Pi
+print prompt.
 
 ## Structured Output
 
@@ -85,7 +121,10 @@ See [docs/structured-output.md](docs/structured-output.md).
 Example:
 
 ```bash
-localpager-agent --final-schema ./examples/schemas/binary-classifier.schema.json -p "classify whether this issue is release-blocking: <text>"
+localpager-agent \
+  --final-schema ./examples/schemas/binary-classifier.schema.json \
+  --prompt-template ./examples/prompts/binary-classifier.hbs \
+  --prompt-vars-file ./examples/prompts/binary-classifier.vars.json
 ```
 
 ## Options
@@ -103,6 +142,10 @@ localpager-agent --final-schema ./examples/schemas/binary-classifier.schema.json
 - `--timeout-ms <n>`: `/v1/models` probe timeout. Default: `3000`
 - `--final-schema <path>`: force the final answer through a JSON schema; requires Pi print mode (`-p` or `--print`)
 - `--schema <path>`: alias for `--final-schema`
+- `--prompt-template <path>`: render a maintained prompt template and pass it to Pi print mode
+- `--prompt-vars-file <path>`: JSON object variables for `--prompt-template`; repeatable
+- `--prompt-var <key=value>`: inline template variable override; repeatable
+- `--write-rendered-prompt <path>`: write the rendered prompt text for audit/debugging
 
 ## Environment
 
@@ -117,6 +160,9 @@ localpager-agent --final-schema ./examples/schemas/binary-classifier.schema.json
 - `LOCALPAGER_AGENT_MAX_TOKENS`
 - `LOCALPAGER_AGENT_TIMEOUT_MS`
 - `LOCALPAGER_AGENT_FINAL_SCHEMA`
+- `LOCALPAGER_AGENT_PROMPT_TEMPLATE`
+- `LOCALPAGER_AGENT_PROMPT_VARS_FILE`
+- `LOCALPAGER_AGENT_WRITE_RENDERED_PROMPT`
 
 ## Development
 

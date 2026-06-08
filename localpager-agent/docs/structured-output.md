@@ -31,6 +31,15 @@ Alias:
 localpager-agent --schema ./examples/schemas/binary-classifier.schema.json -p "classify whether this issue is release-blocking: <text>"
 ```
 
+For maintained prompts, use a prompt template instead of inline `-p` text:
+
+```bash
+localpager-agent \
+  --final-schema ./examples/schemas/binary-classifier.schema.json \
+  --prompt-template ./examples/prompts/binary-classifier.hbs \
+  --prompt-vars-file ./examples/prompts/binary-classifier.vars.json
+```
+
 You can also set a default schema with:
 
 ```bash
@@ -55,7 +64,7 @@ bash,final_json
 
 `--final-schema` cannot be used with `--no-tools`, because the final JSON is submitted through a Pi tool.
 
-`--final-schema` also requires Pi print mode (`-p` or `--print`). Localpager Agent suppresses Pi's normal stdout during schema runs so it can print only the captured JSON, which is not compatible with Pi's interactive terminal UI.
+`--final-schema` also requires Pi print mode (`-p`, `--print`, or `--prompt-template`). Localpager Agent suppresses Pi's normal stdout during schema runs so it can print only the captured JSON, which is not compatible with Pi's interactive terminal UI.
 
 ## Example Schema
 

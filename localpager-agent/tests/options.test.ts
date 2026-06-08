@@ -30,6 +30,26 @@ describe("localpager-agent option parsing", () => {
     );
   });
 
+  it("parses prompt template flags as localpager-agent options", () => {
+    const options = parseLocalpagerAgentArgs([
+      "--prompt-template",
+      "prompts/classifier.hbs",
+      "--prompt-vars-file",
+      "base-vars.json",
+      "--prompt-vars-file",
+      "row-vars.json",
+      "--prompt-var",
+      "title=Fix LM Studio streaming",
+      "--write-rendered-prompt",
+      "/tmp/rendered.prompt.txt"
+    ]);
+
+    expect(options.promptTemplatePath).toBe("prompts/classifier.hbs");
+    expect(options.promptVarsPaths).toEqual(["base-vars.json", "row-vars.json"]);
+    expect(options.promptVars).toEqual(["title=Fix LM Studio streaming"]);
+    expect(options.renderedPromptPath).toBe("/tmp/rendered.prompt.txt");
+  });
+
   it("parses reposhell flags as localpager-agent options", () => {
     const options = parseLocalpagerAgentArgs([
       "--reposhell-socket",

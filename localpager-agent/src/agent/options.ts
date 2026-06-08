@@ -14,6 +14,10 @@ export type LocalpagerAgentOptions = {
   readonly maxTokens: number;
   readonly timeoutMs: number;
   readonly finalSchemaPath: string | undefined;
+  readonly promptTemplatePath: string | undefined;
+  readonly promptVarsPaths: readonly string[];
+  readonly promptVars: readonly string[];
+  readonly renderedPromptPath: string | undefined;
   readonly reposhellSocket: string | undefined;
   readonly reposhellDefaultRepo: string | undefined;
   readonly reposhellVisibleRepos: readonly string[];
@@ -42,6 +46,10 @@ export function defaultOptions(): LocalpagerAgentOptions {
     maxTokens: envPositiveInteger("LOCALPAGER_AGENT_MAX_TOKENS", "8192"),
     timeoutMs: envPositiveInteger("LOCALPAGER_AGENT_TIMEOUT_MS", "3000"),
     finalSchemaPath: process.env["LOCALPAGER_AGENT_FINAL_SCHEMA"],
+    promptTemplatePath: process.env["LOCALPAGER_AGENT_PROMPT_TEMPLATE"],
+    promptVarsPaths: splitCSV(process.env["LOCALPAGER_AGENT_PROMPT_VARS_FILE"] ?? ""),
+    promptVars: [],
+    renderedPromptPath: process.env["LOCALPAGER_AGENT_WRITE_RENDERED_PROMPT"],
     reposhellSocket: process.env["LOCALPAGER_REPOSHELL_SOCKET"],
     reposhellDefaultRepo: process.env["LOCALPAGER_REPOSHELL_DEFAULT_REPO"],
     reposhellVisibleRepos: splitCSV(process.env["LOCALPAGER_REPOSHELL_VISIBLE_REPOS"] ?? ""),
@@ -97,6 +105,12 @@ export function usage(): string {
     "  --timeout-ms <n>          /v1/models probe timeout",
     "  --final-schema <path>     force final schema output; requires Pi -p/--print",
     "  --schema <path>           alias for --final-schema",
+    "  --prompt-template <path>  render a prompt template and pass it to Pi print mode",
+    "  --prompt-vars-file <path>",
+    "                            JSON object variables for --prompt-template; repeatable",
+    "  --prompt-var <key=value>  inline template variable override; repeatable",
+    "  --write-rendered-prompt <path>",
+    "                            write rendered prompt text for audit/debugging",
     "  --reposhell-socket <p>  Unix socket for Localpager read-only bash",
     "  --reposhell-default-repo <id>",
     "                            default repo id for read-only bash",
@@ -147,6 +161,19 @@ const valueFlagUpdaters: Readonly<Record<string, OptionUpdater>> = {
   "--timeout-ms": (options, value) => ({ ...options, timeoutMs: parsePositiveInteger(value) }),
   "--final-schema": (options, value) => ({ ...options, finalSchemaPath: value }),
   "--schema": (options, value) => ({ ...options, finalSchemaPath: value }),
+  "--prompt-template": (options, value) => ({ ...options, promptTemplatePath: value }),
+  "--prompt-vars-file": (options, value) => ({
+    ...options,
+    promptVarsPaths: [...options.promptVarsPaths, value]
+  }),
+  "--prompt-var": (options, value) => ({
+    ...options,
+    promptVars: [...options.promptVars, value]
+  }),
+  "--write-rendered-prompt": (options, value) => ({
+    ...options,
+    renderedPromptPath: value
+  }),
   "--reposhell-socket": (options, value) => ({ ...options, reposhellSocket: value }),
   "--reposhell-default-repo": (options, value) => ({
     ...options,
