@@ -4,6 +4,7 @@ import { mkdir } from "node:fs/promises";
 
 import type { LocalpagerAgentOptions } from "../agent/options.js";
 import type { ReposhellRuntime } from "../reposhell/bash-extension.js";
+import type { SamplingRuntime } from "../sampling/request-extension.js";
 import type { FinalSchemaRuntime } from "../structured/final-schema.js";
 import type { RuntimeConfig } from "./config.js";
 
@@ -19,13 +20,19 @@ export async function createLaunchPlan(
   runtimeConfig: RuntimeConfig,
   model: string,
   finalSchemaRuntime?: FinalSchemaRuntime,
-  reposhellRuntime?: ReposhellRuntime
+  reposhellRuntime?: ReposhellRuntime,
+  samplingRuntime?: SamplingRuntime
 ): Promise<LaunchPlan> {
   await mkdir(options.sessionDir, { recursive: true });
   const forwardedArgs =
     finalSchemaRuntime === undefined
-      ? plainOutputArgs(options.forwardedArgs, reposhellRuntime)
-      : structuredOutputArgs(options.forwardedArgs, finalSchemaRuntime, reposhellRuntime);
+      ? plainOutputArgs(options.forwardedArgs, reposhellRuntime, samplingRuntime)
+      : structuredOutputArgs(
+          options.forwardedArgs,
+          finalSchemaRuntime,
+          reposhellRuntime,
+          samplingRuntime
+        );
   return {
     command: options.piCommand,
     args: [
@@ -72,7 +79,8 @@ export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {
 function structuredOutputArgs(
   forwardedArgs: readonly string[],
   runtime: FinalSchemaRuntime,
-  reposhellRuntime: ReposhellRuntime | undefined
+  reposhellRuntime: ReposhellRuntime | undefined,
+  samplingRuntime: SamplingRuntime | undefined
 ): string[] {
   if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
     throw new Error("--final-schema cannot be used with --no-tools");
@@ -89,6 +97,7 @@ function structuredOutputArgs(
   });
   return [
     ...reposhellExtensionArgs(reposhellRuntime),
+    ...samplingExtensionArgs(samplingRuntime),
     "--extension",
     runtime.extensionPath,
     "--append-system-prompt",
@@ -99,16 +108,18 @@ function structuredOutputArgs(
 
 function plainOutputArgs(
   forwardedArgs: readonly string[],
-  reposhellRuntime: ReposhellRuntime | undefined
+  reposhellRuntime: ReposhellRuntime | undefined,
+  samplingRuntime: SamplingRuntime | undefined
 ): string[] {
   if (reposhellRuntime === undefined) {
-    return [...forwardedArgs];
+    return [...samplingExtensionArgs(samplingRuntime), ...forwardedArgs];
   }
   if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
     throw new Error("--reposhell-socket cannot be used with --no-tools");
   }
   return [
     ...reposhellExtensionArgs(reposhellRuntime),
+    ...samplingExtensionArgs(samplingRuntime),
     ...ensureAllowedTools(forwardedArgs, {
       reposhellEnabled: true,
       finalJsonRequired: false
@@ -120,6 +131,10 @@ function reposhellExtensionArgs(runtime: ReposhellRuntime | undefined): string[]
   return runtime === undefined
     ? []
     : ["--extension", runtime.extensionPath, "--append-system-prompt", runtime.instruction];
+}
+
+function samplingExtensionArgs(runtime: SamplingRuntime | undefined): string[] {
+  return runtime === undefined ? [] : ["--extension", runtime.extensionPath];
 }
 
 function hasRpcMode(args: readonly string[]): boolean {

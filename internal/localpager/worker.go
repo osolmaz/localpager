@@ -45,6 +45,11 @@ type WorkerOptions struct {
 	AgentBaseURL               string
 	AgentContextWindow         int
 	AgentMaxTokens             int
+	AgentTemperature           string
+	AgentTopP                  string
+	AgentSeed                  string
+	AgentPresencePenalty       string
+	AgentFrequencyPenalty      string
 	AgentTimeoutMS             int
 	ModelUnavailableRetryDelay time.Duration
 	DestinationRef             string

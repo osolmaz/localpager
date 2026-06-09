@@ -66,4 +66,48 @@ describe("localpager-agent option parsing", () => {
     expect(options.reposhellVisibleRepos).toEqual(["openclaw", "clawhub"]);
     expect(options.forwardedArgs).toEqual(["-p", "classify"]);
   });
+
+  it("parses OpenAI-compatible sampling flags as localpager-agent options", () => {
+    const options = parseLocalpagerAgentArgs([
+      "--temperature",
+      "0",
+      "--top-p",
+      "1",
+      "--seed",
+      "1234",
+      "--presence-penalty",
+      "0",
+      "--frequency-penalty",
+      "0",
+      "-p",
+      "classify"
+    ]);
+
+    expect(options.sampling).toEqual({
+      temperature: 0,
+      topP: 1,
+      seed: 1234,
+      presencePenalty: 0,
+      frequencyPenalty: 0
+    });
+    expect(options.forwardedArgs).toEqual(["-p", "classify"]);
+  });
+
+  it("rejects invalid sampling values before launching Pi", () => {
+    expect(() => parseLocalpagerAgentArgs(["--temperature", "3"])).toThrow(
+      "--temperature must be a number between 0 and 2"
+    );
+    expect(() => parseLocalpagerAgentArgs(["--top-p", "2"])).toThrow(
+      "--top-p must be a number between 0 and 1"
+    );
+    expect(() => parseLocalpagerAgentArgs(["--seed", "1.5"])).toThrow(
+      "--seed must be a non-negative integer"
+    );
+    expect(() => parseLocalpagerAgentArgs(["--presence-penalty", "3"])).toThrow(
+      "--presence-penalty must be a number between -2 and 2"
+    );
+    expect(() => parseLocalpagerAgentArgs(["--frequency-penalty", "-3"])).toThrow(
+      "--frequency-penalty must be a number between -2 and 2"
+    );
+  });
 });

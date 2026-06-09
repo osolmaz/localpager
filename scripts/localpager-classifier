@@ -13,7 +13,7 @@ reposhell_default_repo="${LOCALPAGER_REPOSHELL_DEFAULT_REPO:-}"
 reposhell_visible_repos="${LOCALPAGER_REPOSHELL_VISIBLE_REPOS:-}"
 
 if [[ $# -lt 1 ]]; then
-  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>] [--base-url <url>] [--context-window <n>] [--max-tokens <n>] [--timeout-ms <n>] [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>] [--github-context-file <path>] [--tools <list>] [--reposhell-socket <path>] [--reposhell-default-repo <id>] [--reposhell-visible-repos <list>]" >&2
+  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>] [--base-url <url>] [--context-window <n>] [--max-tokens <n>] [--temperature <n>] [--top-p <n>] [--seed <n>] [--presence-penalty <n>] [--frequency-penalty <n>] [--timeout-ms <n>] [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>] [--github-context-file <path>] [--tools <list>] [--reposhell-socket <path>] [--reposhell-default-repo <id>] [--reposhell-visible-repos <list>]" >&2
   exit 2
 fi
 
@@ -24,6 +24,11 @@ model="${LOCALPAGER_AGENT_MODEL:-auto}"
 base_url="${LOCALPAGER_AGENT_BASE_URL:-}"
 context_window="${LOCALPAGER_AGENT_CONTEXT_WINDOW:-}"
 max_tokens="${LOCALPAGER_AGENT_MAX_TOKENS:-}"
+temperature="${LOCALPAGER_AGENT_TEMPERATURE:-}"
+top_p="${LOCALPAGER_AGENT_TOP_P:-}"
+seed="${LOCALPAGER_AGENT_SEED:-}"
+presence_penalty="${LOCALPAGER_AGENT_PRESENCE_PENALTY:-}"
+frequency_penalty="${LOCALPAGER_AGENT_FREQUENCY_PENALTY:-}"
 timeout_ms="${LOCALPAGER_AGENT_TIMEOUT_MS:-}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -57,6 +62,46 @@ while [[ $# -gt 0 ]]; do
         exit 2
       fi
       max_tokens="$2"
+      shift 2
+      ;;
+    --temperature)
+      if [[ $# -lt 2 ]]; then
+        echo "--temperature requires a value" >&2
+        exit 2
+      fi
+      temperature="$2"
+      shift 2
+      ;;
+    --top-p)
+      if [[ $# -lt 2 ]]; then
+        echo "--top-p requires a value" >&2
+        exit 2
+      fi
+      top_p="$2"
+      shift 2
+      ;;
+    --seed)
+      if [[ $# -lt 2 ]]; then
+        echo "--seed requires a value" >&2
+        exit 2
+      fi
+      seed="$2"
+      shift 2
+      ;;
+    --presence-penalty)
+      if [[ $# -lt 2 ]]; then
+        echo "--presence-penalty requires a value" >&2
+        exit 2
+      fi
+      presence_penalty="$2"
+      shift 2
+      ;;
+    --frequency-penalty)
+      if [[ $# -lt 2 ]]; then
+        echo "--frequency-penalty requires a value" >&2
+        exit 2
+      fi
+      frequency_penalty="$2"
       shift 2
       ;;
     --timeout-ms)
@@ -234,6 +279,21 @@ if [[ -n "$context_window" ]]; then
 fi
 if [[ -n "$max_tokens" ]]; then
   agent_args+=(--max-tokens "$max_tokens")
+fi
+if [[ -n "$temperature" ]]; then
+  agent_args+=(--temperature "$temperature")
+fi
+if [[ -n "$top_p" ]]; then
+  agent_args+=(--top-p "$top_p")
+fi
+if [[ -n "$seed" ]]; then
+  agent_args+=(--seed "$seed")
+fi
+if [[ -n "$presence_penalty" ]]; then
+  agent_args+=(--presence-penalty "$presence_penalty")
+fi
+if [[ -n "$frequency_penalty" ]]; then
+  agent_args+=(--frequency-penalty "$frequency_penalty")
 fi
 if [[ -n "$timeout_ms" ]]; then
   agent_args+=(--timeout-ms "$timeout_ms")

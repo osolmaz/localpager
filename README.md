@@ -71,6 +71,11 @@ Notification policy is deployment config, not classifier logic:
     "agent_base_url": "http://127.0.0.1:1234/v1",
     "agent_context_window": 8192,
     "agent_max_tokens": 768,
+    "agent_temperature": 0,
+    "agent_top_p": 1,
+    "agent_seed": 1234,
+    "agent_presence_penalty": 0,
+    "agent_frequency_penalty": 0,
     "agent_timeout_ms": 5000,
     "model_unavailable_retry_delay": "5m",
     "notify_topics_any": ["local_models", "open_weight_models"]
@@ -179,6 +184,11 @@ LOCALPAGER_AGENT_BASE_URL
 LOCALPAGER_AGENT_MODEL
 LOCALPAGER_AGENT_CONTEXT_WINDOW
 LOCALPAGER_AGENT_MAX_TOKENS
+LOCALPAGER_AGENT_TEMPERATURE
+LOCALPAGER_AGENT_TOP_P
+LOCALPAGER_AGENT_SEED
+LOCALPAGER_AGENT_PRESENCE_PENALTY
+LOCALPAGER_AGENT_FREQUENCY_PENALTY
 LOCALPAGER_AGENT_TIMEOUT_MS
 LOCALPAGER_AGENT_STATE_DIR
 LOCALPAGER_AGENT_SESSION_DIR

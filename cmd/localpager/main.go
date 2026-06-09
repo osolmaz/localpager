@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -199,6 +200,11 @@ func runStatus(args []string) {
 	app.Printf(os.Stdout, "agent_base_url=%s\n", cfg.Worker.AgentBaseURL)
 	app.Printf(os.Stdout, "agent_context_window=%d\n", cfg.Worker.AgentContextWindow)
 	app.Printf(os.Stdout, "agent_max_tokens=%d\n", cfg.Worker.AgentMaxTokens)
+	app.Printf(os.Stdout, "agent_temperature=%s\n", optionalFloat(cfg.Worker.AgentTemperature))
+	app.Printf(os.Stdout, "agent_top_p=%s\n", optionalFloat(cfg.Worker.AgentTopP))
+	app.Printf(os.Stdout, "agent_seed=%s\n", optionalInt(cfg.Worker.AgentSeed))
+	app.Printf(os.Stdout, "agent_presence_penalty=%s\n", optionalFloat(cfg.Worker.AgentPresencePenalty))
+	app.Printf(os.Stdout, "agent_frequency_penalty=%s\n", optionalFloat(cfg.Worker.AgentFrequencyPenalty))
 	app.Printf(os.Stdout, "agent_timeout_ms=%d\n", cfg.Worker.AgentTimeoutMS)
 	app.Printf(os.Stdout, "model_unavailable_retry_delay=%s\n", cfg.Worker.ModelUnavailableRetryDelay)
 	app.Printf(os.Stdout, "classifier_schema=%s\n", cfg.Classifier.Schema)
@@ -235,6 +241,20 @@ func runTestDiscord(args []string) {
 		log.Fatal(err)
 	}
 	app.Printf(os.Stdout, "sent=true id=%s\n", id)
+}
+
+func optionalFloat(value *float64) string {
+	if value == nil {
+		return ""
+	}
+	return strconv.FormatFloat(*value, 'f', -1, 64)
+}
+
+func optionalInt(value *int) string {
+	if value == nil {
+		return ""
+	}
+	return strconv.Itoa(*value)
 }
 
 func runInstallService(args []string) {

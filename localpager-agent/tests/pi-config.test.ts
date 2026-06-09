@@ -80,6 +80,7 @@ function options(stateDir: string): LocalpagerAgentOptions {
     thinking: "off",
     contextWindow: undefined,
     maxTokens: 8192,
+    sampling: {},
     timeoutMs: 1000,
     finalSchemaPath: undefined,
     promptTemplatePath: undefined,

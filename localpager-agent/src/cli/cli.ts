@@ -8,6 +8,9 @@ import { createLaunchPlan, execLaunchPlan } from "../pi/launch.js";
 import { promptForwardedArgs } from "../prompts/template.js";
 import { createReposhellRuntime } from "../reposhell/bash-extension.js";
 import type { ReposhellRuntime } from "../reposhell/bash-extension.js";
+import { createSamplingRuntime } from "../sampling/request-extension.js";
+import type { SamplingRuntime } from "../sampling/request-extension.js";
+import { hasSamplingOptions, samplingRequestParams } from "../sampling/request-params.js";
 import {
   createFinalSchemaRuntime,
   isMissingFinalSchemaOutputError,
@@ -39,13 +42,15 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
         ? undefined
         : await createFinalSchemaRuntime(runOptions.finalSchemaPath, runOptions.stateDir);
     const reposhellRuntime = await createReposhellRuntime(runOptions);
+    const samplingRuntime = await createSamplingRuntime(runOptions.sampling, runOptions.stateDir);
     const startedAtMs = Date.now();
     const plan = await createLaunchPlan(
       runOptions,
       runtimeConfig,
       resolved.model,
       finalSchemaRuntime,
-      reposhellRuntime
+      reposhellRuntime,
+      samplingRuntime
     );
     const code = await execLaunchPlan(plan);
     if (code !== 0 || plan.finalSchemaOutputPath === undefined) {
@@ -58,6 +63,7 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
       resolved.model,
       finalSchemaRuntime,
       reposhellRuntime,
+      samplingRuntime,
       startedAtMs
     );
   } catch (error) {
@@ -78,6 +84,7 @@ async function readFinalSchemaResult(
   model: string,
   finalSchemaRuntime: FinalSchemaRuntime | undefined,
   reposhellRuntime: ReposhellRuntime | undefined,
+  samplingRuntime: SamplingRuntime | undefined,
   startedAtMs: number
 ): Promise<CommandResult> {
   try {
@@ -92,6 +99,7 @@ async function readFinalSchemaResult(
       model,
       finalSchemaRuntime,
       reposhellRuntime,
+      samplingRuntime,
       startedAtMs,
       outputPath
     );
@@ -104,6 +112,7 @@ async function recoverFinalSchemaResult(
   model: string,
   finalSchemaRuntime: FinalSchemaRuntime,
   reposhellRuntime: ReposhellRuntime | undefined,
+  samplingRuntime: SamplingRuntime | undefined,
   startedAtMs: number,
   outputPath: string
 ): Promise<CommandResult> {
@@ -123,7 +132,8 @@ async function recoverFinalSchemaResult(
     runtimeConfig,
     model,
     finalSchemaRuntime,
-    reposhellRuntime
+    reposhellRuntime,
+    samplingRuntime
   );
   const code = await execLaunchPlan(recoveryPlan);
   return code === 0
@@ -143,9 +153,16 @@ function statusOutput(
       `available models: ${resolved.availableModels.join(", ")}`,
       `context window: ${String(options.contextWindow ?? resolved.contextWindow ?? "unspecified")}`,
       `provider id: ${options.providerId}`,
+      `request params: ${requestParamsStatus(options)}`,
       `pi config dir: ${runtimeConfig.configDir}`,
       `session dir: ${options.sessionDir}`,
       `pi command: ${options.piCommand}`
     ].join("\n") + "\n"
   );
+}
+
+function requestParamsStatus(options: LocalpagerAgentOptions): string {
+  return hasSamplingOptions(options.sampling)
+    ? JSON.stringify(samplingRequestParams(options.sampling))
+    : "unspecified";
 }

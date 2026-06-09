@@ -60,6 +60,11 @@ does not depend on manually loaded local-model defaults:
     "agent_base_url": "http://127.0.0.1:1234/v1",
     "agent_context_window": 8192,
     "agent_max_tokens": 768,
+    "agent_temperature": 0,
+    "agent_top_p": 1,
+    "agent_seed": 1234,
+    "agent_presence_penalty": 0,
+    "agent_frequency_penalty": 0,
     "agent_timeout_ms": 5000,
     "model_unavailable_retry_delay": "5m"
   }
@@ -68,9 +73,10 @@ does not depend on manually loaded local-model defaults:
 
 Treat those numbers as deployment-specific. The configured
 `agent_context_window` should match the context length of the model currently
-loaded at `agent_base_url`, and `worker.max_concurrency` should be compatible
-with the model server's parallelism. For a concrete OpenClaw/Gemma deployment
-example, see
+loaded at `agent_base_url`, sampling fields should match the desired
+OpenAI-compatible request behavior, and `worker.max_concurrency` should be
+compatible with the model server's parallelism. For a concrete OpenClaw/Gemma
+deployment example, see
 [Onur's Isengard Setup](2026-06-02-onur-isengard-localpager-setup.md).
 
 ## Topic Taxonomy

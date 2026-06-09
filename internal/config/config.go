@@ -74,6 +74,11 @@ type Worker struct {
 	AgentBaseURL               string   `json:"agent_base_url"`
 	AgentContextWindow         int      `json:"agent_context_window"`
 	AgentMaxTokens             int      `json:"agent_max_tokens"`
+	AgentTemperature           *float64 `json:"agent_temperature"`
+	AgentTopP                  *float64 `json:"agent_top_p"`
+	AgentSeed                  *int     `json:"agent_seed"`
+	AgentPresencePenalty       *float64 `json:"agent_presence_penalty"`
+	AgentFrequencyPenalty      *float64 `json:"agent_frequency_penalty"`
 	AgentTimeoutMS             int      `json:"agent_timeout_ms"`
 	ModelUnavailableRetryDelay string   `json:"model_unavailable_retry_delay"`
 	DiscordChannelID           string   `json:"discord_channel_id"`

@@ -70,6 +70,19 @@ Point at a different OpenAI-compatible local server:
 localpager-agent --base-url http://127.0.0.1:8000/v1 -p "review the src directory"
 ```
 
+Pin OpenAI-compatible sampling request fields when a workflow needs repeatable
+local model runs:
+
+```bash
+localpager-agent \
+  --temperature 0 \
+  --top-p 1 \
+  --seed 1234 \
+  --presence-penalty 0 \
+  --frequency-penalty 0 \
+  -p "classify this item"
+```
+
 Render a maintained prompt template instead of passing the prompt inline:
 
 ```bash
@@ -139,6 +152,11 @@ localpager-agent \
 - `--thinking <level>`: Pi thinking level. Default: `off`
 - `--context-window <n>`: generated model context window override. By default, localpager-agent uses model metadata when the server reports it and otherwise leaves this unset.
 - `--max-tokens <n>`: generated model max output tokens. Default: `8192`
+- `--temperature <n>`: OpenAI-compatible request temperature, from `0` to `2`
+- `--top-p <n>`: OpenAI-compatible request `top_p`, from `0` to `1`
+- `--seed <n>`: OpenAI-compatible non-negative integer request seed
+- `--presence-penalty <n>`: OpenAI-compatible request `presence_penalty`, from `-2` to `2`
+- `--frequency-penalty <n>`: OpenAI-compatible request `frequency_penalty`, from `-2` to `2`
 - `--timeout-ms <n>`: `/v1/models` probe timeout. Default: `3000`
 - `--final-schema <path>`: force the final answer through a JSON schema; requires Pi print mode (`-p` or `--print`)
 - `--schema <path>`: alias for `--final-schema`
@@ -158,6 +176,11 @@ localpager-agent \
 - `LOCALPAGER_AGENT_THINKING`
 - `LOCALPAGER_AGENT_CONTEXT_WINDOW`
 - `LOCALPAGER_AGENT_MAX_TOKENS`
+- `LOCALPAGER_AGENT_TEMPERATURE`
+- `LOCALPAGER_AGENT_TOP_P`
+- `LOCALPAGER_AGENT_SEED`
+- `LOCALPAGER_AGENT_PRESENCE_PENALTY`
+- `LOCALPAGER_AGENT_FREQUENCY_PENALTY`
 - `LOCALPAGER_AGENT_TIMEOUT_MS`
 - `LOCALPAGER_AGENT_FINAL_SCHEMA`
 - `LOCALPAGER_AGENT_PROMPT_TEMPLATE`

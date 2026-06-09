@@ -9,6 +9,7 @@ import type { LocalpagerAgentOptions } from "../src/agent/options.js";
 import { run } from "../src/cli/cli.js";
 import type { RuntimeConfig } from "../src/pi/config.js";
 import { createLaunchPlan } from "../src/pi/launch.js";
+import { createSamplingRuntime } from "../src/sampling/request-extension.js";
 import { createFinalSchemaRuntime, readFinalSchemaOutput } from "../src/structured/final-schema.js";
 import { extractFinalJsonPayload, recoveryForwardedArgs } from "../src/structured/recovery.js";
 
@@ -228,6 +229,69 @@ describe("structured output", () => {
     ]);
   });
 
+  it("creates a request-params extension for sampling controls", async () => {
+    const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-sampling-"));
+    try {
+      const runtime = await createSamplingRuntime(
+        {
+          temperature: 0,
+          topP: 1,
+          seed: 1234,
+          presencePenalty: 0,
+          frequencyPenalty: 0
+        },
+        stateDir
+      );
+      expect(runtime?.requestParams).toEqual({
+        temperature: 0,
+        top_p: 1,
+        seed: 1234,
+        presence_penalty: 0,
+        frequency_penalty: 0
+      });
+      expect(runtime).toBeDefined();
+      if (runtime === undefined) {
+        throw new Error("sampling runtime was not created");
+      }
+      const source = await readFile(runtime.extensionPath, "utf8");
+      expect(source).toContain('"temperature": 0');
+      expect(source).toContain('"top_p": 1');
+      expect(source).toContain('"seed": 1234');
+      expect(source).toContain('"presence_penalty": 0');
+      expect(source).toContain('"frequency_penalty": 0');
+      expect(source).toContain('pi.on("before_provider_request"');
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+
+  it("adds sampling request params extension to Pi args", async () => {
+    const plan = await createLaunchPlan(
+      { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["-p", "classify"] },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it",
+      undefined,
+      undefined,
+      {
+        extensionPath: "/tmp/request-params-extension.ts",
+        requestParams: { temperature: 0, top_p: 1, seed: 1234 }
+      }
+    );
+
+    expect(plan.args).toEqual([
+      "--provider",
+      "local-openai",
+      "--model",
+      "gemma-4-e4b-it",
+      "--thinking",
+      "off",
+      "--extension",
+      "/tmp/request-params-extension.ts",
+      "-p",
+      "classify"
+    ]);
+  });
+
   it("rejects bash allowlist without reposhell extension", async () => {
     await expect(
       createLaunchPlan(
@@ -344,6 +408,7 @@ function options(stateDir: string): LocalpagerAgentOptions {
     thinking: "off",
     contextWindow: undefined,
     maxTokens: 8192,
+    sampling: {},
     timeoutMs: 1000,
     finalSchemaPath: undefined,
     promptTemplatePath: undefined,

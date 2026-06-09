@@ -77,6 +77,11 @@ func classifierCommandArgs(target string, opts WorkerOptions) []string {
 	args = appendStringFlag(args, "--base-url", opts.AgentBaseURL)
 	args = appendIntFlag(args, "--context-window", opts.AgentContextWindow)
 	args = appendIntFlag(args, "--max-tokens", opts.AgentMaxTokens)
+	args = appendStringFlag(args, "--temperature", opts.AgentTemperature)
+	args = appendStringFlag(args, "--top-p", opts.AgentTopP)
+	args = appendStringFlag(args, "--seed", opts.AgentSeed)
+	args = appendStringFlag(args, "--presence-penalty", opts.AgentPresencePenalty)
+	args = appendStringFlag(args, "--frequency-penalty", opts.AgentFrequencyPenalty)
 	args = appendIntFlag(args, "--timeout-ms", opts.AgentTimeoutMS)
 	return args
 }

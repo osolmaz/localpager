@@ -1,6 +1,8 @@
 import path from "node:path";
 
 import { normalizeBaseUrl } from "../llm/openai.js";
+import type { SamplingOptions } from "../sampling/request-params.js";
+import { samplingOptionsFromEntries } from "../sampling/request-params.js";
 
 export type LocalpagerAgentOptions = {
   readonly baseUrl: string;
@@ -12,6 +14,7 @@ export type LocalpagerAgentOptions = {
   readonly thinking: string;
   readonly contextWindow: number | undefined;
   readonly maxTokens: number;
+  readonly sampling: SamplingOptions;
   readonly timeoutMs: number;
   readonly finalSchemaPath: string | undefined;
   readonly promptTemplatePath: string | undefined;
@@ -44,6 +47,7 @@ export function defaultOptions(): LocalpagerAgentOptions {
     thinking: envString("LOCALPAGER_AGENT_THINKING", "off"),
     contextWindow: envOptionalPositiveInteger("LOCALPAGER_AGENT_CONTEXT_WINDOW"),
     maxTokens: envPositiveInteger("LOCALPAGER_AGENT_MAX_TOKENS", "8192"),
+    sampling: envSamplingOptions(),
     timeoutMs: envPositiveInteger("LOCALPAGER_AGENT_TIMEOUT_MS", "3000"),
     finalSchemaPath: process.env["LOCALPAGER_AGENT_FINAL_SCHEMA"],
     promptTemplatePath: process.env["LOCALPAGER_AGENT_PROMPT_TEMPLATE"],
@@ -102,6 +106,11 @@ export function usage(): string {
     "  --thinking <level>        Pi thinking level; default off",
     "  --context-window <n>      generated model context window",
     "  --max-tokens <n>          generated model max output tokens",
+    "  --temperature <n>         OpenAI-compatible request temperature",
+    "  --top-p <n>               OpenAI-compatible request top_p",
+    "  --seed <n>                OpenAI-compatible request seed",
+    "  --presence-penalty <n>    OpenAI-compatible request presence_penalty",
+    "  --frequency-penalty <n>   OpenAI-compatible request frequency_penalty",
     "  --timeout-ms <n>          /v1/models probe timeout",
     "  --final-schema <path>     force final schema output; requires Pi -p/--print",
     "  --schema <path>           alias for --final-schema",
@@ -158,6 +167,32 @@ const valueFlagUpdaters: Readonly<Record<string, OptionUpdater>> = {
     contextWindow: parsePositiveInteger(value)
   }),
   "--max-tokens": (options, value) => ({ ...options, maxTokens: parsePositiveInteger(value) }),
+  "--temperature": (options, value) => ({
+    ...options,
+    sampling: { ...options.sampling, temperature: parseBoundedNumber(value, "--temperature", 0, 2) }
+  }),
+  "--top-p": (options, value) => ({
+    ...options,
+    sampling: { ...options.sampling, topP: parseBoundedNumber(value, "--top-p", 0, 1) }
+  }),
+  "--seed": (options, value) => ({
+    ...options,
+    sampling: { ...options.sampling, seed: parseNonNegativeInteger(value, "--seed") }
+  }),
+  "--presence-penalty": (options, value) => ({
+    ...options,
+    sampling: {
+      ...options.sampling,
+      presencePenalty: parseBoundedNumber(value, "--presence-penalty", -2, 2)
+    }
+  }),
+  "--frequency-penalty": (options, value) => ({
+    ...options,
+    sampling: {
+      ...options.sampling,
+      frequencyPenalty: parseBoundedNumber(value, "--frequency-penalty", -2, 2)
+    }
+  }),
   "--timeout-ms": (options, value) => ({ ...options, timeoutMs: parsePositiveInteger(value) }),
   "--final-schema": (options, value) => ({ ...options, finalSchemaPath: value }),
   "--schema": (options, value) => ({ ...options, finalSchemaPath: value }),
@@ -211,6 +246,26 @@ function envOptionalPositiveInteger(name: string): number | undefined {
   return value === undefined ? undefined : parsePositiveInteger(value);
 }
 
+function envSamplingOptions(): SamplingOptions {
+  return samplingOptionsFromEntries({
+    temperature: envOptionalBoundedNumber("LOCALPAGER_AGENT_TEMPERATURE", 0, 2),
+    topP: envOptionalBoundedNumber("LOCALPAGER_AGENT_TOP_P", 0, 1),
+    seed: envOptionalNonNegativeInteger("LOCALPAGER_AGENT_SEED"),
+    presencePenalty: envOptionalBoundedNumber("LOCALPAGER_AGENT_PRESENCE_PENALTY", -2, 2),
+    frequencyPenalty: envOptionalBoundedNumber("LOCALPAGER_AGENT_FREQUENCY_PENALTY", -2, 2)
+  });
+}
+
+function envOptionalBoundedNumber(name: string, min: number, max: number): number | undefined {
+  const value = process.env[name];
+  return value === undefined ? undefined : parseBoundedNumber(value, name, min, max);
+}
+
+function envOptionalNonNegativeInteger(name: string): number | undefined {
+  const value = process.env[name];
+  return value === undefined ? undefined : parseNonNegativeInteger(value, name);
+}
+
 function defaultSessionDir(stateDir: string): string {
   return envString(
     "LOCALPAGER_AGENT_SESSION_DIR",
@@ -231,6 +286,27 @@ function parsePositiveInteger(value: string): number {
     throw new Error(`expected a positive integer, got ${value}`);
   }
   return Number.parseInt(value, 10);
+}
+
+function parseNonNegativeInteger(value: string, label: string): number {
+  if (!/^(0|[1-9]\d*)$/u.test(value)) {
+    throw new Error(`${label} must be a non-negative integer, got ${value}`);
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error(`${label} must be a safe integer, got ${value}`);
+  }
+  return parsed;
+}
+
+function parseBoundedNumber(value: string, label: string, min: number, max: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+    throw new Error(
+      `${label} must be a number between ${String(min)} and ${String(max)}, got ${value}`
+    );
+  }
+  return parsed;
 }
 
 function splitCSV(value: string): string[] {

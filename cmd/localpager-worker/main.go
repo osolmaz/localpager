@@ -5,6 +5,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/osolmaz/localpager/internal/app"
@@ -36,6 +37,11 @@ func main() {
 	flag.StringVar(&flags.agentBaseURL, "agent-base-url", "", "localpager-agent OpenAI-compatible base URL")
 	flag.IntVar(&flags.agentContextWindow, "agent-context-window", 0, "localpager-agent model context window")
 	flag.IntVar(&flags.agentMaxTokens, "agent-max-tokens", 0, "localpager-agent max output tokens")
+	flag.StringVar(&flags.agentTemperature, "agent-temperature", "", "localpager-agent OpenAI-compatible request temperature")
+	flag.StringVar(&flags.agentTopP, "agent-top-p", "", "localpager-agent OpenAI-compatible request top_p")
+	flag.StringVar(&flags.agentSeed, "agent-seed", "", "localpager-agent OpenAI-compatible request seed")
+	flag.StringVar(&flags.agentPresencePenalty, "agent-presence-penalty", "", "localpager-agent OpenAI-compatible request presence_penalty")
+	flag.StringVar(&flags.agentFrequencyPenalty, "agent-frequency-penalty", "", "localpager-agent OpenAI-compatible request frequency_penalty")
 	flag.IntVar(&flags.agentTimeoutMS, "agent-timeout-ms", 0, "localpager-agent model probe timeout in milliseconds")
 	flag.StringVar(&flags.modelUnavailableRetryDelay, "model-unavailable-retry-delay", "5m", "retry delay for transient model endpoint failures")
 	flag.StringVar(&flags.discordChannelID, "discord-channel-id", os.Getenv("DISCORD_CHANNEL_ID"), "Discord channel for notifications")
@@ -93,6 +99,11 @@ func main() {
 		AgentBaseURL:               flags.agentBaseURL,
 		AgentContextWindow:         flags.agentContextWindow,
 		AgentMaxTokens:             flags.agentMaxTokens,
+		AgentTemperature:           flags.agentTemperature,
+		AgentTopP:                  flags.agentTopP,
+		AgentSeed:                  flags.agentSeed,
+		AgentPresencePenalty:       flags.agentPresencePenalty,
+		AgentFrequencyPenalty:      flags.agentFrequencyPenalty,
 		AgentTimeoutMS:             flags.agentTimeoutMS,
 		ModelUnavailableRetryDelay: modelUnavailableRetryDelay,
 		DestinationRef:             flags.discordChannelID,
@@ -139,6 +150,11 @@ type workerFlags struct {
 	agentBaseURL               string
 	agentContextWindow         int
 	agentMaxTokens             int
+	agentTemperature           string
+	agentTopP                  string
+	agentSeed                  string
+	agentPresencePenalty       string
+	agentFrequencyPenalty      string
 	agentTimeoutMS             int
 	modelUnavailableRetryDelay string
 	discordChannelID           string
@@ -216,21 +232,17 @@ func (flags *workerFlags) applyClassifierToolConfig(cfg config.Config, setFlags 
 }
 
 func (flags *workerFlags) applyAgentConfig(cfg config.Config, setFlags map[string]bool) {
-	if cfg.Worker.AgentBaseURL != "" && !config.FlagSet(setFlags, "agent-base-url") {
-		flags.agentBaseURL = cfg.Worker.AgentBaseURL
-	}
-	if cfg.Worker.AgentContextWindow != 0 && !config.FlagSet(setFlags, "agent-context-window") {
-		flags.agentContextWindow = cfg.Worker.AgentContextWindow
-	}
-	if cfg.Worker.AgentMaxTokens != 0 && !config.FlagSet(setFlags, "agent-max-tokens") {
-		flags.agentMaxTokens = cfg.Worker.AgentMaxTokens
-	}
-	if cfg.Worker.AgentTimeoutMS != 0 && !config.FlagSet(setFlags, "agent-timeout-ms") {
-		flags.agentTimeoutMS = cfg.Worker.AgentTimeoutMS
-	}
-	if cfg.Worker.ModelUnavailableRetryDelay != "" && !config.FlagSet(setFlags, "model-unavailable-retry-delay") {
-		flags.modelUnavailableRetryDelay = cfg.Worker.ModelUnavailableRetryDelay
-	}
+	worker := cfg.Worker
+	applyConfigValue(&flags.agentBaseURL, worker.AgentBaseURL, "", setFlags, "agent-base-url")
+	applyConfigValue(&flags.agentContextWindow, worker.AgentContextWindow, 0, setFlags, "agent-context-window")
+	applyConfigValue(&flags.agentMaxTokens, worker.AgentMaxTokens, 0, setFlags, "agent-max-tokens")
+	applyPointerConfigValue(&flags.agentTemperature, worker.AgentTemperature, formatFloat, setFlags, "agent-temperature")
+	applyPointerConfigValue(&flags.agentTopP, worker.AgentTopP, formatFloat, setFlags, "agent-top-p")
+	applyPointerConfigValue(&flags.agentSeed, worker.AgentSeed, formatInt, setFlags, "agent-seed")
+	applyPointerConfigValue(&flags.agentPresencePenalty, worker.AgentPresencePenalty, formatFloat, setFlags, "agent-presence-penalty")
+	applyPointerConfigValue(&flags.agentFrequencyPenalty, worker.AgentFrequencyPenalty, formatFloat, setFlags, "agent-frequency-penalty")
+	applyConfigValue(&flags.agentTimeoutMS, worker.AgentTimeoutMS, 0, setFlags, "agent-timeout-ms")
+	applyConfigValue(&flags.modelUnavailableRetryDelay, worker.ModelUnavailableRetryDelay, "", setFlags, "model-unavailable-retry-delay")
 }
 
 func (flags *workerFlags) applyDiscordConfig(cfg config.Config, setFlags map[string]bool) {
@@ -256,4 +268,24 @@ func (flags *workerFlags) applyDiscordConfig(cfg config.Config, setFlags map[str
 
 func (flags *workerFlags) applyGitHubConfig(cfg config.Config, setFlags map[string]bool) {
 	app.ApplyGitHubConfig(&flags.githubBaseURL, &flags.githubTokenEnv, cfg, setFlags)
+}
+
+func applyConfigValue[T comparable](target *T, value T, zero T, setFlags map[string]bool, flagName string) {
+	if value != zero && !config.FlagSet(setFlags, flagName) {
+		*target = value
+	}
+}
+
+func applyPointerConfigValue[T any](target *string, value *T, format func(T) string, setFlags map[string]bool, flagName string) {
+	if value != nil && !config.FlagSet(setFlags, flagName) {
+		*target = format(*value)
+	}
+}
+
+func formatFloat(value float64) string {
+	return strconv.FormatFloat(value, 'f', -1, 64)
+}
+
+func formatInt(value int) string {
+	return strconv.Itoa(value)
 }
