@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { LocalpagerAgentOptions } from "../agent/options.js";
@@ -18,10 +18,14 @@ export async function writeRuntimeConfig(
   await mkdir(configDir, { recursive: true });
   const modelsPath = path.join(configDir, "models.json");
   const settingsPath = path.join(configDir, "settings.json");
-  await writeFile(
-    modelsPath,
-    `${JSON.stringify(modelsConfig(options, model, discoveredContextWindow), null, 2)}\n`
-  );
+  if (options.backend === "openai-compatible") {
+    await writeFile(
+      modelsPath,
+      `${JSON.stringify(modelsConfig(options, model, discoveredContextWindow), null, 2)}\n`
+    );
+  } else {
+    await rm(modelsPath, { force: true });
+  }
   await writeFile(
     settingsPath,
     `${JSON.stringify(settingsConfig(options, model, discoveredContextWindow), null, 2)}\n`

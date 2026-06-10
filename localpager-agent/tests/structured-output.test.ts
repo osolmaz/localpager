@@ -399,6 +399,7 @@ function classificationSchema(): unknown {
 
 function options(stateDir: string): LocalpagerAgentOptions {
   return {
+    backend: "openai-compatible",
     baseUrl: "http://127.0.0.1:1234/v1",
     model: "auto",
     providerId: "local-openai",

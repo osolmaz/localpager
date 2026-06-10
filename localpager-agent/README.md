@@ -1,8 +1,12 @@
 # localpager-agent
 
-Localpager Agent is Pi with the model wiring prefilled for a local OpenAI-compatible endpoint.
+Localpager Agent is Pi with model wiring prefilled for either an
+OpenAI-compatible endpoint or a Pi built-in provider.
 
-It does not know about any project-specific workflow. It discovers the local model, writes a temporary Pi config under local state, and forwards the rest of the command line to Pi.
+It does not know about any project-specific workflow. For OpenAI-compatible
+endpoints, it discovers the model, writes a temporary Pi config under local
+state, and forwards the rest of the command line to Pi. For Pi built-in
+providers, it leaves Pi's model registry and auth storage in control.
 
 ## Install
 
@@ -69,6 +73,32 @@ Point at a different OpenAI-compatible local server:
 ```bash
 localpager-agent --base-url http://127.0.0.1:8000/v1 -p "review the src directory"
 ```
+
+Use a Pi built-in provider, such as the ChatGPT/Codex subscription-backed
+`openai-codex` provider:
+
+```bash
+localpager-agent \
+  --backend pi-builtin \
+  --model openai-codex/gpt-5.3-codex-spark \
+  --thinking minimal \
+  -p "classify this item"
+```
+
+Equivalent explicit provider form:
+
+```bash
+localpager-agent \
+  --backend pi-builtin \
+  --provider-id openai-codex \
+  --model gpt-5.3-codex-spark \
+  --thinking minimal \
+  -p "classify this item"
+```
+
+Pi must already have credentials for that provider in the selected
+`PI_CODING_AGENT_DIR`; use Pi's `/login` flow once if the provider is not
+configured.
 
 Pin OpenAI-compatible sampling request fields when a workflow needs repeatable
 local model runs:
@@ -142,10 +172,11 @@ localpager-agent \
 
 ## Options
 
-- `--base-url <url>`: local OpenAI-compatible endpoint. Default: `http://127.0.0.1:1234/v1`
-- `--model <id|auto>`: model id. Default: `auto`, meaning first id returned by `/v1/models`
+- `--backend <openai-compatible|pi-builtin>`: backend wiring mode. Default: `openai-compatible`
+- `--base-url <url>`: OpenAI-compatible endpoint for the `openai-compatible` backend. Default: `http://127.0.0.1:1234/v1`
+- `--model <id|auto>`: model id. Default: `auto`, meaning first id returned by `/v1/models` for the `openai-compatible` backend. The `pi-builtin` backend requires an explicit model and accepts `provider/model` shorthand.
 - `--status`: print model/config status and exit
-- `--provider-id <id>`: generated Pi provider id. Default: `local-openai`
+- `--provider-id <id>`: generated Pi provider id for `openai-compatible`, or Pi built-in provider id for `pi-builtin`. Default: `local-openai`
 - `--state-dir <path>`: runtime state directory. Default: `~/.local/state/localpager-agent`
 - `--session-dir <path>`: Pi session directory. Default: `<state-dir>/sessions`
 - `--pi-command <command>`: Pi launch command. Default: `npx -y @earendil-works/pi-coding-agent@latest`
@@ -168,6 +199,7 @@ localpager-agent \
 ## Environment
 
 - `LOCALPAGER_AGENT_BASE_URL`
+- `LOCALPAGER_AGENT_BACKEND`
 - `LOCALPAGER_AGENT_MODEL`
 - `LOCALPAGER_AGENT_PROVIDER_ID`
 - `LOCALPAGER_AGENT_STATE_DIR`
