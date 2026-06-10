@@ -26,16 +26,21 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
       return ok(usage());
     }
 
-    const resolved = await resolveLocalModel(options.baseUrl, options.model, options.timeoutMs);
-    const runtimeConfig = await writeRuntimeConfig(options, resolved.model, resolved.contextWindow);
+    const resolved = await resolveModel(options);
+    const resolvedOptions = { ...options, providerId: resolved.providerId };
+    const runtimeConfig = await writeRuntimeConfig(
+      resolvedOptions,
+      resolved.model,
+      resolved.contextWindow
+    );
 
-    if (options.status) {
-      return ok(statusOutput(options, resolved, runtimeConfig));
+    if (resolvedOptions.status) {
+      return ok(statusOutput(resolvedOptions, resolved, runtimeConfig));
     }
 
     const runOptions = {
-      ...options,
-      forwardedArgs: await promptForwardedArgs(options)
+      ...resolvedOptions,
+      forwardedArgs: await promptForwardedArgs(resolvedOptions)
     };
     const finalSchemaRuntime =
       runOptions.finalSchemaPath === undefined
@@ -73,9 +78,62 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
 
 type ResolvedModel = {
   readonly model: string;
+  readonly providerId: string;
   readonly availableModels: readonly string[];
   readonly contextWindow?: number;
 };
+
+async function resolveModel(options: LocalpagerAgentOptions): Promise<ResolvedModel> {
+  if (options.backend === "openai-compatible") {
+    const resolved = await resolveLocalModel(options.baseUrl, options.model, options.timeoutMs);
+    return { ...resolved, providerId: options.providerId };
+  }
+  return resolvePiBuiltinModel(options);
+}
+
+function resolvePiBuiltinModel(options: LocalpagerAgentOptions): ResolvedModel {
+  if (options.model === "auto") {
+    throw new Error("pi-builtin backend requires an explicit --model");
+  }
+  const { providerId, model } = resolvePiBuiltinReference(options);
+  const resolved = {
+    model,
+    providerId,
+    availableModels: [`${providerId}/${model}`]
+  };
+  return options.contextWindow === undefined
+    ? resolved
+    : { ...resolved, contextWindow: options.contextWindow };
+}
+
+function resolvePiBuiltinReference(options: LocalpagerAgentOptions): {
+  readonly providerId: string;
+  readonly model: string;
+} {
+  if (options.providerId !== "local-openai") {
+    return { providerId: options.providerId, model: options.model };
+  }
+  const parsed = parseProviderQualifiedModel(options.model);
+  if (parsed !== undefined) {
+    return parsed;
+  }
+  throw new Error(
+    "pi-builtin backend requires --model <provider/model> or --provider-id <provider>"
+  );
+}
+
+function parseProviderQualifiedModel(
+  model: string
+): { readonly providerId: string; readonly model: string } | undefined {
+  const separatorIndex = model.indexOf("/");
+  if (separatorIndex <= 0 || separatorIndex === model.length - 1) {
+    return undefined;
+  }
+  return {
+    providerId: model.slice(0, separatorIndex),
+    model: model.slice(separatorIndex + 1)
+  };
+}
 
 async function readFinalSchemaResult(
   outputPath: string,
@@ -148,17 +206,31 @@ function statusOutput(
 ): string {
   return (
     [
+      `backend: ${options.backend}`,
       `base url: ${options.baseUrl}`,
       `model: ${resolved.model}`,
-      `available models: ${resolved.availableModels.join(", ")}`,
+      `available models: ${availableModelsStatus(options, resolved)}`,
       `context window: ${String(options.contextWindow ?? resolved.contextWindow ?? "unspecified")}`,
       `provider id: ${options.providerId}`,
+      `model source: ${modelSourceStatus(options)}`,
       `request params: ${requestParamsStatus(options)}`,
       `pi config dir: ${runtimeConfig.configDir}`,
       `session dir: ${options.sessionDir}`,
       `pi command: ${options.piCommand}`
     ].join("\n") + "\n"
   );
+}
+
+function availableModelsStatus(options: LocalpagerAgentOptions, resolved: ResolvedModel): string {
+  return options.backend === "pi-builtin"
+    ? `${resolved.availableModels.join(", ")} (not probed; resolved by Pi)`
+    : resolved.availableModels.join(", ");
+}
+
+function modelSourceStatus(options: LocalpagerAgentOptions): string {
+  return options.backend === "pi-builtin"
+    ? "Pi built-in registry"
+    : "generated OpenAI-compatible models.json";
 }
 
 function requestParamsStatus(options: LocalpagerAgentOptions): string {

@@ -133,6 +133,48 @@ describe("prompt templates", () => {
       await rm(stateDir, { recursive: true, force: true });
     }
   });
+
+  it("launches Pi built-in providers without a local model probe", async () => {
+    const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-pi-builtin-"));
+    try {
+      const argsPath = path.join(stateDir, "pi-args.json");
+      const fakePiPath = path.join(stateDir, "fake-pi.mjs");
+      await writeFile(fakePiPath, fakePiSource(argsPath), "utf8");
+
+      const result = await run([
+        "--backend",
+        "pi-builtin",
+        "--model",
+        "openai-codex/gpt-5.3-codex-spark",
+        "--state-dir",
+        stateDir,
+        "--pi-command",
+        `node ${fakePiPath}`,
+        "--thinking",
+        "minimal",
+        "-p",
+        "classify"
+      ]);
+
+      expect(result.code).toBe(0);
+      const piArgs = JSON.parse(await readFile(argsPath, "utf8")) as string[];
+      expect(piArgs).toEqual([
+        "--provider",
+        "openai-codex",
+        "--model",
+        "gpt-5.3-codex-spark",
+        "--thinking",
+        "minimal",
+        "-p",
+        "classify"
+      ]);
+      await expect(
+        readFile(path.join(stateDir, "pi-config-runtime", "models.json"), "utf8")
+      ).rejects.toThrow();
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
 });
 
 function createModelServer(): ReturnType<typeof createServer> {

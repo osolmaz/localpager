@@ -4,7 +4,10 @@ import { normalizeBaseUrl } from "../llm/openai.js";
 import type { SamplingOptions } from "../sampling/request-params.js";
 import { samplingOptionsFromEntries } from "../sampling/request-params.js";
 
+export type LocalpagerAgentBackend = "openai-compatible" | "pi-builtin";
+
 export type LocalpagerAgentOptions = {
+  readonly backend: LocalpagerAgentBackend;
   readonly baseUrl: string;
   readonly model: string;
   readonly providerId: string;
@@ -35,6 +38,7 @@ export function defaultOptions(): LocalpagerAgentOptions {
     path.join(home, ".local/state/localpager-agent")
   );
   return {
+    backend: envBackend("LOCALPAGER_AGENT_BACKEND", "openai-compatible"),
     baseUrl: normalizeBaseUrl(envString("LOCALPAGER_AGENT_BASE_URL", "http://127.0.0.1:1234/v1")),
     model: envString("LOCALPAGER_AGENT_MODEL", "auto"),
     providerId: envString("LOCALPAGER_AGENT_PROVIDER_ID", "local-openai"),
@@ -90,16 +94,17 @@ export function parseLocalpagerAgentArgs(args: readonly string[]): LocalpagerAge
 
 export function usage(): string {
   return `${[
-    "localpager-agent - pi, automatically pointed at a local OpenAI-compatible model",
+    "localpager-agent - pi, automatically wired to an OpenAI-compatible endpoint or Pi built-in provider",
     "",
     "usage:",
     "  localpager-agent [localpager-agent options] [pi options/messages]",
     "",
     "localpager-agent options:",
-    "  --base-url <url>          local OpenAI-compatible endpoint",
-    "  --model <id|auto>         model to use; auto selects the first /v1/models id",
+    "  --backend <name>          openai-compatible or pi-builtin; default openai-compatible",
+    "  --base-url <url>          OpenAI-compatible endpoint for openai-compatible backend",
+    "  --model <id|auto>         model to use; auto selects the first /v1/models id for openai-compatible",
     "  --status                  print local model and runtime config status",
-    "  --provider-id <id>        generated Pi provider id",
+    "  --provider-id <id>        generated Pi provider id, or Pi built-in provider for pi-builtin",
     "  --state-dir <path>        localpager-agent runtime state directory",
     "  --session-dir <path>      Pi session directory",
     "  --pi-command <command>    Pi launch command",
@@ -131,6 +136,7 @@ export function usage(): string {
     "  localpager-agent --status",
     '  localpager-agent -p "summarize this repo"',
     '  localpager-agent --model gemma-4-e4b-it -p "write a long implementation plan"',
+    '  localpager-agent --backend pi-builtin --model openai-codex/gpt-5.3-codex-spark -p "classify this item"',
     "  localpager-agent -- --help"
   ].join("\n")}\n`;
 }
@@ -155,6 +161,7 @@ function parseLocalpagerAgentFlag(
 type OptionUpdater = (options: LocalpagerAgentOptions, value: string) => LocalpagerAgentOptions;
 
 const valueFlagUpdaters: Readonly<Record<string, OptionUpdater>> = {
+  "--backend": (options, value) => ({ ...options, backend: parseBackend(value) }),
   "--base-url": (options, value) => ({ ...options, baseUrl: normalizeBaseUrl(value) }),
   "--model": (options, value) => ({ ...options, model: value }),
   "--provider-id": (options, value) => ({ ...options, providerId: value }),
@@ -235,6 +242,19 @@ function parseValueFlag(
 
 function envString(name: string, fallback: string): string {
   return process.env[name] ?? fallback;
+}
+
+function envBackend(name: string, fallback: LocalpagerAgentBackend): LocalpagerAgentBackend {
+  return parseBackend(envString(name, fallback));
+}
+
+function parseBackend(value: string): LocalpagerAgentBackend {
+  if (value === "openai-compatible" || value === "pi-builtin") {
+    return value;
+  }
+  throw new Error(
+    `invalid backend ${JSON.stringify(value)}; expected openai-compatible or pi-builtin`
+  );
 }
 
 function envPositiveInteger(name: string, fallback: string): number {

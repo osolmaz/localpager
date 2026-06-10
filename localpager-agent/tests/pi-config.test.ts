@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -67,10 +67,37 @@ describe("Pi runtime config", () => {
       await rm(stateDir, { recursive: true, force: true });
     }
   });
+
+  it("uses Pi built-in registry without generated provider config", async () => {
+    const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-test-"));
+    try {
+      const staleModelsPath = path.join(stateDir, "pi-config-runtime", "models.json");
+      await mkdir(path.dirname(staleModelsPath), { recursive: true });
+      await writeFile(staleModelsPath, JSON.stringify({ providers: { stale: {} } }), "utf8");
+      const runtime = await writeRuntimeConfig(
+        { ...options(stateDir), backend: "pi-builtin", providerId: "openai-codex" },
+        "gpt-5.3-codex-spark",
+        272000
+      );
+
+      await expect(access(runtime.modelsPath)).rejects.toThrow();
+      const settings = JSON.parse(await readFile(runtime.settingsPath, "utf8")) as {
+        defaultProvider?: string;
+        defaultModel?: string;
+        compaction?: { enabled?: boolean };
+      };
+      expect(settings.defaultProvider).toBe("openai-codex");
+      expect(settings.defaultModel).toBe("gpt-5.3-codex-spark");
+      expect(settings.compaction?.enabled).toBe(true);
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
 });
 
 function options(stateDir: string): LocalpagerAgentOptions {
   return {
+    backend: "openai-compatible",
     baseUrl: "http://127.0.0.1:1234/v1",
     model: "auto",
     providerId: "local-openai",
