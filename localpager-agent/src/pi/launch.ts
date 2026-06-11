@@ -42,6 +42,7 @@ export async function createLaunchPlan(
       model,
       "--thinking",
       options.thinking,
+      "--no-context-files",
       ...forwardedArgs
     ],
     finalSchemaOutputPath: finalSchemaRuntime?.outputPath,

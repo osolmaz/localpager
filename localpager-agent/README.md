@@ -203,6 +203,10 @@ only when `--final-schema` is set, and exposes `bash` only through the reposhell
 extension when a reposhell socket is configured. Other Pi tools such as read,
 write, or edit are never passed through.
 
+`localpager-agent` also disables Pi context-file discovery by passing
+`--no-context-files`, so `AGENTS.md` and `CLAUDE.md` files from the caller's
+current directory are not loaded into local classification/chat runs.
+
 ## Environment
 
 - `LOCALPAGER_AGENT_BASE_URL`

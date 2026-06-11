@@ -131,6 +131,7 @@ export function usage(): string {
     "  --reposhell-visible-repos <ids>",
     "                            comma-separated repo ids visible to read-only bash",
     "  Pi tool flags are not accepted; Localpager owns final_json and reposhell bash exposure",
+    "  Pi context-file discovery is disabled; AGENTS.md and CLAUDE.md are not loaded",
     "  -h, --help                show this help",
     "",
     "examples:",

@@ -165,6 +165,8 @@ describe("prompt templates", () => {
         "gpt-5.3-codex-spark",
         "--thinking",
         "minimal",
+        "--no-context-files",
+        "--no-tools",
         "-p",
         "classify"
       ]);
