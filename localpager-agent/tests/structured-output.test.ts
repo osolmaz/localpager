@@ -229,6 +229,50 @@ describe("structured output", () => {
     ]);
   });
 
+  it("disables Pi tools when no Localpager tool runtime is configured", async () => {
+    const plan = await createLaunchPlan(
+      { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["-p", "inspect"] },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it"
+    );
+
+    expect(plan.args).toEqual([
+      "--provider",
+      "local-openai",
+      "--model",
+      "gemma-4-e4b-it",
+      "--thinking",
+      "off",
+      "--no-tools",
+      "-p",
+      "inspect"
+    ]);
+  });
+
+  it("normalizes explicit no-tools allowlist when no Localpager tools are configured", async () => {
+    const plan = await createLaunchPlan(
+      { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["--tools", "none", "-p", "inspect"] },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it"
+    );
+
+    expect(plan.args).toContain("--no-tools");
+    expect(plan.args).not.toContain("--tools");
+  });
+
+  it("rejects unsafe Pi tools that Localpager did not create", async () => {
+    await expect(
+      createLaunchPlan(
+        {
+          ...options("/tmp/localpager-agent-state"),
+          forwardedArgs: ["--tools", "read,write,edit", "-p", "inspect"]
+        },
+        runtimeConfig("/tmp/localpager-agent-state"),
+        "gemma-4-e4b-it"
+      )
+    ).rejects.toThrow("--tools read is not available through localpager-agent");
+  });
+
   it("creates a request-params extension for sampling controls", async () => {
     const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-sampling-"));
     try {
@@ -290,6 +334,7 @@ describe("structured output", () => {
       "off",
       "--extension",
       "/tmp/request-params-extension.ts",
+      "--no-tools",
       "-p",
       "classify"
     ]);

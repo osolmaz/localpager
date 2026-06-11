@@ -197,6 +197,11 @@ localpager-agent \
 - `--prompt-var <key=value>`: inline template variable override; repeatable
 - `--write-rendered-prompt <path>`: write the rendered prompt text for audit/debugging
 
+Pi tools are disabled by default. `localpager-agent` only exposes tools that it
+creates itself: `final_json` when `--final-schema` is set, and reposhell `bash`
+when a reposhell socket is configured. Requests for other Pi tools such as
+read, write, or edit are rejected before Pi starts.
+
 ## Environment
 
 - `LOCALPAGER_AGENT_BASE_URL`

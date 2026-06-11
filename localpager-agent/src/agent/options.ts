@@ -130,6 +130,7 @@ export function usage(): string {
     "                            default repo id for read-only bash",
     "  --reposhell-visible-repos <ids>",
     "                            comma-separated repo ids visible to read-only bash",
+    "  Pi tools are disabled by default; only Localpager-created final_json and reposhell bash are allowed",
     "  -h, --help                show this help",
     "",
     "examples:",

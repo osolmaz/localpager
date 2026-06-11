@@ -112,7 +112,13 @@ function plainOutputArgs(
   samplingRuntime: SamplingRuntime | undefined
 ): string[] {
   if (reposhellRuntime === undefined) {
-    return [...samplingExtensionArgs(samplingRuntime), ...forwardedArgs];
+    return [
+      ...samplingExtensionArgs(samplingRuntime),
+      ...ensureAllowedTools(forwardedArgs, {
+        reposhellEnabled: false,
+        finalJsonRequired: false
+      })
+    ];
   }
   if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
     throw new Error("--reposhell-socket cannot be used with --no-tools");
@@ -155,7 +161,10 @@ function ensureAllowedTools(args: readonly string[], options: ToolOptions): stri
   const indexes = toolsFlagIndexes(next);
   if (indexes.length === 0) {
     const tools = defaultTools(options);
-    return tools.length === 0 ? next : ["--tools", tools.join(","), ...next];
+    if (tools.length > 0) {
+      return ["--tools", tools.join(","), ...next];
+    }
+    return hasNoTools(next) ? next : ["--no-tools", ...next];
   }
   if (indexes.length > 1) {
     throw new Error("duplicate --tools flags are not supported");
@@ -169,12 +178,21 @@ function ensureAllowedTools(args: readonly string[], options: ToolOptions): stri
   if (flag === undefined || value === undefined) {
     throw new Error(`${flag ?? "--tools"} requires a value`);
   }
-  next[index + 1] = normalizeTools(value, options).join(",");
+  const tools = normalizeTools(value, options);
+  if (tools.length === 0) {
+    next.splice(index, 2, "--no-tools");
+    return next;
+  }
+  next[index + 1] = tools.join(",");
   return next;
 }
 
 function toolsFlagIndexes(args: readonly string[]): number[] {
   return args.flatMap((arg, index) => (arg === "--tools" || arg === "-t" ? [index] : []));
+}
+
+function hasNoTools(args: readonly string[]): boolean {
+  return args.includes("--no-tools") || args.includes("-nt");
 }
 
 function defaultTools(options: ToolOptions): string[] {
@@ -192,9 +210,15 @@ function normalizeTools(value: string, options: ToolOptions): string[] {
   const tools = value
     .split(",")
     .map((tool) => tool.trim())
-    .filter((tool) => tool.length > 0);
-  if (tools.includes("bash") && !options.reposhellEnabled) {
-    throw new Error("--tools bash requires --reposhell-socket");
+    .filter((tool) => tool.length > 0 && tool !== "none");
+  const allowed = new Set(defaultTools(options));
+  for (const tool of tools) {
+    if (tool === "bash" && !options.reposhellEnabled) {
+      throw new Error("--tools bash requires --reposhell-socket");
+    }
+    if (!allowed.has(tool)) {
+      throw new Error(`--tools ${tool} is not available through localpager-agent`);
+    }
   }
   if (options.reposhellEnabled && !tools.includes("bash")) {
     tools.push("bash");
@@ -202,7 +226,7 @@ function normalizeTools(value: string, options: ToolOptions): string[] {
   if (options.finalJsonRequired && !tools.includes("final_json")) {
     tools.push("final_json");
   }
-  return tools;
+  return [...new Set(tools)];
 }
 
 function shellCommand(command: string, args: readonly string[]): string {
