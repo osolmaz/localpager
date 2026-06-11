@@ -207,6 +207,11 @@ write, or edit are never passed through.
 `--no-context-files`, so `AGENTS.md` and `CLAUDE.md` files from the caller's
 current directory are not loaded into local classification/chat runs.
 
+For `--final-schema` runs, `localpager-agent` replaces Pi's default coding-agent
+system prompt with a short structured-output prompt that names the available
+`final_json` tool and tells the model to call it as soon as the final answer is
+ready. Passing an explicit Pi `--system-prompt` still overrides this default.
+
 ## Environment
 
 - `LOCALPAGER_AGENT_BASE_URL`

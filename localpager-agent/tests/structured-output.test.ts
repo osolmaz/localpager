@@ -10,6 +10,7 @@ import { run } from "../src/cli/cli.js";
 import type { RuntimeConfig } from "../src/pi/config.js";
 import { createLaunchPlan } from "../src/pi/launch.js";
 import { createSamplingRuntime } from "../src/sampling/request-extension.js";
+import type { FinalSchemaRuntime } from "../src/structured/final-schema.js";
 import { createFinalSchemaRuntime, readFinalSchemaOutput } from "../src/structured/final-schema.js";
 import { extractFinalJsonPayload, recoveryForwardedArgs } from "../src/structured/recovery.js";
 
@@ -51,7 +52,8 @@ describe("structured output", () => {
       const source = await readFile(runtime.extensionPath, "utf8");
 
       expect(runtime.outputPath).toMatch(/final-output\.json$/u);
-      expect(runtime.instruction).toContain("call the final_json tool exactly once");
+      expect(runtime.systemPrompt).toContain("required final tool is final_json");
+      expect(runtime.instruction).toContain("Call final_json exactly once");
       expect(source).toContain('name: "final_json"');
       expect(source).toContain('"is_local_model_related"');
       expect(source).toContain('"interest"');
@@ -139,11 +141,7 @@ describe("structured output", () => {
   });
 
   it("adds the generated extension and final_json allowlist to Pi args", async () => {
-    const runtime = {
-      extensionPath: "/tmp/final-json-extension.ts",
-      outputPath: "/tmp/final-output.json",
-      instruction: "call final_json"
-    };
+    const runtime = finalSchemaRuntime();
     const reposhellRuntime = {
       extensionPath: "/tmp/reposhell-bash-extension.ts",
       instruction: "use bash only if needed"
@@ -168,6 +166,8 @@ describe("structured output", () => {
       "--thinking",
       "off",
       "--no-context-files",
+      "--system-prompt",
+      "structured system",
       "--extension",
       "/tmp/reposhell-bash-extension.ts",
       "--append-system-prompt",
@@ -188,15 +188,27 @@ describe("structured output", () => {
       { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["-p", "classify"] },
       runtimeConfig("/tmp/localpager-agent-state"),
       "gemma-4-e4b-it",
-      {
-        extensionPath: "/tmp/final-json-extension.ts",
-        outputPath: "/tmp/final-output.json",
-        instruction: "call final_json"
-      }
+      finalSchemaRuntime()
     );
 
     expect(plan.args).toContain("--tools");
     expect(plan.args).toContain("final_json");
+  });
+
+  it("preserves caller-supplied system prompts in schema mode", async () => {
+    const plan = await createLaunchPlan(
+      {
+        ...options("/tmp/localpager-agent-state"),
+        forwardedArgs: ["--system-prompt", "custom system", "-p", "classify"]
+      },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it",
+      finalSchemaRuntime()
+    );
+
+    expect(plan.args.filter((arg) => arg === "--system-prompt")).toHaveLength(1);
+    expect(plan.args).toContain("custom system");
+    expect(plan.args).not.toContain("structured system");
   });
 
   it("adds reposhell bash extension without final schema", async () => {
@@ -350,11 +362,7 @@ describe("structured output", () => {
         },
         runtimeConfig("/tmp/localpager-agent-state"),
         "gemma-4-e4b-it",
-        {
-          extensionPath: "/tmp/final-json-extension.ts",
-          outputPath: "/tmp/final-output.json",
-          instruction: "call final_json"
-        }
+        finalSchemaRuntime()
       )
     ).rejects.toThrow("--tools is not accepted; localpager-agent owns Pi tool configuration");
   });
@@ -368,11 +376,7 @@ describe("structured output", () => {
         },
         runtimeConfig("/tmp/localpager-agent-state"),
         "gemma-4-e4b-it",
-        {
-          extensionPath: "/tmp/final-json-extension.ts",
-          outputPath: "/tmp/final-output.json",
-          instruction: "call final_json"
-        }
+        finalSchemaRuntime()
       )
     ).rejects.toThrow("--tools is not accepted; localpager-agent owns Pi tool configuration");
   });
@@ -383,11 +387,7 @@ describe("structured output", () => {
         { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["--no-tools"] },
         runtimeConfig("/tmp/localpager-agent-state"),
         "gemma-4-e4b-it",
-        {
-          extensionPath: "/tmp/final-json-extension.ts",
-          outputPath: "/tmp/final-output.json",
-          instruction: "call final_json"
-        }
+        finalSchemaRuntime()
       )
     ).rejects.toThrow("--no-tools is not accepted; localpager-agent owns Pi tool configuration");
 
@@ -396,11 +396,7 @@ describe("structured output", () => {
         { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["-nt"] },
         runtimeConfig("/tmp/localpager-agent-state"),
         "gemma-4-e4b-it",
-        {
-          extensionPath: "/tmp/final-json-extension.ts",
-          outputPath: "/tmp/final-output.json",
-          instruction: "call final_json"
-        }
+        finalSchemaRuntime()
       )
     ).rejects.toThrow("-nt is not accepted; localpager-agent owns Pi tool configuration");
   });
@@ -411,11 +407,7 @@ describe("structured output", () => {
         { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["classify"] },
         runtimeConfig("/tmp/localpager-agent-state"),
         "gemma-4-e4b-it",
-        {
-          extensionPath: "/tmp/final-json-extension.ts",
-          outputPath: "/tmp/final-output.json",
-          instruction: "call final_json"
-        }
+        finalSchemaRuntime()
       )
     ).rejects.toThrow("--final-schema requires Pi print mode");
   });
@@ -443,6 +435,15 @@ function classificationSchema(): unknown {
       description: { type: "string" },
       caveats: { type: "array", items: { type: "string" } }
     }
+  };
+}
+
+function finalSchemaRuntime(): FinalSchemaRuntime {
+  return {
+    extensionPath: "/tmp/final-json-extension.ts",
+    outputPath: "/tmp/final-output.json",
+    systemPrompt: "structured system",
+    instruction: "call final_json"
   };
 }
 

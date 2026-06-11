@@ -5,6 +5,7 @@ import path from "node:path";
 export type FinalSchemaRuntime = {
   readonly extensionPath: string;
   readonly outputPath: string;
+  readonly systemPrompt: string;
   readonly instruction: string;
 };
 
@@ -23,11 +24,20 @@ export async function createFinalSchemaRuntime(
   return {
     extensionPath,
     outputPath,
+    systemPrompt: [
+      "You are a fast structured-output task runner.",
+      "Available tools are limited by this run. The required final tool is final_json.",
+      "final_json submits the final JSON answer and ends the run.",
+      "If another tool is available, use it only when needed for evidence.",
+      "Once you have enough evidence, call final_json immediately.",
+      "Keep internal reasoning brief. Do not write ordinary prose or markdown."
+    ].join("\n"),
     instruction: [
       "This localpager-agent run requires structured final output.",
-      "When the task is complete, call the final_json tool exactly once with the final answer.",
+      "The available finalization tool is final_json.",
+      "Call final_json exactly once with the final answer as soon as the answer is ready.",
       "The final_json tool parameters are the required JSON schema.",
-      "Do not answer with final prose instead of calling final_json."
+      "Do not answer with final prose, markdown, or raw JSON text instead of calling final_json."
     ].join("\n")
   };
 }

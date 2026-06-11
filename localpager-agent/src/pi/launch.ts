@@ -95,6 +95,7 @@ function structuredOutputArgs(
     finalJsonRequired: true
   });
   return [
+    ...structuredSystemPromptArgs(runtime, forwardedArgs),
     ...reposhellExtensionArgs(reposhellRuntime),
     ...samplingExtensionArgs(samplingRuntime),
     "--extension",
@@ -146,6 +147,17 @@ function hasRpcMode(args: readonly string[]): boolean {
 
 function hasPrintMode(args: readonly string[]): boolean {
   return args.includes("--print") || args.includes("-p");
+}
+
+function structuredSystemPromptArgs(
+  runtime: FinalSchemaRuntime,
+  forwardedArgs: readonly string[]
+): string[] {
+  return hasSystemPrompt(forwardedArgs) ? [] : ["--system-prompt", runtime.systemPrompt];
+}
+
+function hasSystemPrompt(args: readonly string[]): boolean {
+  return args.includes("--system-prompt");
 }
 
 type ToolOptions = {
