@@ -4,6 +4,7 @@ export type SamplingOptions = {
   readonly seed?: number;
   readonly presencePenalty?: number;
   readonly frequencyPenalty?: number;
+  readonly maxTokens?: number;
 };
 
 type SamplingOptionInput = {
@@ -25,7 +26,8 @@ export function samplingRequestParams(options: SamplingOptions): Record<string, 
     ...entry("top_p", options.topP),
     ...entry("seed", options.seed),
     ...entry("presence_penalty", options.presencePenalty),
-    ...entry("frequency_penalty", options.frequencyPenalty)
+    ...entry("frequency_penalty", options.frequencyPenalty),
+    ...entry("max_tokens", options.maxTokens)
   ]);
 }
 

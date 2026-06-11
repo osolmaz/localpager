@@ -110,7 +110,7 @@ export function usage(): string {
     "  --pi-command <command>    Pi launch command",
     "  --thinking <level>        Pi thinking level; default off",
     "  --context-window <n>      generated model context window",
-    "  --max-tokens <n>          generated model max output tokens",
+    "  --max-tokens <n>          max output tokens; forwarded as max_tokens for openai-compatible",
     "  --temperature <n>         OpenAI-compatible request temperature",
     "  --top-p <n>               OpenAI-compatible request top_p",
     "  --seed <n>                OpenAI-compatible request seed",

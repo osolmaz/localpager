@@ -238,7 +238,8 @@ describe("structured output", () => {
           topP: 1,
           seed: 1234,
           presencePenalty: 0,
-          frequencyPenalty: 0
+          frequencyPenalty: 0,
+          maxTokens: 256
         },
         stateDir
       );
@@ -247,7 +248,8 @@ describe("structured output", () => {
         top_p: 1,
         seed: 1234,
         presence_penalty: 0,
-        frequency_penalty: 0
+        frequency_penalty: 0,
+        max_tokens: 256
       });
       expect(runtime).toBeDefined();
       if (runtime === undefined) {
@@ -259,6 +261,7 @@ describe("structured output", () => {
       expect(source).toContain('"seed": 1234');
       expect(source).toContain('"presence_penalty": 0');
       expect(source).toContain('"frequency_penalty": 0');
+      expect(source).toContain('"max_tokens": 256');
       expect(source).toContain('pi.on("before_provider_request"');
     } finally {
       await rm(stateDir, { recursive: true, force: true });
@@ -504,8 +507,13 @@ if (sessionArgIndex < 0) {
   process.exit(0);
 }
 
-const extensionIndex = args.indexOf("--extension");
-const extensionPath = args[extensionIndex + 1];
+const extensionPaths = args.flatMap((arg, index) => arg === "--extension" ? [args[index + 1]] : []).filter(Boolean);
+const extensionPath = extensionPaths.find((candidate) =>
+  readFileSync(candidate, "utf8").includes("const outputPath = ")
+);
+if (extensionPath === undefined) {
+  throw new Error("final_json extension not found");
+}
 const source = readFileSync(extensionPath, "utf8");
 const outputPath = JSON.parse(source.match(/const outputPath = ("[^"]+");/)?.[1]);
 const payload = {

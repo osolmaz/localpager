@@ -182,7 +182,8 @@ localpager-agent \
 - `--pi-command <command>`: Pi launch command. Default: `npx -y @earendil-works/pi-coding-agent@latest`
 - `--thinking <level>`: Pi thinking level. Default: `off`
 - `--context-window <n>`: generated model context window override. By default, localpager-agent uses model metadata when the server reports it and otherwise leaves this unset.
-- `--max-tokens <n>`: generated model max output tokens. Default: `8192`
+- `--max-tokens <n>`: max output tokens; for OpenAI-compatible backends this is
+  also forwarded as request `max_tokens`. Default: `8192`
 - `--temperature <n>`: OpenAI-compatible request temperature, from `0` to `2`
 - `--top-p <n>`: OpenAI-compatible request `top_p`, from `0` to `1`
 - `--seed <n>`: OpenAI-compatible non-negative integer request seed

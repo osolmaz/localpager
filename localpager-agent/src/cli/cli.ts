@@ -47,7 +47,10 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
         ? undefined
         : await createFinalSchemaRuntime(runOptions.finalSchemaPath, runOptions.stateDir);
     const reposhellRuntime = await createReposhellRuntime(runOptions);
-    const samplingRuntime = await createSamplingRuntime(runOptions.sampling, runOptions.stateDir);
+    const samplingRuntime = await createSamplingRuntime(
+      requestParamOptions(runOptions),
+      runOptions.stateDir
+    );
     const startedAtMs = Date.now();
     const plan = await createLaunchPlan(
       runOptions,
@@ -74,6 +77,13 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
   } catch (error) {
     return fail(`localpager-agent: ${errorMessage(error)}`);
   }
+}
+
+function requestParamOptions(options: LocalpagerAgentOptions): LocalpagerAgentOptions["sampling"] {
+  if (options.backend !== "openai-compatible") {
+    return options.sampling;
+  }
+  return { ...options.sampling, maxTokens: options.maxTokens };
 }
 
 type ResolvedModel = {
