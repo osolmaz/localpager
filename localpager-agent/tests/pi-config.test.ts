@@ -48,6 +48,22 @@ describe("Pi runtime config", () => {
     }
   });
 
+  it("marks local models as reasoning-capable when Pi thinking is enabled", async () => {
+    const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-test-"));
+    try {
+      const runtime = await writeRuntimeConfig(
+        { ...options(stateDir), thinking: "high" },
+        "gemma-12b-q4km-reason"
+      );
+      const models = JSON.parse(await readFile(runtime.modelsPath, "utf8")) as {
+        providers: Record<string, { models: readonly { reasoning?: boolean }[] }>;
+      };
+      expect(models.providers["local-openai"]?.models[0]?.reasoning).toBe(true);
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+
   it("scales Pi compaction settings below small local context windows", async () => {
     const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-test-"));
     try {

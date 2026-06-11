@@ -53,7 +53,7 @@ function modelsConfig(
           withoutUndefined({
             id: model,
             name: `Local model (${model})`,
-            reasoning: false,
+            reasoning: options.thinking !== "off",
             input: ["text"],
             contextWindow,
             maxTokens: options.maxTokens,
