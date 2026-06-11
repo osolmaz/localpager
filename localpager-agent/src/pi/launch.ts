@@ -82,16 +82,14 @@ function structuredOutputArgs(
   reposhellRuntime: ReposhellRuntime | undefined,
   samplingRuntime: SamplingRuntime | undefined
 ): string[] {
-  if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
-    throw new Error("--final-schema cannot be used with --no-tools");
-  }
+  rejectCallerToolFlags(forwardedArgs);
   if (hasRpcMode(forwardedArgs)) {
     throw new Error("--final-schema cannot be used with --mode rpc");
   }
   if (!hasPrintMode(forwardedArgs)) {
     throw new Error("--final-schema requires Pi print mode (-p or --print)");
   }
-  const args = ensureAllowedTools(forwardedArgs, {
+  const args = withOwnedToolArgs(forwardedArgs, {
     reposhellEnabled: reposhellRuntime !== undefined,
     finalJsonRequired: true
   });
@@ -111,22 +109,20 @@ function plainOutputArgs(
   reposhellRuntime: ReposhellRuntime | undefined,
   samplingRuntime: SamplingRuntime | undefined
 ): string[] {
+  rejectCallerToolFlags(forwardedArgs);
   if (reposhellRuntime === undefined) {
     return [
       ...samplingExtensionArgs(samplingRuntime),
-      ...ensureAllowedTools(forwardedArgs, {
+      ...withOwnedToolArgs(forwardedArgs, {
         reposhellEnabled: false,
         finalJsonRequired: false
       })
     ];
   }
-  if (forwardedArgs.includes("--no-tools") || forwardedArgs.includes("-nt")) {
-    throw new Error("--reposhell-socket cannot be used with --no-tools");
-  }
   return [
     ...reposhellExtensionArgs(reposhellRuntime),
     ...samplingExtensionArgs(samplingRuntime),
-    ...ensureAllowedTools(forwardedArgs, {
+    ...withOwnedToolArgs(forwardedArgs, {
       reposhellEnabled: true,
       finalJsonRequired: false
     })
@@ -156,43 +152,17 @@ type ToolOptions = {
   readonly finalJsonRequired: boolean;
 };
 
-function ensureAllowedTools(args: readonly string[], options: ToolOptions): string[] {
-  const next = [...args];
-  const indexes = toolsFlagIndexes(next);
-  if (indexes.length === 0) {
-    const tools = defaultTools(options);
-    if (tools.length > 0) {
-      return ["--tools", tools.join(","), ...next];
-    }
-    return hasNoTools(next) ? next : ["--no-tools", ...next];
-  }
-  if (indexes.length > 1) {
-    throw new Error("duplicate --tools flags are not supported");
-  }
-  const index = indexes[0];
-  if (index === undefined) {
-    throw new Error("--tools requires a value");
-  }
-  const flag = next[index];
-  const value = next[index + 1];
-  if (flag === undefined || value === undefined) {
-    throw new Error(`${flag ?? "--tools"} requires a value`);
-  }
-  const tools = normalizeTools(value, options);
-  if (tools.length === 0) {
-    next.splice(index, 2, "--no-tools");
-    return next;
-  }
-  next[index + 1] = tools.join(",");
-  return next;
+function withOwnedToolArgs(args: readonly string[], options: ToolOptions): string[] {
+  rejectCallerToolFlags(args);
+  const tools = defaultTools(options);
+  return tools.length > 0 ? ["--tools", tools.join(","), ...args] : ["--no-tools", ...args];
 }
 
-function toolsFlagIndexes(args: readonly string[]): number[] {
-  return args.flatMap((arg, index) => (arg === "--tools" || arg === "-t" ? [index] : []));
-}
-
-function hasNoTools(args: readonly string[]): boolean {
-  return args.includes("--no-tools") || args.includes("-nt");
+function rejectCallerToolFlags(args: readonly string[]): void {
+  const flag = args.find((arg) => arg === "--tools" || arg === "-t" || arg === "--no-tools" || arg === "-nt");
+  if (flag !== undefined) {
+    throw new Error(`${flag} is not accepted; localpager-agent owns Pi tool configuration`);
+  }
 }
 
 function defaultTools(options: ToolOptions): string[] {
@@ -204,29 +174,6 @@ function defaultTools(options: ToolOptions): string[] {
     tools.push("final_json");
   }
   return tools;
-}
-
-function normalizeTools(value: string, options: ToolOptions): string[] {
-  const tools = value
-    .split(",")
-    .map((tool) => tool.trim())
-    .filter((tool) => tool.length > 0 && tool !== "none");
-  const allowed = new Set(defaultTools(options));
-  for (const tool of tools) {
-    if (tool === "bash" && !options.reposhellEnabled) {
-      throw new Error("--tools bash requires --reposhell-socket");
-    }
-    if (!allowed.has(tool)) {
-      throw new Error(`--tools ${tool} is not available through localpager-agent`);
-    }
-  }
-  if (options.reposhellEnabled && !tools.includes("bash")) {
-    tools.push("bash");
-  }
-  if (options.finalJsonRequired && !tools.includes("final_json")) {
-    tools.push("final_json");
-  }
-  return [...new Set(tools)];
 }
 
 function shellCommand(command: string, args: readonly string[]): string {

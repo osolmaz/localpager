@@ -151,7 +151,7 @@ describe("structured output", () => {
     const plan = await createLaunchPlan(
       {
         ...options("/tmp/localpager-agent-state"),
-        forwardedArgs: ["--tools", "bash", "-p", "classify"]
+        forwardedArgs: ["-p", "classify"]
       },
       runtimeConfig("/tmp/localpager-agent-state"),
       "gemma-4-e4b-it",
@@ -249,18 +249,7 @@ describe("structured output", () => {
     ]);
   });
 
-  it("normalizes explicit no-tools allowlist when no Localpager tools are configured", async () => {
-    const plan = await createLaunchPlan(
-      { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["--tools", "none", "-p", "inspect"] },
-      runtimeConfig("/tmp/localpager-agent-state"),
-      "gemma-4-e4b-it"
-    );
-
-    expect(plan.args).toContain("--no-tools");
-    expect(plan.args).not.toContain("--tools");
-  });
-
-  it("rejects unsafe Pi tools that Localpager did not create", async () => {
+  it("rejects caller-supplied Pi tool flags", async () => {
     await expect(
       createLaunchPlan(
         {
@@ -270,7 +259,15 @@ describe("structured output", () => {
         runtimeConfig("/tmp/localpager-agent-state"),
         "gemma-4-e4b-it"
       )
-    ).rejects.toThrow("--tools read is not available through localpager-agent");
+    ).rejects.toThrow("--tools is not accepted; localpager-agent owns Pi tool configuration");
+
+    await expect(
+      createLaunchPlan(
+        { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["--no-tools", "-p", "inspect"] },
+        runtimeConfig("/tmp/localpager-agent-state"),
+        "gemma-4-e4b-it"
+      )
+    ).rejects.toThrow("--no-tools is not accepted; localpager-agent owns Pi tool configuration");
   });
 
   it("creates a request-params extension for sampling controls", async () => {
@@ -340,7 +337,7 @@ describe("structured output", () => {
     ]);
   });
 
-  it("rejects bash allowlist without reposhell extension", async () => {
+  it("rejects caller-supplied bash allowlist instead of exposing default Pi bash", async () => {
     await expect(
       createLaunchPlan(
         {
@@ -355,10 +352,10 @@ describe("structured output", () => {
           instruction: "call final_json"
         }
       )
-    ).rejects.toThrow("--tools bash requires --reposhell-socket");
+    ).rejects.toThrow("--tools is not accepted; localpager-agent owns Pi tool configuration");
   });
 
-  it("rejects duplicate tool allowlist flags", async () => {
+  it("rejects duplicate caller-supplied tool allowlist flags", async () => {
     await expect(
       createLaunchPlan(
         {
@@ -373,10 +370,10 @@ describe("structured output", () => {
           instruction: "call final_json"
         }
       )
-    ).rejects.toThrow("duplicate --tools flags");
+    ).rejects.toThrow("--tools is not accepted; localpager-agent owns Pi tool configuration");
   });
 
-  it("rejects schema mode when Pi tools are disabled", async () => {
+  it("rejects caller-supplied no-tools in schema mode", async () => {
     await expect(
       createLaunchPlan(
         { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["--no-tools"] },
@@ -388,7 +385,7 @@ describe("structured output", () => {
           instruction: "call final_json"
         }
       )
-    ).rejects.toThrow("--final-schema cannot be used with --no-tools");
+    ).rejects.toThrow("--no-tools is not accepted; localpager-agent owns Pi tool configuration");
 
     await expect(
       createLaunchPlan(
@@ -401,7 +398,7 @@ describe("structured output", () => {
           instruction: "call final_json"
         }
       )
-    ).rejects.toThrow("--final-schema cannot be used with --no-tools");
+    ).rejects.toThrow("-nt is not accepted; localpager-agent owns Pi tool configuration");
   });
 
   it("rejects schema mode outside Pi print mode", async () => {
