@@ -146,6 +146,83 @@ To keep many rollouts tractable:
   concurrency, every candidate, its scores, and the chosen prompt to a run
   directory so a run is reproducible from saved inputs.
 
+### Initial feedback/minibatch pool
+
+Use Shaun's 60-row `gepa-good-60` set as the initial GEPA feedback/minibatch
+pool. The row selection comes from
+`/home/bob/scratch/shaun-openclaw-data-rows/gepa-good-60.rows.jsonl`, and the
+hydrated local input is
+`/home/bob/scratch/shaun-openclaw-data-rows/gepa-good-60.hydrated.ds4-input.jsonl`.
+
+This set is for optimizer feedback, not final validation. It contains 32
+stratified rows, 19 confusion rows, and 9 random rows. Use only the row
+identities/order from Shaun's manifest. Do not score against the manifest's
+`teacher_topics` or `expected_topics`; those are broader teacher labels. Score
+against the canonical `ds4.jsonl` `topics_of_interest` labels below.
+
+| # | target | gold `topics_of_interest` from `ds4.jsonl` |
+| ---: | --- | --- |
+| 1 | PR #48940 | `acp`, `gateway`, `agent_runtime` |
+| 2 | PR #80783 | `mcp_tooling`, `config`, `security` |
+| 3 | PR #42027 | `exec_tools`, `browser_automation`, `cron_automation` |
+| 4 | PR #77748 | `codex`, `chat_integrations` |
+| 5 | issue #79897 | `model_serving` |
+| 6 | issue #40332 | `acp`, `approvals`, `acpx` |
+| 7 | PR #63007 | `gateway`, `sessions` |
+| 8 | PR #80255 | `memory`, `reliability` |
+| 9 | PR #84670 | `gateway`, `api_surface`, `ui_tui` |
+| 10 | PR #46552 | `queueing`, `docs` |
+| 11 | PR #62428 | `exec_tools`, `sandboxing`, `approvals` |
+| 12 | issue #82507 | `acpx`, `codex`, `skills_plugins` |
+| 13 | PR #80479 | `self_hosted_inference`, `memory` |
+| 14 | issue #90146 | `local_model_providers`, `reliability` |
+| 15 | PR #51849 | `docs` |
+| 16 | PR #68725 | `open_weight_models`, `local_model_providers` |
+| 17 | issue #84297 | `notifications`, `chat_integrations` |
+| 18 | PR #77827 | `model_serving`, `local_models` |
+| 19 | PR #81957 | `security` |
+| 20 | issue #39248 | `coding_agents`, `sandboxing`, `agent_runtime` |
+| 21 | PR #47083 | `sessions`, `telemetry_usage` |
+| 22 | PR #70882 | `mcp_tooling`, `tool_calling` |
+| 23 | PR #63826 | `security`, `hooks`, `skills_plugins` |
+| 24 | issue #81249 | `local_models`, `self_hosted_inference` |
+| 25 | issue #70529 | `browser_automation`, `packaging_deployment` |
+| 26 | issue #87277 | `local_model_providers`, `model_serving` |
+| 27 | issue #64199 | `acp`, `sessions` |
+| 28 | PR #84752 | `reliability`, `auth_identity`, `sessions` |
+| 29 | issue #84583 | `cron_automation`, `sessions`, `reliability` |
+| 30 | issue #67244 | `acpx`, `acp` |
+| 31 | issue #71216 | `config`, `sandboxing`, `gateway` |
+| 32 | issue #84477 | `sessions`, `agent_runtime`, `reliability` |
+| 33 | PR #65242 | `acp`, `coding_agents`, `reliability` |
+| 34 | issue #73910 | `codex`, `acp`, `acpx`, `auth_identity` |
+| 35 | PR #80008 | `acp`, `coding_agents` |
+| 36 | PR #43765 | `reliability`, `exec_tools`, `cron_automation` |
+| 37 | issue #60979 | `acp`, `chat_integrations`, `sessions` |
+| 38 | issue #83863 | `acp`, `codex`, `agent_runtime` |
+| 39 | issue #84715 | `codex`, `packaging_deployment` |
+| 40 | issue #84757 | `sessions`, `chat_integrations`, `reliability` |
+| 41 | PR #56442 | `acp`, `sessions`, `agent_runtime` |
+| 42 | issue #78528 | `security`, `exec_tools`, `skills_plugins` |
+| 43 | issue #84789 | `memory`, `sessions` |
+| 44 | PR #84763 | `acpx`, `acp`, `security` |
+| 45 | PR #65364 | `auth_identity`, `api_surface` |
+| 46 | PR #52747 | `acp`, `sessions`, `reliability` |
+| 47 | issue #10467 | `queueing`, `sessions`, `coding_agents` |
+| 48 | PR #43246 | `tool_calling`, `security` |
+| 49 | issue #59878 | `sessions`, `reliability` |
+| 50 | issue #51667 | `model_serving`, `security`, `config` |
+| 51 | issue #44202 | `local_models`, `memory`, `self_hosted_inference` |
+| 52 | issue #48580 | `acpx`, `codex`, `sessions` |
+| 53 | issue #74305 | `acpx`, `codex` |
+| 54 | PR #45393 | `tool_calling`, `coding_agents`, `reliability` |
+| 55 | issue #84771 | `reliability`, `sessions` |
+| 56 | PR #44379 | `coding_agents`, `memory`, `hooks`, `reliability` |
+| 57 | issue #84746 | `reliability`, `sessions` |
+| 58 | issue #68187 | `mcp_tooling`, `sessions`, `gateway` |
+| 59 | issue #52249 | `acp`, `sessions`, `reliability` |
+| 60 | PR #69256 | `cron_automation`, `sessions`, `reliability` |
+
 ## Package layout
 
 ```
