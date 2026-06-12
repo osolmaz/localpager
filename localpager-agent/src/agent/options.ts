@@ -1,7 +1,8 @@
 import path from "node:path";
 
-import { Command } from "commander";
+import { CommanderError, type Command } from "commander";
 
+import { createLocalpagerAgentCommand, localpagerAgentUsage } from "./command.js";
 import { normalizeBaseUrl } from "../llm/openai.js";
 import type { SamplingOptions } from "../sampling/request-params.js";
 import { samplingOptionsFromEntries } from "../sampling/request-params.js";
@@ -75,16 +76,59 @@ export function parseLocalpagerAgentArgs(args: readonly string[]): LocalpagerAge
   if (hasLocalHelp(args)) {
     return { ...options, forwardedArgs: ["--help"] };
   }
-  const command = localpagerAgentCommand();
-  command.parse([...args], { from: "user" });
+  const command = createLocalpagerAgentCommand();
+  parseCommand(command, args);
   const parsed = command.opts<CommanderOptions>();
-  return applyCommanderOptions(options, parsed, args, forwardedPiArgs(args));
+  return applyCommanderOptions(options, parsed, forwardedPiArgs(args, command));
+}
+
+function parseCommand(command: Command, args: readonly string[]): void {
+  try {
+    command.parse([...args], { from: "user" });
+  } catch (error) {
+    if (error instanceof CommanderError && error.code === "commander.optionMissingArgument") {
+      throw new Error(missingArgumentMessage(command, args, error.message));
+    }
+    throw error;
+  }
+}
+
+function missingArgumentMessage(
+  command: Command,
+  args: readonly string[],
+  message: string
+): string {
+  const typedFlag = missingValueFlag(command, args);
+  if (typedFlag !== undefined) {
+    return `${typedFlag} requires a value`;
+  }
+  const match = /option '([^']+)'/u.exec(message);
+  const flagWithValue = match?.[1];
+  const flag = flagWithValue?.split(/[ ,]/u)[0] ?? "option";
+  return `${flag} requires a value`;
+}
+
+function missingValueFlag(command: Command, args: readonly string[]): string | undefined {
+  const optionIndex = localOptionIndex(command);
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--") {
+      return undefined;
+    }
+    if (arg === undefined || !optionIndex.valueFlags.has(arg)) {
+      continue;
+    }
+    if (args[index + 1] === undefined) {
+      return arg;
+    }
+    index += 1;
+  }
+  return undefined;
 }
 
 function applyCommanderOptions(
   options: LocalpagerAgentOptions,
   parsed: CommanderOptions,
-  args: readonly string[],
   forwardedArgs: readonly string[]
 ): LocalpagerAgentOptions {
   return {
@@ -105,11 +149,10 @@ function applyCommanderOptions(
     maxTokens: optionalParsed(parsed.maxTokens, options.maxTokens, parsePositiveInteger),
     sampling: parsedSamplingOptions(options.sampling, parsed),
     timeoutMs: optionalParsed(parsed.timeoutMs, options.timeoutMs, parsePositiveInteger),
-    finalSchemaPath: optionalValue(
-      lastLocalOptionValue(args, ["--final-schema", "--schema"]),
-      options.finalSchemaPath
-    ),
-    finalSchemaInstruction: resolvedFinalSchemaInstruction(options, args),
+    finalSchemaPath: optionalValue(parsed.schema, options.finalSchemaPath),
+    finalSchemaInstruction: optionalValue(parsed.finalSchemaInstruction, true)
+      ? options.finalSchemaInstruction
+      : false,
     promptTemplatePath: optionalValue(parsed.promptTemplate, options.promptTemplatePath),
     promptVarsPaths: appendedValues(options.promptVarsPaths, parsed.promptVarsFile),
     promptVars: appendedValues(options.promptVars, parsed.promptVar),
@@ -136,15 +179,6 @@ function optionalParsed<T>(value: string | undefined, fallback: T, parse: (value
 
 function appendedValues<T>(current: readonly T[], next: readonly T[] | undefined): readonly T[] {
   return next === undefined ? current : [...current, ...next];
-}
-
-function resolvedFinalSchemaInstruction(
-  options: LocalpagerAgentOptions,
-  args: readonly string[]
-): boolean {
-  return hasLocalFlag(args, "--no-final-schema-instruction")
-    ? false
-    : options.finalSchemaInstruction;
 }
 
 function parsedSamplingOptions(
@@ -190,7 +224,7 @@ function parseFrequencyPenalty(value: string): number {
 }
 
 export function usage(): string {
-  return `${localpagerAgentCommand().helpInformation()}${helpFooter()}`;
+  return localpagerAgentUsage();
 }
 
 type CommanderOptions = {
@@ -210,8 +244,8 @@ type CommanderOptions = {
   readonly presencePenalty?: string;
   readonly frequencyPenalty?: string;
   readonly timeoutMs?: string;
-  readonly finalSchema?: string;
   readonly schema?: string;
+  readonly finalSchemaInstruction?: boolean;
   readonly promptTemplate?: string;
   readonly promptVarsFile?: readonly string[];
   readonly promptVar?: readonly string[];
@@ -222,120 +256,17 @@ type CommanderOptions = {
   readonly status?: boolean;
 };
 
-function localpagerAgentCommand(): Command {
-  return new Command()
-    .name("localpager-agent")
-    .description("pi, automatically wired to an OpenAI-compatible endpoint or Pi built-in provider")
-    .usage("[localpager-agent options] [pi options/messages]")
-    .allowUnknownOption(true)
-    .allowExcessArguments(true)
-    .exitOverride()
-    .configureOutput({ writeOut: () => undefined, writeErr: () => undefined })
-    .helpOption("-h, --help", "show this help")
-    .option("--backend <name>", "openai-compatible or pi-builtin; default openai-compatible")
-    .option("--base-url <url>", "OpenAI-compatible endpoint for openai-compatible backend")
-    .option(
-      "--model <id|auto>",
-      "model to use; auto selects the first /v1/models id for openai-compatible"
-    )
-    .option("--status", "print local model and runtime config status")
-    .option(
-      "--provider-id <id>",
-      "generated Pi provider id, or Pi built-in provider for pi-builtin"
-    )
-    .option("--state-dir <path>", "localpager-agent runtime state directory")
-    .option("--session-dir <path>", "Pi session directory")
-    .option("--pi-command <command>", "Pi launch command")
-    .option("--thinking <level>", "Pi thinking level; default off")
-    .option("--context-window <n>", "generated model context window")
-    .option("--max-tokens <n>", "max output tokens; forwarded as max_tokens for openai-compatible")
-    .option("--temperature <n>", "OpenAI-compatible request temperature")
-    .option("--top-p <n>", "OpenAI-compatible request top_p")
-    .option("--seed <n>", "OpenAI-compatible request seed")
-    .option("--presence-penalty <n>", "OpenAI-compatible request presence_penalty")
-    .option("--frequency-penalty <n>", "OpenAI-compatible request frequency_penalty")
-    .option("--timeout-ms <n>", "/v1/models probe timeout")
-    .option("--final-schema <path>", "force final schema output; requires Pi -p/--print")
-    .option("--schema <path>", "alias for --final-schema")
-    .option("--no-final-schema-instruction", "do not append the final_json system instruction")
-    .option("--prompt-template <path>", "render a prompt template and pass it to Pi print mode")
-    .option(
-      "--prompt-vars-file <path>",
-      "JSON object variables for --prompt-template; repeatable",
-      collectValues,
-      []
-    )
-    .option(
-      "--prompt-var <key=value>",
-      "inline template variable override; repeatable",
-      collectValues,
-      []
-    )
-    .option("--write-rendered-prompt <path>", "write rendered prompt text for audit/debugging")
-    .option("--reposhell-socket <path>", "Unix socket for Localpager read-only bash")
-    .option("--reposhell-default-repo <id>", "default repo id for read-only bash")
-    .option(
-      "--reposhell-visible-repos <ids>",
-      "comma-separated repo ids visible to read-only bash"
-    );
-}
-
-function collectValues(value: string, previous: string[] = []): string[] {
-  return [...previous, value];
-}
-
-function helpFooter(): string {
-  return [
-    "",
-    "notes:",
-    "  Pi tool flags are not accepted; Localpager owns final_json and reposhell bash exposure",
-    "  Pi context-file discovery is disabled; AGENTS.md and CLAUDE.md are not loaded",
-    "",
-    "examples:",
-    "  localpager-agent --status",
-    '  localpager-agent -p "summarize this repo"',
-    '  localpager-agent --model gemma-4-e4b-it -p "write a long implementation plan"',
-    '  localpager-agent --backend pi-builtin --model openai-codex/gpt-5.3-codex-spark -p "classify this item"',
-    "  localpager-agent -- --help",
-    ""
-  ].join("\n");
-}
-
 function hasLocalHelp(args: readonly string[]): boolean {
   return hasLocalFlag(args, "-h") || hasLocalFlag(args, "--help");
 }
 
-const localBooleanFlags = new Set(["--status", "--no-final-schema-instruction", "-h", "--help"]);
+type LocalOptionIndex = {
+  readonly booleanFlags: ReadonlySet<string>;
+  readonly valueFlags: ReadonlySet<string>;
+};
 
-const localValueFlags = new Set([
-  "--backend",
-  "--base-url",
-  "--model",
-  "--provider-id",
-  "--state-dir",
-  "--session-dir",
-  "--pi-command",
-  "--thinking",
-  "--context-window",
-  "--max-tokens",
-  "--temperature",
-  "--top-p",
-  "--seed",
-  "--presence-penalty",
-  "--frequency-penalty",
-  "--timeout-ms",
-  "--final-schema",
-  "--schema",
-  "--prompt-template",
-  "--prompt-vars-file",
-  "--prompt-var",
-  "--write-rendered-prompt",
-  "--reposhell-socket",
-  "--reposhell-default-repo",
-  "--reposhell-visible-repos"
-]);
-
-function forwardedPiArgs(args: readonly string[]): readonly string[] {
+function forwardedPiArgs(args: readonly string[], command: Command): readonly string[] {
+  const optionIndex = localOptionIndex(command);
   const forwardedArgs: string[] = [];
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -346,7 +277,7 @@ function forwardedPiArgs(args: readonly string[]): readonly string[] {
     if (arg === undefined) {
       continue;
     }
-    const advance = localFlagAdvance(arg);
+    const advance = localFlagAdvance(arg, optionIndex);
     if (advance !== undefined) {
       index += advance;
       continue;
@@ -356,21 +287,33 @@ function forwardedPiArgs(args: readonly string[]): readonly string[] {
   return forwardedArgs;
 }
 
-function localFlagAdvance(arg: string | undefined): number | undefined {
-  if (arg === undefined) {
-    return undefined;
+function localOptionIndex(command: Command): LocalOptionIndex {
+  const booleanFlags = new Set<string>();
+  const valueFlags = new Set<string>();
+  for (const option of command.options) {
+    const target = option.required || option.optional ? valueFlags : booleanFlags;
+    if (option.short !== undefined) {
+      target.add(option.short);
+    }
+    if (option.long !== undefined) {
+      target.add(option.long);
+    }
   }
-  if (localBooleanFlags.has(arg)) {
-    return 0;
-  }
-  if (localValueFlags.has(arg)) {
-    return 1;
-  }
-  return isInlineLocalValueFlag(arg) ? 0 : undefined;
+  return { booleanFlags, valueFlags };
 }
 
-function isInlineLocalValueFlag(arg: string): boolean {
-  for (const flag of localValueFlags) {
+function localFlagAdvance(arg: string, optionIndex: LocalOptionIndex): number | undefined {
+  if (optionIndex.booleanFlags.has(arg)) {
+    return 0;
+  }
+  if (optionIndex.valueFlags.has(arg)) {
+    return 1;
+  }
+  return isInlineLocalValueFlag(arg, optionIndex) ? 0 : undefined;
+}
+
+function isInlineLocalValueFlag(arg: string, optionIndex: LocalOptionIndex): boolean {
+  for (const flag of optionIndex.valueFlags) {
     if (arg.startsWith(`${flag}=`)) {
       return true;
     }
@@ -388,35 +331,6 @@ function hasLocalFlag(args: readonly string[], flag: string): boolean {
     }
   }
   return false;
-}
-
-function lastLocalOptionValue(
-  args: readonly string[],
-  names: readonly string[]
-): string | undefined {
-  let value: string | undefined;
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === "--") {
-      return value;
-    }
-    if (arg === undefined) {
-      continue;
-    }
-    if (names.includes(arg)) {
-      value = requiredValue(args, index + 1, arg);
-      index += 1;
-      continue;
-    }
-    for (const name of names) {
-      const prefix = `${name}=`;
-      if (arg.startsWith(prefix)) {
-        value = arg.slice(prefix.length);
-        break;
-      }
-    }
-  }
-  return value;
 }
 
 function envString(name: string, fallback: string): string {
@@ -484,14 +398,6 @@ function defaultSessionDir(stateDir: string): string {
     "LOCALPAGER_AGENT_SESSION_DIR",
     envString("PI_CODING_AGENT_SESSION_DIR", path.join(stateDir, "sessions"))
   );
-}
-
-function requiredValue(args: readonly string[], index: number, flag: string): string {
-  const value = args[index];
-  if (value === undefined) {
-    throw new Error(`${flag} requires a value`);
-  }
-  return value;
 }
 
 function parsePositiveInteger(value: string): number {

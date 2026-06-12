@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseLocalpagerAgentArgs } from "../src/agent/options.js";
+import { parseLocalpagerAgentArgs, usage } from "../src/agent/options.js";
 
 describe("localpager-agent option parsing", () => {
   it("keeps pi args as pass-through arguments", () => {
@@ -43,6 +43,32 @@ describe("localpager-agent option parsing", () => {
     expect(parseLocalpagerAgentArgs(["--schema", "schema.json"]).finalSchemaPath).toBe(
       "schema.json"
     );
+  });
+
+  it("uses the last final schema alias value", () => {
+    const options = parseLocalpagerAgentArgs([
+      "--final-schema",
+      "first.json",
+      "--schema",
+      "second.json"
+    ]);
+
+    expect(options.finalSchemaPath).toBe("second.json");
+  });
+
+  it("parses inline local option values without forwarding them to Pi", () => {
+    const options = parseLocalpagerAgentArgs([
+      "--model=gemma-4-e4b-it",
+      "--temperature=0",
+      "--final-schema=schema.json",
+      "-p",
+      "classify"
+    ]);
+
+    expect(options.model).toBe("gemma-4-e4b-it");
+    expect(options.sampling.temperature).toBe(0);
+    expect(options.finalSchemaPath).toBe("schema.json");
+    expect(options.forwardedArgs).toEqual(["-p", "classify"]);
   });
 
   it("can disable the appended final schema instruction", () => {
@@ -131,5 +157,17 @@ describe("localpager-agent option parsing", () => {
     expect(() => parseLocalpagerAgentArgs(["--frequency-penalty", "-3"])).toThrow(
       "--frequency-penalty must be a number between -2 and 2"
     );
+  });
+
+  it("uses wrapper-style errors for missing local option values", () => {
+    expect(() => parseLocalpagerAgentArgs(["--model"])).toThrow("--model requires a value");
+    expect(() => parseLocalpagerAgentArgs(["--schema"])).toThrow("--schema requires a value");
+  });
+
+  it("includes localpager notes and examples in help output", () => {
+    const output = usage();
+
+    expect(output).toContain("Pi tool flags are not accepted");
+    expect(output).toContain('localpager-agent -p "summarize this repo"');
   });
 });
