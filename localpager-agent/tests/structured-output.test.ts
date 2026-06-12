@@ -298,7 +298,10 @@ describe("structured output", () => {
 
     await expect(
       createLaunchPlan(
-        { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["--no-tools", "-p", "inspect"] },
+        {
+          ...options("/tmp/localpager-agent-state"),
+          forwardedArgs: ["--no-tools", "-p", "inspect"]
+        },
         runtimeConfig("/tmp/localpager-agent-state"),
         "gemma-4-e4b-it"
       )

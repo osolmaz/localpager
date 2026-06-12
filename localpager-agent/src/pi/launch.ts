@@ -180,7 +180,9 @@ function withOwnedToolArgs(args: readonly string[], options: ToolOptions): strin
 }
 
 function rejectCallerToolFlags(args: readonly string[]): void {
-  const flag = args.find((arg) => arg === "--tools" || arg === "-t" || arg === "--no-tools" || arg === "-nt");
+  const flag = args.find(
+    (arg) => arg === "--tools" || arg === "-t" || arg === "--no-tools" || arg === "-nt"
+  );
   if (flag !== undefined) {
     throw new Error(`${flag} is not accepted; localpager-agent owns Pi tool configuration`);
   }
