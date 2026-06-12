@@ -1,0 +1,218 @@
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from prompt_optimizer.adapter import LocalpagerAdapter, ROUTING_POLICY_COMPONENT
+from prompt_optimizer.dataset import (
+    DEFAULT_DS4_PATH,
+    DEFAULT_FEEDBACK_MANIFEST_PATH,
+    DEFAULT_TAXONOMY_PATH,
+    FeedbackPoolRow,
+    build_feedback_pool,
+    load_taxonomy,
+)
+from prompt_optimizer.harness import ClassifierHarness, LocalpagerAgentHarness, StaticClassifierHarness
+from prompt_optimizer.prompt import DEFAULT_SEED_PROMPT_PATH, PromptParts, load_seed_prompt
+from prompt_optimizer.reflection import CodexReflectionLM
+
+DEFAULT_MODEL = "gemma-12b-q4km-reason"
+FALLBACK_MODEL = "gemma-e4b-reason-test"
+DEFAULT_CONCURRENCY = 2
+
+
+@dataclass(frozen=True)
+class OptimizerInputs:
+    rows: tuple[FeedbackPoolRow, ...]
+    allowed_topics: frozenset[str]
+    prompt_parts: PromptParts
+
+
+@dataclass(frozen=True)
+class HarnessConfig:
+    model: str = DEFAULT_MODEL
+    concurrency: int = DEFAULT_CONCURRENCY
+    max_tokens: int = 768
+    timeout_ms: int = 900_000
+    base_url: str | None = None
+    context_window: int | None = None
+    state_dir: Path | None = None
+
+
+@dataclass(frozen=True)
+class GEPARunConfig:
+    output_dir: Path
+    max_metric_calls: int
+    reflection_minibatch_size: int = 4
+    seed: int = 0
+    row_limit: int | None = None
+    harness: HarnessConfig = HarnessConfig()
+
+
+def load_optimizer_inputs(
+    *,
+    ds4_path: Path = DEFAULT_DS4_PATH,
+    feedback_manifest_path: Path = DEFAULT_FEEDBACK_MANIFEST_PATH,
+    taxonomy_path: Path = DEFAULT_TAXONOMY_PATH,
+    seed_prompt_path: Path = DEFAULT_SEED_PROMPT_PATH,
+) -> OptimizerInputs:
+    pool = build_feedback_pool(ds4_path, feedback_manifest_path, taxonomy_path)
+    return OptimizerInputs(
+        rows=pool.rows,
+        allowed_topics=load_taxonomy(taxonomy_path),
+        prompt_parts=load_seed_prompt(seed_prompt_path),
+    )
+
+
+def seed_candidate(prompt_parts: PromptParts) -> dict[str, str]:
+    return {ROUTING_POLICY_COMPONENT: prompt_parts.routing_policy}
+
+
+def make_adapter(
+    *,
+    inputs: OptimizerInputs,
+    harness: ClassifierHarness,
+    concurrency: int = DEFAULT_CONCURRENCY,
+) -> LocalpagerAdapter:
+    return LocalpagerAdapter(
+        prompt_parts=inputs.prompt_parts,
+        harness=harness,
+        allowed_topics=inputs.allowed_topics,
+        concurrency=concurrency,
+    )
+
+
+def static_empty_harness() -> StaticClassifierHarness:
+    return StaticClassifierHarness(predictions={})
+
+
+def localpager_agent_harness(config: HarnessConfig) -> LocalpagerAgentHarness:
+    return LocalpagerAgentHarness(
+        model=config.model,
+        base_url=config.base_url,
+        context_window=config.context_window,
+        max_tokens=config.max_tokens,
+        timeout_ms=config.timeout_ms,
+        state_dir=config.state_dir,
+    )
+
+
+def evaluate_seed(
+    *,
+    inputs: OptimizerInputs,
+    harness: ClassifierHarness,
+    concurrency: int = DEFAULT_CONCURRENCY,
+    limit: int | None = None,
+    capture_traces: bool = True,
+) -> dict[str, Any]:
+    rows = _limited_rows(inputs.rows, limit)
+    adapter = make_adapter(inputs=inputs, harness=harness, concurrency=concurrency)
+    batch = adapter.evaluate(list(rows), seed_candidate(inputs.prompt_parts), capture_traces=capture_traces)
+    return evaluation_report(rows, batch)
+
+
+def run_gepa(
+    *,
+    inputs: OptimizerInputs,
+    config: GEPARunConfig,
+) -> dict[str, Any]:
+    import gepa
+
+    rows = list(_limited_rows(inputs.rows, config.row_limit))
+    harness = localpager_agent_harness(config.harness)
+    adapter = make_adapter(inputs=inputs, harness=harness, concurrency=config.harness.concurrency)
+    config.output_dir.mkdir(parents=True, exist_ok=True)
+    result = gepa.optimize(
+        seed_candidate=seed_candidate(inputs.prompt_parts),
+        trainset=rows,
+        valset=rows,
+        adapter=adapter,
+        reflection_lm=CodexReflectionLM(),
+        max_metric_calls=config.max_metric_calls,
+        reflection_minibatch_size=config.reflection_minibatch_size,
+        run_dir=str(config.output_dir),
+        seed=config.seed,
+        display_progress_bar=True,
+    )
+    return write_result_artifacts(result, inputs.prompt_parts, config.output_dir, config)
+
+
+def write_result_artifacts(
+    result: Any,
+    prompt_parts: PromptParts,
+    output_dir: Path,
+    config: GEPARunConfig,
+) -> dict[str, Any]:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    best_candidate = result.best_candidate
+    if not isinstance(best_candidate, dict):
+        raise TypeError("GEPA best_candidate must be a dict for routing_policy optimization")
+    best_routing_policy = best_candidate[ROUTING_POLICY_COMPONENT]
+    summary = {
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "best_idx": result.best_idx,
+        "best_score": result.val_aggregate_scores[result.best_idx],
+        "num_candidates": result.num_candidates,
+        "total_metric_calls": result.total_metric_calls,
+        "num_full_val_evals": result.num_full_val_evals,
+        "config": _jsonable_config(config),
+        "best_prompt_path": str(output_dir / "best.prompt.md"),
+        "best_routing_policy_path": str(output_dir / "best.routing_policy.md"),
+        "result_path": str(output_dir / "gepa-result.json"),
+    }
+    (output_dir / "best.routing_policy.md").write_text(best_routing_policy, encoding="utf-8")
+    (output_dir / "best.prompt.md").write_text(prompt_parts.assemble(best_routing_policy), encoding="utf-8")
+    (output_dir / "summary.json").write_text(json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8")
+    (output_dir / "gepa-result.json").write_text(
+        json.dumps(result.to_dict(), default=str, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return summary
+
+
+def evaluation_report(rows: tuple[FeedbackPoolRow, ...], batch: Any) -> dict[str, Any]:
+    row_reports = []
+    for row, output, score in zip(rows, batch.outputs, batch.scores, strict=True):
+        row_reports.append(
+            {
+                "id": row.ds4.id,
+                "target": row.ds4.url,
+                "title": row.ds4.title,
+                "gold_topics": list(row.ds4.topics_of_interest),
+                "predicted_topics": list(output.topics_of_interest),
+                "score": score,
+                "error": output.error,
+            }
+        )
+    mean_score = sum(batch.scores) / len(batch.scores) if batch.scores else 0.0
+    return {
+        "rows": len(row_reports),
+        "mean_score": mean_score,
+        "scores": list(batch.scores),
+        "row_reports": row_reports,
+    }
+
+
+def default_output_dir(root: Path = Path("prompt-optimizer/out")) -> Path:
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return root / f"gepa-{stamp}"
+
+
+def _limited_rows(rows: tuple[FeedbackPoolRow, ...], limit: int | None) -> tuple[FeedbackPoolRow, ...]:
+    if limit is None:
+        return rows
+    if limit < 1:
+        raise ValueError("limit must be at least 1")
+    return rows[:limit]
+
+
+def _jsonable_config(config: GEPARunConfig) -> dict[str, Any]:
+    payload = asdict(config)
+    payload["output_dir"] = str(config.output_dir)
+    harness = payload["harness"]
+    if harness["state_dir"] is not None:
+        harness["state_dir"] = str(harness["state_dir"])
+    return payload

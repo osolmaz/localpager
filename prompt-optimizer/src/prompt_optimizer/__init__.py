@@ -7,4 +7,5 @@ __all__ = [
     "metric",
     "prompt",
     "reflection",
+    "run",
 ]

@@ -4,7 +4,7 @@ import unittest
 
 from prompt_optimizer.adapter import LocalpagerAdapter, ROUTING_POLICY_COMPONENT
 from prompt_optimizer.dataset import DS4Row, FeedbackManifestRow, FeedbackPoolRow
-from prompt_optimizer.harness import StaticClassifierHarness
+from prompt_optimizer.harness import ClassifierOutput, StaticClassifierHarness
 from prompt_optimizer.prompt import normalize_template_variables, split_seed_prompt
 
 
@@ -87,6 +87,43 @@ Old policy
         assert batch.trajectories is not None
         self.assertIn("invalid label", batch.trajectories[0].feedback[0])
 
+    def test_concurrent_evaluate_preserves_batch_order(self) -> None:
+        rows = [
+            _pool_row("row-1", ["acp"], "ACP"),
+            _pool_row("row-2", ["gateway"], "Gateway"),
+        ]
+        prompt_parts = split_seed_prompt(
+            normalize_template_variables(
+                """{{{allowed_topics_json}}}
+{{{topic_descriptions}}}
+
+## Goal
+Old policy
+
+## Target
+{{target}}
+
+## GitHub Context
+{{{github_context}}}
+"""
+            )
+        )
+        adapter = LocalpagerAdapter(
+            prompt_parts=prompt_parts,
+            harness=EchoHarness(),
+            allowed_topics=frozenset({"acp", "gateway"}),
+            concurrency=2,
+        )
+
+        batch = adapter.evaluate(
+            rows,
+            {ROUTING_POLICY_COMPONENT: "## Goal\nNew policy\n"},
+            capture_traces=True,
+        )
+
+        self.assertEqual([output.description for output in batch.outputs], ["row-1", "row-2"])
+        self.assertEqual(batch.scores, [1.0, 1.0])
+
 
 def _pool_row(row_id: str, topics: list[str], title: str) -> FeedbackPoolRow:
     ds4 = DS4Row(
@@ -112,6 +149,15 @@ def _pool_row(row_id: str, topics: list[str], title: str) -> FeedbackPoolRow:
         raw={},
     )
     return FeedbackPoolRow(manifest=manifest, ds4=ds4)
+
+
+class EchoHarness:
+    def classify(self, row: FeedbackPoolRow, prompt_text: str) -> ClassifierOutput:
+        del prompt_text
+        return ClassifierOutput(
+            topics_of_interest=row.ds4.topics_of_interest,
+            description=row.ds4.id,
+        )
 
 
 if __name__ == "__main__":

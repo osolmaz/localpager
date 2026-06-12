@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
@@ -45,10 +46,14 @@ class LocalpagerAdapter:
         prompt_parts: PromptParts,
         harness: ClassifierHarness,
         allowed_topics: frozenset[str],
+        concurrency: int = 1,
     ) -> None:
+        if concurrency < 1:
+            raise ValueError("concurrency must be at least 1")
         self.prompt_parts = prompt_parts
         self.harness = harness
         self.allowed_topics = allowed_topics
+        self.concurrency = concurrency
 
     def evaluate(
         self,
@@ -63,28 +68,8 @@ class LocalpagerAdapter:
         trajectories: list[LocalpagerTrajectory] | None = [] if capture_traces else None
         objective_scores: list[dict[str, float]] = []
 
-        for row in batch:
-            output = self.harness.classify(row, prompt_text)
+        for output, score, row_score, feedback, error, row in self._evaluate_rows(batch, prompt_text):
             outputs.append(output)
-            row_score: RowScore | None = None
-            feedback: tuple[str, ...]
-            error = output.error
-            if error is None:
-                try:
-                    row_score = score_row(
-                        row.ds4.topics_of_interest,
-                        output.topics_of_interest,
-                        self.allowed_topics,
-                    )
-                    score = row_score.score
-                    feedback = asi_notes(row.ds4.id, row_score)
-                except InvalidLabelError as exc:
-                    error = str(exc)
-                    score = 0.0
-                    feedback = (f"{row.ds4.id}: classifier emitted invalid label: {exc}",)
-            else:
-                score = 0.0
-                feedback = (f"{row.ds4.id}: classifier failed: {error}",)
             scores.append(score)
             objective_scores.append({"weighted_score": score})
             if trajectories is not None:
@@ -140,6 +125,59 @@ class LocalpagerAdapter:
                 }
             )
         return {ROUTING_POLICY_COMPONENT: records}
+
+    def _evaluate_rows(
+        self,
+        batch: list[FeedbackPoolRow],
+        prompt_text: str,
+    ) -> list[
+        tuple[
+            ClassifierOutput,
+            float,
+            RowScore | None,
+            tuple[str, ...],
+            str | None,
+            FeedbackPoolRow,
+        ]
+    ]:
+        if self.concurrency == 1 or len(batch) <= 1:
+            return [self._evaluate_row(row, prompt_text) for row in batch]
+        with ThreadPoolExecutor(max_workers=self.concurrency) as executor:
+            return list(executor.map(lambda row: self._evaluate_row(row, prompt_text), batch))
+
+    def _evaluate_row(
+        self,
+        row: FeedbackPoolRow,
+        prompt_text: str,
+    ) -> tuple[
+        ClassifierOutput,
+        float,
+        RowScore | None,
+        tuple[str, ...],
+        str | None,
+        FeedbackPoolRow,
+    ]:
+        output = self.harness.classify(row, prompt_text)
+        row_score: RowScore | None = None
+        feedback: tuple[str, ...]
+        error = output.error
+        if error is None:
+            try:
+                row_score = score_row(
+                    row.ds4.topics_of_interest,
+                    output.topics_of_interest,
+                    self.allowed_topics,
+                )
+                score = row_score.score
+                feedback = asi_notes(row.ds4.id, row_score)
+            except InvalidLabelError as exc:
+                error = str(exc)
+                score = 0.0
+                feedback = (f"{row.ds4.id}: classifier emitted invalid label: {exc}",)
+        else:
+            score = 0.0
+            feedback = (f"{row.ds4.id}: classifier failed: {error}",)
+        return output, score, row_score, feedback, error, row
 
 
 def _candidate_routing_policy(candidate: dict[str, str]) -> str:

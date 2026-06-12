@@ -20,6 +20,7 @@ Or run the commands directly:
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m unittest discover -s prompt-optimizer/tests
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed --limit 1
 ```
 
 The summary command expects the local dataset checkout and Shaun feedback set
@@ -38,6 +39,24 @@ The first implementation slice covers:
 - evaluating candidates through a mockable GEPA adapter shape
 - invoking the production `scripts/localpager-classifier` wrapper through a
   tested subprocess harness
+- wiring `gepa.optimize` behind an explicit CLI command that writes run artifacts
 - wrapping `codex exec -` as a GEPA reflection language model
 
-GEPA run wiring and live `localpager-agent` classification come next.
+The `evaluate-seed` command defaults to a no-model static harness. To run a
+real one-row classifier smoke through the production wrapper, pass:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
+  --harness localpager-agent \
+  --model gemma-12b-q4km-reason \
+  --limit 1
+```
+
+GEPA optimization is explicit because a live run can take a long time:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
+  --max-metric-calls 20 \
+  --row-limit 4 \
+  --model gemma-12b-q4km-reason
+```
