@@ -211,6 +211,26 @@ describe("structured output", () => {
     expect(plan.args).not.toContain("structured system");
   });
 
+  it("can omit the appended final schema instruction for full system prompt control", async () => {
+    const plan = await createLaunchPlan(
+      {
+        ...options("/tmp/localpager-agent-state"),
+        finalSchemaInstruction: false,
+        forwardedArgs: ["--system-prompt", "custom system", "-p", "classify"]
+      },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it",
+      finalSchemaRuntime()
+    );
+
+    expect(plan.args.filter((arg) => arg === "--system-prompt")).toHaveLength(1);
+    expect(plan.args).toContain("custom system");
+    expect(plan.args).toContain("--extension");
+    expect(plan.args).toContain("/tmp/final-json-extension.ts");
+    expect(plan.args).not.toContain("--append-system-prompt");
+    expect(plan.args).not.toContain("call final_json");
+  });
+
   it("adds reposhell bash extension without final schema", async () => {
     const plan = await createLaunchPlan(
       { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["-p", "inspect"] },
@@ -462,6 +482,7 @@ function options(stateDir: string): LocalpagerAgentOptions {
     sampling: {},
     timeoutMs: 1000,
     finalSchemaPath: undefined,
+    finalSchemaInstruction: true,
     promptTemplatePath: undefined,
     promptVarsPaths: [],
     promptVars: [],

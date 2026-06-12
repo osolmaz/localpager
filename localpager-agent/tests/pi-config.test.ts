@@ -126,6 +126,7 @@ function options(stateDir: string): LocalpagerAgentOptions {
     sampling: {},
     timeoutMs: 1000,
     finalSchemaPath: undefined,
+    finalSchemaInstruction: true,
     promptTemplatePath: undefined,
     promptVarsPaths: [],
     promptVars: [],

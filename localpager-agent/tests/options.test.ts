@@ -30,6 +30,13 @@ describe("localpager-agent option parsing", () => {
     );
   });
 
+  it("can disable the appended final schema instruction", () => {
+    const options = parseLocalpagerAgentArgs(["--no-final-schema-instruction", "-p", "classify"]);
+
+    expect(options.finalSchemaInstruction).toBe(false);
+    expect(options.forwardedArgs).toEqual(["-p", "classify"]);
+  });
+
   it("parses prompt template flags as localpager-agent options", () => {
     const options = parseLocalpagerAgentArgs([
       "--prompt-template",

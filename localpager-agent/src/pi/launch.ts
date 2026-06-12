@@ -28,6 +28,7 @@ export async function createLaunchPlan(
     finalSchemaRuntime === undefined
       ? plainOutputArgs(options.forwardedArgs, reposhellRuntime, samplingRuntime)
       : structuredOutputArgs(
+          options,
           options.forwardedArgs,
           finalSchemaRuntime,
           reposhellRuntime,
@@ -78,6 +79,7 @@ export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {
 }
 
 function structuredOutputArgs(
+  options: LocalpagerAgentOptions,
   forwardedArgs: readonly string[],
   runtime: FinalSchemaRuntime,
   reposhellRuntime: ReposhellRuntime | undefined,
@@ -100,8 +102,7 @@ function structuredOutputArgs(
     ...samplingExtensionArgs(samplingRuntime),
     "--extension",
     runtime.extensionPath,
-    "--append-system-prompt",
-    runtime.instruction,
+    ...finalSchemaInstructionArgs(options, runtime),
     ...args
   ];
 }
@@ -135,6 +136,13 @@ function reposhellExtensionArgs(runtime: ReposhellRuntime | undefined): string[]
   return runtime === undefined
     ? []
     : ["--extension", runtime.extensionPath, "--append-system-prompt", runtime.instruction];
+}
+
+function finalSchemaInstructionArgs(
+  options: LocalpagerAgentOptions,
+  runtime: FinalSchemaRuntime
+): string[] {
+  return options.finalSchemaInstruction ? ["--append-system-prompt", runtime.instruction] : [];
 }
 
 function samplingExtensionArgs(runtime: SamplingRuntime | undefined): string[] {

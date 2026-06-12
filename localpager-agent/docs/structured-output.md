@@ -13,7 +13,7 @@ Localpager Agent does not modify Pi and does not proxy the model API. Instead, i
 1. Localpager Agent reads the JSON Schema file.
 2. It generates a Pi extension that registers a `final_json` tool with that schema as its parameters.
 3. It starts Pi with that extension plus an extra instruction telling the model to call `final_json` when the work is done.
-4. Pi can still use normal tools during the investigation.
+4. If reposhell is configured, Pi can use that read-only `bash` tool during the investigation.
 5. When the model calls `final_json`, Pi validates the tool arguments against the schema, the extension writes the JSON to disk, and the run terminates.
 6. Localpager Agent prints only the captured JSON.
 
@@ -46,23 +46,34 @@ You can also set a default schema with:
 export LOCALPAGER_AGENT_FINAL_SCHEMA=./examples/schemas/binary-classifier.schema.json
 ```
 
-## Tool Allow Lists
+## Prompt Control
 
-If you pass Pi a tool allow list with `--tools` or `-t`, localpager-agent automatically adds `final_json` to it.
+By default, schema runs replace Pi's coding-agent system prompt with a short
+structured-output prompt and append a final-schema instruction. A caller can
+pass Pi `--system-prompt` to replace the base prompt while keeping the appended
+`final_json` instruction.
 
-For example, this:
+For complete control over the system prompt text, pass both a custom
+`--system-prompt` and `--no-final-schema-instruction`:
 
 ```bash
-localpager-agent --final-schema ./examples/schemas/binary-classifier.schema.json --tools bash -p "inspect the repository and classify the issue"
+localpager-agent \
+  --final-schema ./examples/schemas/binary-classifier.schema.json \
+  --no-final-schema-instruction \
+  --system-prompt "Your full system prompt here." \
+  -p "classify whether this issue is release-blocking: <text>"
 ```
 
-is passed to Pi as if the tool list were:
+The `final_json` tool is still registered and schema-validated. This option only
+removes the generated appended prompt text, so the caller's custom system prompt
+must still tell the model when and how to call `final_json`.
 
-```text
-bash,final_json
-```
+## Tool Configuration
 
-`--final-schema` cannot be used with `--no-tools`, because the final JSON is submitted through a Pi tool.
+Localpager Agent owns Pi tool configuration. Caller-supplied Pi tool flags such
+as `--tools`, `-t`, `--no-tools`, and `-nt` are rejected. Schema runs expose
+`final_json`; reposhell runs expose read-only `bash`; other Pi tools are not
+passed through.
 
 `--final-schema` also requires Pi print mode (`-p`, `--print`, or `--prompt-template`). Localpager Agent suppresses Pi's normal stdout during schema runs so it can print only the captured JSON, which is not compatible with Pi's interactive terminal UI.
 

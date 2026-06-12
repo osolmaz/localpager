@@ -192,6 +192,9 @@ localpager-agent \
 - `--timeout-ms <n>`: `/v1/models` probe timeout. Default: `3000`
 - `--final-schema <path>`: force the final answer through a JSON schema; requires Pi print mode (`-p` or `--print`)
 - `--schema <path>`: alias for `--final-schema`
+- `--no-final-schema-instruction`: do not append the generated `final_json`
+  system instruction for `--final-schema` runs. Use with an explicit Pi
+  `--system-prompt` when the caller needs complete control over prompt text.
 - `--prompt-template <path>`: render a maintained prompt template and pass it to Pi print mode
 - `--prompt-vars-file <path>`: JSON object variables for `--prompt-template`; repeatable
 - `--prompt-var <key=value>`: inline template variable override; repeatable
@@ -211,6 +214,12 @@ For `--final-schema` runs, `localpager-agent` replaces Pi's default coding-agent
 system prompt with a short structured-output prompt that names the available
 `final_json` tool and tells the model to call it as soon as the final answer is
 ready. Passing an explicit Pi `--system-prompt` still overrides this default.
+By default, `localpager-agent` also appends a short final-schema instruction so
+custom system prompts still know to call `final_json`. Pass
+`--no-final-schema-instruction` to disable that append when the caller wants the
+complete system prompt text to come from the forwarded Pi arguments.
+The current minimal base system prompt is recorded in
+[docs/prompt-history/2026-06-12-localpager-agent-minimal-system-prompt.md](docs/prompt-history/2026-06-12-localpager-agent-minimal-system-prompt.md).
 
 ## Environment
 

@@ -20,6 +20,7 @@ export type LocalpagerAgentOptions = {
   readonly sampling: SamplingOptions;
   readonly timeoutMs: number;
   readonly finalSchemaPath: string | undefined;
+  readonly finalSchemaInstruction: boolean;
   readonly promptTemplatePath: string | undefined;
   readonly promptVarsPaths: readonly string[];
   readonly promptVars: readonly string[];
@@ -54,6 +55,7 @@ export function defaultOptions(): LocalpagerAgentOptions {
     sampling: envSamplingOptions(),
     timeoutMs: envPositiveInteger("LOCALPAGER_AGENT_TIMEOUT_MS", "3000"),
     finalSchemaPath: process.env["LOCALPAGER_AGENT_FINAL_SCHEMA"],
+    finalSchemaInstruction: envBoolean("LOCALPAGER_AGENT_FINAL_SCHEMA_INSTRUCTION", true),
     promptTemplatePath: process.env["LOCALPAGER_AGENT_PROMPT_TEMPLATE"],
     promptVarsPaths: splitCSV(process.env["LOCALPAGER_AGENT_PROMPT_VARS_FILE"] ?? ""),
     promptVars: [],
@@ -119,6 +121,8 @@ export function usage(): string {
     "  --timeout-ms <n>          /v1/models probe timeout",
     "  --final-schema <path>     force final schema output; requires Pi -p/--print",
     "  --schema <path>           alias for --final-schema",
+    "  --no-final-schema-instruction",
+    "                            do not append the final_json system instruction",
     "  --prompt-template <path>  render a prompt template and pass it to Pi print mode",
     "  --prompt-vars-file <path>",
     "                            JSON object variables for --prompt-template; repeatable",
@@ -156,6 +160,9 @@ function parseLocalpagerAgentFlag(
   const arg = args[index];
   if (arg === "--status") {
     return { options: { ...options, status: true }, advance: 0 };
+  }
+  if (arg === "--no-final-schema-instruction") {
+    return { options: { ...options, finalSchemaInstruction: false }, advance: 0 };
   }
   return arg === undefined ? undefined : parseValueFlag(options, args, index, arg);
 }
@@ -244,6 +251,20 @@ function parseValueFlag(
 
 function envString(name: string, fallback: string): string {
   return process.env[name] ?? fallback;
+}
+
+function envBoolean(name: string, fallback: boolean): boolean {
+  const value = process.env[name];
+  if (value === undefined) {
+    return fallback;
+  }
+  if (["1", "true", "yes", "on"].includes(value.toLowerCase())) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(value.toLowerCase())) {
+    return false;
+  }
+  throw new Error(`${name} must be a boolean`);
 }
 
 function envBackend(name: string, fallback: LocalpagerAgentBackend): LocalpagerAgentBackend {
