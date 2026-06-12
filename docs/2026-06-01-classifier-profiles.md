@@ -171,6 +171,10 @@ rather than every technically related topic.
 
 ## Runtime Behavior
 
+For the concrete chain, prompt placeholders, schema-enum generation, and
+missing-`final_json` recovery, see
+[Classifier Pipeline and Profile Rendering](2026-06-12-classifier-pipeline-and-rendering.md).
+
 1. Worker calls the configured classifier command.
 2. Classifier wrapper loads profile config.
 3. Wrapper renders a runtime schema from `classifier.schema` and
