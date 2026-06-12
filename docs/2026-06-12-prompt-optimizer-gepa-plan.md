@@ -329,6 +329,17 @@ Stretch goal for the same time box: classify one Shaun row through
 `localpager-agent` with a mock or live model path and parse `final_json`. Do not
 block the required first slice on a slow 12B rollout.
 
+Live smoke note from 2026-06-13: row `openclaw-openclaw-48940` now runs through
+the production `scripts/localpager-classifier` -> `localpager-agent` path. With
+12B and `--max-tokens 512`, the model exhausted the output cap during reasoning
+and never called `final_json`; this should be treated as a structural failure,
+not a classifier score. With E4B and the same row/cap, `final_json` parsed and
+scored `0.25` (`acp`, `gateway`, `sessions` vs DS4 gold `acp`, `gateway`,
+`agent_runtime`). With 12B and `--max-tokens 1536`, `final_json` parsed and
+scored `0.5` (`acp`, `gateway` vs the same DS4 gold). Optimizer live defaults
+should therefore use 12B, concurrency 2, and the larger output cap unless a
+run is explicitly marked as E4B smoke/debug.
+
 ## Open questions
 
 - Exact rollout budget vs. wall-clock threshold for switching exploratory runs

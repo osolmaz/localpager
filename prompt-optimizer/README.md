@@ -49,6 +49,7 @@ real one-row classifier smoke through the production wrapper, pass:
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --harness localpager-agent \
   --model gemma-12b-q4km-reason \
+  --max-tokens 1536 \
   --limit 1
 ```
 
@@ -58,5 +59,6 @@ GEPA optimization is explicit because a live run can take a long time:
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --max-metric-calls 20 \
   --row-limit 4 \
-  --model gemma-12b-q4km-reason
+  --model gemma-12b-q4km-reason \
+  --max-tokens 1536
 ```

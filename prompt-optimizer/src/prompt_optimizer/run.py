@@ -15,7 +15,12 @@ from prompt_optimizer.dataset import (
     build_feedback_pool,
     load_taxonomy,
 )
-from prompt_optimizer.harness import ClassifierHarness, LocalpagerAgentHarness, StaticClassifierHarness
+from prompt_optimizer.harness import (
+    DEFAULT_MAX_TOKENS,
+    ClassifierHarness,
+    LocalpagerAgentHarness,
+    StaticClassifierHarness,
+)
 from prompt_optimizer.prompt import DEFAULT_SEED_PROMPT_PATH, PromptParts, load_seed_prompt
 from prompt_optimizer.reflection import CodexReflectionLM
 
@@ -35,7 +40,7 @@ class OptimizerInputs:
 class HarnessConfig:
     model: str = DEFAULT_MODEL
     concurrency: int = DEFAULT_CONCURRENCY
-    max_tokens: int = 768
+    max_tokens: int = DEFAULT_MAX_TOKENS
     timeout_ms: int = 900_000
     base_url: str | None = None
     context_window: int | None = None

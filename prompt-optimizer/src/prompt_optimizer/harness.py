@@ -13,6 +13,7 @@ from prompt_optimizer.dataset import DEFAULT_TAXONOMY_PATH, DS4Row, FeedbackPool
 
 DEFAULT_CLASSIFIER_COMMAND = REPO_ROOT / "scripts/localpager-classifier"
 DEFAULT_SCHEMA_PATH = REPO_ROOT / "schemas/classification.schema.json"
+DEFAULT_MAX_TOKENS = 1536
 
 
 @dataclass(frozen=True)
@@ -56,7 +57,7 @@ class LocalpagerAgentHarness:
     topic_taxonomy_path: Path = DEFAULT_TAXONOMY_PATH
     base_url: str | None = None
     context_window: int | None = None
-    max_tokens: int = 768
+    max_tokens: int = DEFAULT_MAX_TOKENS
     timeout_ms: int = 900_000
     state_dir: Path | None = None
     extra_agent_args: tuple[str, ...] = ()

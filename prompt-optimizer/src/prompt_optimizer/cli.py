@@ -17,6 +17,7 @@ from prompt_optimizer.metric import SCORING_CONFIG
 from prompt_optimizer.prompt import DEFAULT_SEED_PROMPT_PATH, load_seed_prompt
 from prompt_optimizer.run import (
     DEFAULT_CONCURRENCY,
+    DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     GEPARunConfig,
     HarnessConfig,
@@ -144,7 +145,7 @@ def _add_input_args(parser: argparse.ArgumentParser) -> None:
 
 def _add_harness_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--model", default=DEFAULT_MODEL)
-    parser.add_argument("--max-tokens", type=int, default=768)
+    parser.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
     parser.add_argument("--timeout-ms", type=int, default=900_000)
     parser.add_argument("--base-url", default=None)
     parser.add_argument("--context-window", type=int, default=None)
