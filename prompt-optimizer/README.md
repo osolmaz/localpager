@@ -35,5 +35,6 @@ The first implementation slice covers:
 - normalizing the v9.1 prompt template into Localpager placeholders
 - extracting the editable `routing_policy` block
 - scoring predictions with a false-positive-heavy multilabel metric
+- wrapping `codex exec -` as a GEPA reflection language model
 
 GEPA adapter wiring and live `localpager-agent` classification come next.

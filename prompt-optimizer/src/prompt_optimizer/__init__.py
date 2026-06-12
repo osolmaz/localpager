@@ -4,4 +4,5 @@ __all__ = [
     "dataset",
     "metric",
     "prompt",
+    "reflection",
 ]
