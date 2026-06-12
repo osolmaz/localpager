@@ -95,6 +95,11 @@ To keep many rollouts tractable:
 - Keep the model server warm.
 - Run at concurrency 2: at most two classifier calls in flight against the local
   12B model.
+- If 12B rollout speed blocks iteration, use `gemma-e4b-reason-test` for
+  smoke/debug runs and explicitly marked exploratory optimizer iterations. E4B
+  scores are not transfer evidence: any candidate selected or filtered with E4B
+  must be re-evaluated on the 12B model before promotion, validation, or final
+  reporting.
 - Add the one production-side seam below so rows stream through a warm process
   instead of spawning Pi per row.
 
@@ -127,6 +132,9 @@ To keep many rollouts tractable:
 
 - Task / evaluator LM: the already-loaded local 12B model we actually serve.
   Non-negotiable for transfer; the prompt is tuned to that loaded model's quirks.
+- Fast fallback LM: `gemma-e4b-reason-test`, for smoke/debug runs or
+  budget-limited exploration only. Log fallback use clearly and never compare E4B
+  scores directly against 12B scores.
 - Reflection / proposer LM: Codex. Prefer a direct non-interactive Codex CLI
   bridge (`codex exec -`) wrapped as GEPA's `reflection_lm`; pass the reflection
   prompt on stdin and capture the final response from stdout or
@@ -291,8 +299,8 @@ it is independently useful.
 
 ## Open questions
 
-- Rollout budget vs. wall-clock on the already-loaded local 12B model with
-  concurrency fixed at 2.
+- Exact rollout budget vs. wall-clock threshold for switching exploratory runs
+  from the already-loaded local 12B model to `gemma-e4b-reason-test`.
 - Whether to ever optimize more than the prompt (schema or topic list); if so,
   the library's `optimize_anything` / adapter framing is the fit, and the
   candidate grows beyond `routing_policy`.
