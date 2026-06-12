@@ -36,6 +36,8 @@ The first implementation slice covers:
 - extracting the editable `routing_policy` block
 - scoring predictions with a false-positive-heavy multilabel metric
 - evaluating candidates through a mockable GEPA adapter shape
+- invoking the production `scripts/localpager-classifier` wrapper through a
+  tested subprocess harness
 - wrapping `codex exec -` as a GEPA reflection language model
 
-Live `localpager-agent` classification comes next.
+GEPA run wiring and live `localpager-agent` classification come next.
