@@ -127,8 +127,14 @@ To keep many rollouts tractable:
 
 - Task / evaluator LM: the already-loaded local 12B model we actually serve.
   Non-negotiable for transfer; the prompt is tuned to that loaded model's quirks.
-- Reflection / proposer LM: a stronger API model (e.g. Codex / GPT-5.x), passed
-  as `reflection_lm`.
+- Reflection / proposer LM: Codex. Prefer a direct non-interactive Codex CLI
+  bridge (`codex exec -`) wrapped as GEPA's `reflection_lm`; pass the reflection
+  prompt on stdin and capture the final response from stdout or
+  `--output-last-message`. Use `--output-schema` when the reflection response
+  needs machine-readable fields. A Pi-backed Codex invocation is an acceptable
+  fallback only if the direct CLI bridge does not fit GEPA's adapter contract.
+  Keep Codex auth outside the repo, using the operator's existing Codex CLI
+  authentication/config.
 
 ## Data and reproducibility
 
@@ -254,6 +260,12 @@ against the installed `gepa` version):
 reflection_lm, max_metric_calls=...)` and writes the winning `routing_policy`
 plus a report to `out/`.
 
+The first reflection bridge should be `CodexReflectionLM`, a thin subprocess
+wrapper around `codex exec -`. It must run with no repository edits, log the
+exact `codex --version`, selected model/profile/config knobs, command argv, and
+reflection prompt digest for reproducibility, and fail closed if Codex returns
+non-JSON when a schema is required.
+
 ## The one production change
 
 Add a batch / RPC classify mode to `localpager-agent` so the adapter can stream
@@ -269,15 +281,16 @@ it is independently useful.
 3. `harness.py` + `metric.py`: classify one row through the real harness and
    score it vs DS4 using the weighted FP/FN/over-labeling objective, with a mock
    model path for fast tests.
-4. `adapter.py`: implement `evaluate` and `make_reflective_dataset`.
-5. `run.py`: wire `gepa.optimize`; do a tiny smoke run on a handful of rows.
-6. Add the batch-classify seam to `localpager-agent`; switch the harness to it.
-7. Full run; review the winning prompt; commit it as the new
+4. `reflection.py`: implement and smoke-test `CodexReflectionLM` over
+   `codex exec -`.
+5. `adapter.py`: implement `evaluate` and `make_reflective_dataset`.
+6. `run.py`: wire `gepa.optimize`; do a tiny smoke run on a handful of rows.
+7. Add the batch-classify seam to `localpager-agent`; switch the harness to it.
+8. Full run; review the winning prompt; commit it as the new
    `classifier.prompt_template`.
 
 ## Open questions
 
-- Reflection model and its access (API key handling, kept out of the repo).
 - Rollout budget vs. wall-clock on the already-loaded local 12B model with
   concurrency fixed at 2.
 - Whether to ever optimize more than the prompt (schema or topic list); if so,
