@@ -306,6 +306,29 @@ useful.
 8. Full run; review the winning prompt; commit it as the new
    `classifier.prompt_template`.
 
+## 8-hour progress target
+
+Within the first 8 hours of implementation, "good progress" means a committed,
+tested first slice exists even if no full GEPA optimization run has completed:
+
+- `prompt-optimizer/` is scaffolded with `pyproject.toml`, package modules,
+  README, and local test command.
+- `dataset.py` loads canonical `ds4.jsonl`, loads Shaun's `gepa-good-60` row
+  identities, validates all 60 rows against the configured taxonomy, and reports
+  the feedback-pool composition.
+- Prompt handling loads the v9.1 seed prompt, normalizes the Handlebars
+  variables to Localpager placeholders, extracts the editable `routing_policy`,
+  and preserves the frozen scaffold in tests.
+- `metric.py` implements the weighted FP/FN/over-labeling score with tests that
+  prove random extra labels hurt, false positives cost more than false
+  negatives, and invalid labels fail instead of earning partial credit.
+- A small CLI or test fixture can print a deterministic summary of the chosen
+  dataset, prompt seed, and scoring config.
+
+Stretch goal for the same time box: classify one Shaun row through
+`localpager-agent` with a mock or live model path and parse `final_json`. Do not
+block the required first slice on a slow 12B rollout.
+
 ## Open questions
 
 - Exact rollout budget vs. wall-clock threshold for switching exploratory runs
