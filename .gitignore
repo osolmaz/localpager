@@ -10,3 +10,7 @@ node_modules/
 tmp/
 vendor/
 experiment-runs/
+prompt-optimizer/.venv/
+prompt-optimizer/out/
+prompt-optimizer/.pytest_cache/
+prompt-optimizer/**/__pycache__/
