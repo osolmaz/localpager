@@ -88,6 +88,12 @@ lab transfers to deployment:
 - Run it through `localpager-classifier` → `localpager-agent` → Pi → the
   already-loaded local 12B model → `final_json`.
 
+The runtime classifier harness is `localpager-agent`. The Python
+`prompt-optimizer` harness is only a driver: it assembles candidate prompt files,
+selects dataset rows, invokes `localpager-classifier` / `localpager-agent`, and
+parses `final_json`. It must not replace or bypass `localpager-agent` for model
+execution.
+
 To keep many rollouts tractable:
 
 - Pre-fetch and cache each dataset row's GitHub context once (pass
@@ -244,7 +250,7 @@ prompt-optimizer/
   pyproject.toml                 # depends on gepa + an OpenAI-compatible client
   README.md                      # what it does, how to run
   src/prompt_optimizer/
-    harness.py                   # render candidate + run classifier, parse final_json
+    harness.py                   # Python driver around localpager-agent, parse final_json
     metric.py                    # weighted score, topic F1, ASI text from FP/FN
     adapter.py                   # LocalpagerAdapter(gepa GEPAAdapter)
     dataset.py                   # load DS4 rows, cache GitHub contexts, split
@@ -258,8 +264,9 @@ prompt-optimizer/
 against the installed `gepa` version):
 
 - `evaluate(batch, candidate, capture_traces)` → for each row: assemble the
-  prompt from frozen scaffold + `candidate["routing_policy"]`, run it through the
-  harness, parse `final_json`, score vs DS4. Returns outputs, scores, and (when
+  prompt from frozen scaffold + `candidate["routing_policy"]`, hand it to the
+  Python driver, run classification through `localpager-agent`, parse
+  `final_json`, score vs DS4. Returns outputs, scores, and (when
   `capture_traces`) the wrong-topic details.
 - `make_reflective_dataset(candidate, eval_batch, components_to_update)` → turn
   the captured mistakes into the ASI notes above, keyed by `routing_policy`.
@@ -276,24 +283,26 @@ non-JSON when a schema is required.
 
 ## The one production change
 
-Add a batch / RPC classify mode to `localpager-agent` so the adapter can stream
-many rows through one warm agent process instead of spawning Pi per row. This is
-the only change outside `prompt-optimizer/`, it keeps evaluation faithful, and
-it is independently useful.
+Add a batch / RPC classify mode to `localpager-agent`, the runtime classifier
+harness, so the adapter can stream many rows through one warm agent process
+instead of spawning Pi per row. This is the only change outside
+`prompt-optimizer/`, it keeps evaluation faithful, and it is independently
+useful.
 
 ## Milestones
 
 1. Scaffold `prompt-optimizer/` (pyproject, package skeleton, README).
 2. `dataset.py`: load DS4 rows, cache the v9.1 seed prompt and GitHub contexts,
    three-way split.
-3. `harness.py` + `metric.py`: classify one row through the real harness and
+3. `harness.py` + `metric.py`: classify one row through `localpager-agent` and
    score it vs DS4 using the weighted FP/FN/over-labeling objective, with a mock
    model path for fast tests.
 4. `reflection.py`: implement and smoke-test `CodexReflectionLM` over
    `codex exec -`.
 5. `adapter.py`: implement `evaluate` and `make_reflective_dataset`.
 6. `run.py`: wire `gepa.optimize`; do a tiny smoke run on a handful of rows.
-7. Add the batch-classify seam to `localpager-agent`; switch the harness to it.
+7. Add the batch-classify seam to `localpager-agent`; switch the Python driver
+   to it.
 8. Full run; review the winning prompt; commit it as the new
    `classifier.prompt_template`.
 
