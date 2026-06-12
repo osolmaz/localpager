@@ -340,6 +340,14 @@ scored `0.5` (`acp`, `gateway` vs the same DS4 gold). Optimizer live defaults
 should therefore use 12B, concurrency 2, and the larger output cap unless a
 run is explicitly marked as E4B smoke/debug.
 
+Live GEPA note from 2026-06-13: the first 12B continuation candidate is saved at
+`prompt-optimizer/results/2026-06-13-gepa-12b-twelve-best.routing_policy.md`.
+It improves the external 12B mean from `0.5016` to `0.5244` over rows 1-18
+of Shaun's ordered set, but the evidence is still noisy: the external rows 1-12
+re-evaluation had one structural `final_json` failure, and only rows 13-18 were
+held out from the second GEPA run. Treat this as a candidate worth further
+validation, not as a production prompt replacement yet.
+
 ## Open questions
 
 - Exact rollout budget vs. wall-clock threshold for switching exploratory runs

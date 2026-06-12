@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -54,6 +55,7 @@ class GEPARunConfig:
     reflection_minibatch_size: int = 4
     seed: int = 0
     row_limit: int | None = None
+    seed_routing_policy: str | None = None
     harness: HarnessConfig = HarnessConfig()
 
 
@@ -111,12 +113,44 @@ def evaluate_seed(
     harness: ClassifierHarness,
     concurrency: int = DEFAULT_CONCURRENCY,
     limit: int | None = None,
+    offset: int = 0,
     capture_traces: bool = True,
 ) -> dict[str, Any]:
-    rows = _limited_rows(inputs.rows, limit)
+    rows = _selected_rows(inputs.rows, limit, offset)
     adapter = make_adapter(inputs=inputs, harness=harness, concurrency=concurrency)
     batch = adapter.evaluate(list(rows), seed_candidate(inputs.prompt_parts), capture_traces=capture_traces)
-    return evaluation_report(rows, batch)
+    return evaluation_report(
+        rows,
+        batch,
+        routing_policy=inputs.prompt_parts.routing_policy,
+        candidate_name="seed",
+    )
+
+
+def evaluate_routing_policy(
+    *,
+    inputs: OptimizerInputs,
+    routing_policy: str,
+    harness: ClassifierHarness,
+    concurrency: int = DEFAULT_CONCURRENCY,
+    limit: int | None = None,
+    offset: int = 0,
+    capture_traces: bool = True,
+    candidate_name: str = "candidate",
+) -> dict[str, Any]:
+    rows = _selected_rows(inputs.rows, limit, offset)
+    adapter = make_adapter(inputs=inputs, harness=harness, concurrency=concurrency)
+    batch = adapter.evaluate(
+        list(rows),
+        {ROUTING_POLICY_COMPONENT: routing_policy},
+        capture_traces=capture_traces,
+    )
+    return evaluation_report(
+        rows,
+        batch,
+        routing_policy=routing_policy,
+        candidate_name=candidate_name,
+    )
 
 
 def run_gepa(
@@ -126,12 +160,17 @@ def run_gepa(
 ) -> dict[str, Any]:
     import gepa
 
-    rows = list(_limited_rows(inputs.rows, config.row_limit))
+    rows = list(_selected_rows(inputs.rows, config.row_limit, 0))
     harness = localpager_agent_harness(config.harness)
     adapter = make_adapter(inputs=inputs, harness=harness, concurrency=config.harness.concurrency)
+    initial_candidate = (
+        {ROUTING_POLICY_COMPONENT: config.seed_routing_policy}
+        if config.seed_routing_policy is not None
+        else seed_candidate(inputs.prompt_parts)
+    )
     config.output_dir.mkdir(parents=True, exist_ok=True)
     result = gepa.optimize(
-        seed_candidate=seed_candidate(inputs.prompt_parts),
+        seed_candidate=initial_candidate,
         trainset=rows,
         valset=rows,
         adapter=adapter,
@@ -140,7 +179,7 @@ def run_gepa(
         reflection_minibatch_size=config.reflection_minibatch_size,
         run_dir=str(config.output_dir),
         seed=config.seed,
-        display_progress_bar=True,
+        display_progress_bar=False,
     )
     return write_result_artifacts(result, inputs.prompt_parts, config.output_dir, config)
 
@@ -178,22 +217,42 @@ def write_result_artifacts(
     return summary
 
 
-def evaluation_report(rows: tuple[FeedbackPoolRow, ...], batch: Any) -> dict[str, Any]:
+def evaluation_report(
+    rows: tuple[FeedbackPoolRow, ...],
+    batch: Any,
+    *,
+    routing_policy: str,
+    candidate_name: str,
+) -> dict[str, Any]:
     row_reports = []
-    for row, output, score in zip(rows, batch.outputs, batch.scores, strict=True):
-        row_reports.append(
-            {
-                "id": row.ds4.id,
-                "target": row.ds4.url,
-                "title": row.ds4.title,
-                "gold_topics": list(row.ds4.topics_of_interest),
-                "predicted_topics": list(output.topics_of_interest),
-                "score": score,
-                "error": output.error,
-            }
-        )
+    trajectories = batch.trajectories or []
+    for index, (row, output, score) in enumerate(zip(rows, batch.outputs, batch.scores, strict=True)):
+        report = {
+            "id": row.ds4.id,
+            "target": row.ds4.url,
+            "title": row.ds4.title,
+            "gold_topics": list(row.ds4.topics_of_interest),
+            "predicted_topics": list(output.topics_of_interest),
+            "score": score,
+            "error": output.error,
+        }
+        if index < len(trajectories):
+            row_score = getattr(trajectories[index], "score", None)
+            if row_score is not None:
+                report.update(
+                    {
+                        "true_positives": list(row_score.true_positives),
+                        "false_positives": list(row_score.false_positives),
+                        "false_negatives": list(row_score.false_negatives),
+                        "over_label_count": row_score.over_label_count,
+                        "loss": row_score.loss,
+                    }
+                )
+        row_reports.append(report)
     mean_score = sum(batch.scores) / len(batch.scores) if batch.scores else 0.0
     return {
+        "candidate": candidate_name,
+        "routing_policy_sha256": _sha256(routing_policy),
         "rows": len(row_reports),
         "mean_score": mean_score,
         "scores": list(batch.scores),
@@ -206,7 +265,10 @@ def default_output_dir(root: Path = Path("prompt-optimizer/out")) -> Path:
     return root / f"gepa-{stamp}"
 
 
-def _limited_rows(rows: tuple[FeedbackPoolRow, ...], limit: int | None) -> tuple[FeedbackPoolRow, ...]:
+def _selected_rows(rows: tuple[FeedbackPoolRow, ...], limit: int | None, offset: int) -> tuple[FeedbackPoolRow, ...]:
+    if offset < 0:
+        raise ValueError("offset must be non-negative")
+    rows = rows[offset:]
     if limit is None:
         return rows
     if limit < 1:
@@ -217,7 +279,18 @@ def _limited_rows(rows: tuple[FeedbackPoolRow, ...], limit: int | None) -> tuple
 def _jsonable_config(config: GEPARunConfig) -> dict[str, Any]:
     payload = asdict(config)
     payload["output_dir"] = str(config.output_dir)
+    seed_routing_policy = payload.pop("seed_routing_policy")
+    payload["seed_routing_policy_sha256"] = (
+        _sha256(seed_routing_policy) if seed_routing_policy is not None else None
+    )
+    payload["seed_routing_policy_chars"] = (
+        len(seed_routing_policy) if seed_routing_policy is not None else None
+    )
     harness = payload["harness"]
     if harness["state_dir"] is not None:
         harness["state_dir"] = str(harness["state_dir"])
     return payload
+
+
+def _sha256(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()

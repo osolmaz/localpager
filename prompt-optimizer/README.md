@@ -41,6 +41,8 @@ The first implementation slice covers:
   tested subprocess harness
 - wiring `gepa.optimize` behind an explicit CLI command that writes run artifacts
 - wrapping `codex exec -` as a GEPA reflection language model
+- re-evaluating saved routing-policy candidates against explicit dataset slices
+- continuing a GEPA run from a saved routing-policy candidate
 
 The `evaluate-seed` command defaults to a no-model static harness. To run a
 real one-row classifier smoke through the production wrapper, pass:
@@ -53,12 +55,41 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --limit 1
 ```
 
+Use `--offset` with `--limit` to check held-out slices of Shaun's ordered
+60-row set. Saved routing-policy candidates can be scored without another GEPA
+run:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-candidate \
+  --harness localpager-agent \
+  --model gemma-12b-q4km-reason \
+  --max-tokens 1536 \
+  --routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-twelve-best.routing_policy.md \
+  --candidate-name gepa-12b-twelve-best \
+  --limit 6 \
+  --offset 12
+```
+
 GEPA optimization is explicit because a live run can take a long time:
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --max-metric-calls 20 \
   --row-limit 4 \
+  --model gemma-12b-q4km-reason \
+  --max-tokens 1536
+```
+
+To continue from a saved candidate instead of the v9.1 seed prompt, pass
+`--seed-routing-policy`:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
+  --seed-routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-twelve-best.routing_policy.md \
+  --max-metric-calls 30 \
+  --row-limit 12 \
+  --reflection-minibatch-size 4 \
+  --concurrency 2 \
   --model gemma-12b-q4km-reason \
   --max-tokens 1536
 ```
