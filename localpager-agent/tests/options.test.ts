@@ -21,6 +21,21 @@ describe("localpager-agent option parsing", () => {
     expect(options.forwardedArgs).toEqual(["--model", "ignored-by-wrapper"]);
   });
 
+  it("removes -- from forwarded pi args after earlier pass-through args", () => {
+    const options = parseLocalpagerAgentArgs([
+      "--model",
+      "gemma-4-e4b-it",
+      "-p",
+      "classify",
+      "--",
+      "--model",
+      "pi-model"
+    ]);
+
+    expect(options.model).toBe("gemma-4-e4b-it");
+    expect(options.forwardedArgs).toEqual(["-p", "classify", "--model", "pi-model"]);
+  });
+
   it("parses final schema flags as localpager-agent options", () => {
     expect(parseLocalpagerAgentArgs(["--final-schema", "schema.json"]).finalSchemaPath).toBe(
       "schema.json"

@@ -1,5 +1,7 @@
 import path from "node:path";
 
+import { Command } from "commander";
+
 import { normalizeBaseUrl } from "../llm/openai.js";
 import type { SamplingOptions } from "../sampling/request-params.js";
 import { samplingOptionsFromEntries } from "../sampling/request-params.js";
@@ -69,184 +71,352 @@ export function defaultOptions(): LocalpagerAgentOptions {
 }
 
 export function parseLocalpagerAgentArgs(args: readonly string[]): LocalpagerAgentOptions {
-  let options = defaultOptions();
-  const forwardedArgs: string[] = [];
-  for (let index = 0; index < args.length; index += 1) {
-    const arg = args[index];
-    if (arg === undefined) {
-      continue;
-    }
-    if (arg === "--") {
-      forwardedArgs.push(...args.slice(index + 1));
-      break;
-    }
-    if (arg === "-h" || arg === "--help") {
-      return { ...options, forwardedArgs: ["--help"] };
-    }
-    const parsed = parseLocalpagerAgentFlag(options, args, index);
-    if (parsed !== undefined) {
-      options = parsed.options;
-      index += parsed.advance;
-      continue;
-    }
-    forwardedArgs.push(arg);
+  const options = defaultOptions();
+  if (hasLocalHelp(args)) {
+    return { ...options, forwardedArgs: ["--help"] };
   }
-  return { ...options, forwardedArgs };
+  const command = localpagerAgentCommand();
+  command.parse([...args], { from: "user" });
+  const parsed = command.opts<CommanderOptions>();
+  return applyCommanderOptions(options, parsed, args, forwardedPiArgs(args));
+}
+
+function applyCommanderOptions(
+  options: LocalpagerAgentOptions,
+  parsed: CommanderOptions,
+  args: readonly string[],
+  forwardedArgs: readonly string[]
+): LocalpagerAgentOptions {
+  return {
+    ...options,
+    backend: optionalParsed(parsed.backend, options.backend, parseBackend),
+    baseUrl: optionalParsed(parsed.baseUrl, options.baseUrl, normalizeBaseUrl),
+    model: optionalValue(parsed.model, options.model),
+    providerId: optionalValue(parsed.providerId, options.providerId),
+    stateDir: optionalValue(parsed.stateDir, options.stateDir),
+    sessionDir: optionalValue(parsed.sessionDir, options.sessionDir),
+    piCommand: optionalValue(parsed.piCommand, options.piCommand),
+    thinking: optionalValue(parsed.thinking, options.thinking),
+    contextWindow: optionalParsed(
+      parsed.contextWindow,
+      options.contextWindow,
+      parsePositiveInteger
+    ),
+    maxTokens: optionalParsed(parsed.maxTokens, options.maxTokens, parsePositiveInteger),
+    sampling: parsedSamplingOptions(options.sampling, parsed),
+    timeoutMs: optionalParsed(parsed.timeoutMs, options.timeoutMs, parsePositiveInteger),
+    finalSchemaPath: optionalValue(
+      lastLocalOptionValue(args, ["--final-schema", "--schema"]),
+      options.finalSchemaPath
+    ),
+    finalSchemaInstruction: resolvedFinalSchemaInstruction(options, args),
+    promptTemplatePath: optionalValue(parsed.promptTemplate, options.promptTemplatePath),
+    promptVarsPaths: appendedValues(options.promptVarsPaths, parsed.promptVarsFile),
+    promptVars: appendedValues(options.promptVars, parsed.promptVar),
+    renderedPromptPath: optionalValue(parsed.writeRenderedPrompt, options.renderedPromptPath),
+    reposhellSocket: optionalValue(parsed.reposhellSocket, options.reposhellSocket),
+    reposhellDefaultRepo: optionalValue(parsed.reposhellDefaultRepo, options.reposhellDefaultRepo),
+    reposhellVisibleRepos: optionalParsed(
+      parsed.reposhellVisibleRepos,
+      options.reposhellVisibleRepos,
+      splitCSV
+    ),
+    status: optionalValue(parsed.status, options.status),
+    forwardedArgs
+  };
+}
+
+function optionalValue<T>(value: T | undefined, fallback: T): T {
+  return value ?? fallback;
+}
+
+function optionalParsed<T>(value: string | undefined, fallback: T, parse: (value: string) => T): T {
+  return value === undefined ? fallback : parse(value);
+}
+
+function appendedValues<T>(current: readonly T[], next: readonly T[] | undefined): readonly T[] {
+  return next === undefined ? current : [...current, ...next];
+}
+
+function resolvedFinalSchemaInstruction(
+  options: LocalpagerAgentOptions,
+  args: readonly string[]
+): boolean {
+  return hasLocalFlag(args, "--no-final-schema-instruction")
+    ? false
+    : options.finalSchemaInstruction;
+}
+
+function parsedSamplingOptions(
+  current: SamplingOptions,
+  parsed: CommanderOptions
+): SamplingOptions {
+  return samplingOptionsFromEntries({
+    ...current,
+    temperature: optionalParsed(parsed.temperature, current.temperature, parseTemperature),
+    topP: optionalParsed(parsed.topP, current.topP, parseTopP),
+    seed: optionalParsed(parsed.seed, current.seed, parseSeed),
+    presencePenalty: optionalParsed(
+      parsed.presencePenalty,
+      current.presencePenalty,
+      parsePresencePenalty
+    ),
+    frequencyPenalty: optionalParsed(
+      parsed.frequencyPenalty,
+      current.frequencyPenalty,
+      parseFrequencyPenalty
+    )
+  });
+}
+
+function parseTemperature(value: string): number {
+  return parseBoundedNumber(value, "--temperature", 0, 2);
+}
+
+function parseTopP(value: string): number {
+  return parseBoundedNumber(value, "--top-p", 0, 1);
+}
+
+function parseSeed(value: string): number {
+  return parseNonNegativeInteger(value, "--seed");
+}
+
+function parsePresencePenalty(value: string): number {
+  return parseBoundedNumber(value, "--presence-penalty", -2, 2);
+}
+
+function parseFrequencyPenalty(value: string): number {
+  return parseBoundedNumber(value, "--frequency-penalty", -2, 2);
 }
 
 export function usage(): string {
-  return `${[
-    "localpager-agent - pi, automatically wired to an OpenAI-compatible endpoint or Pi built-in provider",
+  return `${localpagerAgentCommand().helpInformation()}${helpFooter()}`;
+}
+
+type CommanderOptions = {
+  readonly backend?: string;
+  readonly baseUrl?: string;
+  readonly model?: string;
+  readonly providerId?: string;
+  readonly stateDir?: string;
+  readonly sessionDir?: string;
+  readonly piCommand?: string;
+  readonly thinking?: string;
+  readonly contextWindow?: string;
+  readonly maxTokens?: string;
+  readonly temperature?: string;
+  readonly topP?: string;
+  readonly seed?: string;
+  readonly presencePenalty?: string;
+  readonly frequencyPenalty?: string;
+  readonly timeoutMs?: string;
+  readonly finalSchema?: string;
+  readonly schema?: string;
+  readonly promptTemplate?: string;
+  readonly promptVarsFile?: readonly string[];
+  readonly promptVar?: readonly string[];
+  readonly writeRenderedPrompt?: string;
+  readonly reposhellSocket?: string;
+  readonly reposhellDefaultRepo?: string;
+  readonly reposhellVisibleRepos?: string;
+  readonly status?: boolean;
+};
+
+function localpagerAgentCommand(): Command {
+  return new Command()
+    .name("localpager-agent")
+    .description("pi, automatically wired to an OpenAI-compatible endpoint or Pi built-in provider")
+    .usage("[localpager-agent options] [pi options/messages]")
+    .allowUnknownOption(true)
+    .allowExcessArguments(true)
+    .exitOverride()
+    .configureOutput({ writeOut: () => undefined, writeErr: () => undefined })
+    .helpOption("-h, --help", "show this help")
+    .option("--backend <name>", "openai-compatible or pi-builtin; default openai-compatible")
+    .option("--base-url <url>", "OpenAI-compatible endpoint for openai-compatible backend")
+    .option(
+      "--model <id|auto>",
+      "model to use; auto selects the first /v1/models id for openai-compatible"
+    )
+    .option("--status", "print local model and runtime config status")
+    .option(
+      "--provider-id <id>",
+      "generated Pi provider id, or Pi built-in provider for pi-builtin"
+    )
+    .option("--state-dir <path>", "localpager-agent runtime state directory")
+    .option("--session-dir <path>", "Pi session directory")
+    .option("--pi-command <command>", "Pi launch command")
+    .option("--thinking <level>", "Pi thinking level; default off")
+    .option("--context-window <n>", "generated model context window")
+    .option("--max-tokens <n>", "max output tokens; forwarded as max_tokens for openai-compatible")
+    .option("--temperature <n>", "OpenAI-compatible request temperature")
+    .option("--top-p <n>", "OpenAI-compatible request top_p")
+    .option("--seed <n>", "OpenAI-compatible request seed")
+    .option("--presence-penalty <n>", "OpenAI-compatible request presence_penalty")
+    .option("--frequency-penalty <n>", "OpenAI-compatible request frequency_penalty")
+    .option("--timeout-ms <n>", "/v1/models probe timeout")
+    .option("--final-schema <path>", "force final schema output; requires Pi -p/--print")
+    .option("--schema <path>", "alias for --final-schema")
+    .option("--no-final-schema-instruction", "do not append the final_json system instruction")
+    .option("--prompt-template <path>", "render a prompt template and pass it to Pi print mode")
+    .option(
+      "--prompt-vars-file <path>",
+      "JSON object variables for --prompt-template; repeatable",
+      collectValues,
+      []
+    )
+    .option(
+      "--prompt-var <key=value>",
+      "inline template variable override; repeatable",
+      collectValues,
+      []
+    )
+    .option("--write-rendered-prompt <path>", "write rendered prompt text for audit/debugging")
+    .option("--reposhell-socket <path>", "Unix socket for Localpager read-only bash")
+    .option("--reposhell-default-repo <id>", "default repo id for read-only bash")
+    .option(
+      "--reposhell-visible-repos <ids>",
+      "comma-separated repo ids visible to read-only bash"
+    );
+}
+
+function collectValues(value: string, previous: string[] = []): string[] {
+  return [...previous, value];
+}
+
+function helpFooter(): string {
+  return [
     "",
-    "usage:",
-    "  localpager-agent [localpager-agent options] [pi options/messages]",
-    "",
-    "localpager-agent options:",
-    "  --backend <name>          openai-compatible or pi-builtin; default openai-compatible",
-    "  --base-url <url>          OpenAI-compatible endpoint for openai-compatible backend",
-    "  --model <id|auto>         model to use; auto selects the first /v1/models id for openai-compatible",
-    "  --status                  print local model and runtime config status",
-    "  --provider-id <id>        generated Pi provider id, or Pi built-in provider for pi-builtin",
-    "  --state-dir <path>        localpager-agent runtime state directory",
-    "  --session-dir <path>      Pi session directory",
-    "  --pi-command <command>    Pi launch command",
-    "  --thinking <level>        Pi thinking level; default off",
-    "  --context-window <n>      generated model context window",
-    "  --max-tokens <n>          max output tokens; forwarded as max_tokens for openai-compatible",
-    "  --temperature <n>         OpenAI-compatible request temperature",
-    "  --top-p <n>               OpenAI-compatible request top_p",
-    "  --seed <n>                OpenAI-compatible request seed",
-    "  --presence-penalty <n>    OpenAI-compatible request presence_penalty",
-    "  --frequency-penalty <n>   OpenAI-compatible request frequency_penalty",
-    "  --timeout-ms <n>          /v1/models probe timeout",
-    "  --final-schema <path>     force final schema output; requires Pi -p/--print",
-    "  --schema <path>           alias for --final-schema",
-    "  --no-final-schema-instruction",
-    "                            do not append the final_json system instruction",
-    "  --prompt-template <path>  render a prompt template and pass it to Pi print mode",
-    "  --prompt-vars-file <path>",
-    "                            JSON object variables for --prompt-template; repeatable",
-    "  --prompt-var <key=value>  inline template variable override; repeatable",
-    "  --write-rendered-prompt <path>",
-    "                            write rendered prompt text for audit/debugging",
-    "  --reposhell-socket <p>  Unix socket for Localpager read-only bash",
-    "  --reposhell-default-repo <id>",
-    "                            default repo id for read-only bash",
-    "  --reposhell-visible-repos <ids>",
-    "                            comma-separated repo ids visible to read-only bash",
+    "notes:",
     "  Pi tool flags are not accepted; Localpager owns final_json and reposhell bash exposure",
     "  Pi context-file discovery is disabled; AGENTS.md and CLAUDE.md are not loaded",
-    "  -h, --help                show this help",
     "",
     "examples:",
     "  localpager-agent --status",
     '  localpager-agent -p "summarize this repo"',
     '  localpager-agent --model gemma-4-e4b-it -p "write a long implementation plan"',
     '  localpager-agent --backend pi-builtin --model openai-codex/gpt-5.3-codex-spark -p "classify this item"',
-    "  localpager-agent -- --help"
-  ].join("\n")}\n`;
+    "  localpager-agent -- --help",
+    ""
+  ].join("\n");
 }
 
-type ParseResult = {
-  readonly options: LocalpagerAgentOptions;
-  readonly advance: number;
-};
-
-function parseLocalpagerAgentFlag(
-  options: LocalpagerAgentOptions,
-  args: readonly string[],
-  index: number
-): ParseResult | undefined {
-  const arg = args[index];
-  if (arg === "--status") {
-    return { options: { ...options, status: true }, advance: 0 };
-  }
-  if (arg === "--no-final-schema-instruction") {
-    return { options: { ...options, finalSchemaInstruction: false }, advance: 0 };
-  }
-  return arg === undefined ? undefined : parseValueFlag(options, args, index, arg);
+function hasLocalHelp(args: readonly string[]): boolean {
+  return hasLocalFlag(args, "-h") || hasLocalFlag(args, "--help");
 }
 
-type OptionUpdater = (options: LocalpagerAgentOptions, value: string) => LocalpagerAgentOptions;
+const localBooleanFlags = new Set(["--status", "--no-final-schema-instruction", "-h", "--help"]);
 
-const valueFlagUpdaters: Readonly<Record<string, OptionUpdater>> = {
-  "--backend": (options, value) => ({ ...options, backend: parseBackend(value) }),
-  "--base-url": (options, value) => ({ ...options, baseUrl: normalizeBaseUrl(value) }),
-  "--model": (options, value) => ({ ...options, model: value }),
-  "--provider-id": (options, value) => ({ ...options, providerId: value }),
-  "--state-dir": (options, value) => ({ ...options, stateDir: value }),
-  "--session-dir": (options, value) => ({ ...options, sessionDir: value }),
-  "--pi-command": (options, value) => ({ ...options, piCommand: value }),
-  "--thinking": (options, value) => ({ ...options, thinking: value }),
-  "--context-window": (options, value) => ({
-    ...options,
-    contextWindow: parsePositiveInteger(value)
-  }),
-  "--max-tokens": (options, value) => ({ ...options, maxTokens: parsePositiveInteger(value) }),
-  "--temperature": (options, value) => ({
-    ...options,
-    sampling: { ...options.sampling, temperature: parseBoundedNumber(value, "--temperature", 0, 2) }
-  }),
-  "--top-p": (options, value) => ({
-    ...options,
-    sampling: { ...options.sampling, topP: parseBoundedNumber(value, "--top-p", 0, 1) }
-  }),
-  "--seed": (options, value) => ({
-    ...options,
-    sampling: { ...options.sampling, seed: parseNonNegativeInteger(value, "--seed") }
-  }),
-  "--presence-penalty": (options, value) => ({
-    ...options,
-    sampling: {
-      ...options.sampling,
-      presencePenalty: parseBoundedNumber(value, "--presence-penalty", -2, 2)
-    }
-  }),
-  "--frequency-penalty": (options, value) => ({
-    ...options,
-    sampling: {
-      ...options.sampling,
-      frequencyPenalty: parseBoundedNumber(value, "--frequency-penalty", -2, 2)
-    }
-  }),
-  "--timeout-ms": (options, value) => ({ ...options, timeoutMs: parsePositiveInteger(value) }),
-  "--final-schema": (options, value) => ({ ...options, finalSchemaPath: value }),
-  "--schema": (options, value) => ({ ...options, finalSchemaPath: value }),
-  "--prompt-template": (options, value) => ({ ...options, promptTemplatePath: value }),
-  "--prompt-vars-file": (options, value) => ({
-    ...options,
-    promptVarsPaths: [...options.promptVarsPaths, value]
-  }),
-  "--prompt-var": (options, value) => ({
-    ...options,
-    promptVars: [...options.promptVars, value]
-  }),
-  "--write-rendered-prompt": (options, value) => ({
-    ...options,
-    renderedPromptPath: value
-  }),
-  "--reposhell-socket": (options, value) => ({ ...options, reposhellSocket: value }),
-  "--reposhell-default-repo": (options, value) => ({
-    ...options,
-    reposhellDefaultRepo: value
-  }),
-  "--reposhell-visible-repos": (options, value) => ({
-    ...options,
-    reposhellVisibleRepos: splitCSV(value)
-  })
-};
+const localValueFlags = new Set([
+  "--backend",
+  "--base-url",
+  "--model",
+  "--provider-id",
+  "--state-dir",
+  "--session-dir",
+  "--pi-command",
+  "--thinking",
+  "--context-window",
+  "--max-tokens",
+  "--temperature",
+  "--top-p",
+  "--seed",
+  "--presence-penalty",
+  "--frequency-penalty",
+  "--timeout-ms",
+  "--final-schema",
+  "--schema",
+  "--prompt-template",
+  "--prompt-vars-file",
+  "--prompt-var",
+  "--write-rendered-prompt",
+  "--reposhell-socket",
+  "--reposhell-default-repo",
+  "--reposhell-visible-repos"
+]);
 
-function parseValueFlag(
-  options: LocalpagerAgentOptions,
-  args: readonly string[],
-  index: number,
-  flag: string
-): ParseResult | undefined {
-  const updater = valueFlagUpdaters[flag];
-  if (updater === undefined) {
+function forwardedPiArgs(args: readonly string[]): readonly string[] {
+  const forwardedArgs: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--") {
+      forwardedArgs.push(...args.slice(index + 1));
+      break;
+    }
+    if (arg === undefined) {
+      continue;
+    }
+    const advance = localFlagAdvance(arg);
+    if (advance !== undefined) {
+      index += advance;
+      continue;
+    }
+    forwardedArgs.push(arg);
+  }
+  return forwardedArgs;
+}
+
+function localFlagAdvance(arg: string | undefined): number | undefined {
+  if (arg === undefined) {
     return undefined;
   }
-  return { options: updater(options, requiredValue(args, index + 1, flag)), advance: 1 };
+  if (localBooleanFlags.has(arg)) {
+    return 0;
+  }
+  if (localValueFlags.has(arg)) {
+    return 1;
+  }
+  return isInlineLocalValueFlag(arg) ? 0 : undefined;
+}
+
+function isInlineLocalValueFlag(arg: string): boolean {
+  for (const flag of localValueFlags) {
+    if (arg.startsWith(`${flag}=`)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasLocalFlag(args: readonly string[], flag: string): boolean {
+  for (const arg of args) {
+    if (arg === "--") {
+      return false;
+    }
+    if (arg === flag) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function lastLocalOptionValue(
+  args: readonly string[],
+  names: readonly string[]
+): string | undefined {
+  let value: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === "--") {
+      return value;
+    }
+    if (arg === undefined) {
+      continue;
+    }
+    if (names.includes(arg)) {
+      value = requiredValue(args, index + 1, arg);
+      index += 1;
+      continue;
+    }
+    for (const name of names) {
+      const prefix = `${name}=`;
+      if (arg.startsWith(prefix)) {
+        value = arg.slice(prefix.length);
+        break;
+      }
+    }
+  }
+  return value;
 }
 
 function envString(name: string, fallback: string): string {
