@@ -36,9 +36,6 @@ func runClassifier(ctx context.Context, job ClaimedJob, opts WorkerOptions) (Cla
 	if opts.ClassifierTopicTaxonomy != "" {
 		args = append(args, "--topic-taxonomy", opts.ClassifierTopicTaxonomy)
 	}
-	if len(opts.ClassifierTools) > 0 {
-		args = append(args, "--tools", strings.Join(opts.ClassifierTools, ","))
-	}
 	if opts.ReposhellSocket != "" {
 		args = append(args, "--reposhell-socket", opts.ReposhellSocket)
 	}

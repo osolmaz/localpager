@@ -12,7 +12,11 @@ import { createLaunchPlan } from "../src/pi/launch.js";
 import { createSamplingRuntime } from "../src/sampling/request-extension.js";
 import type { FinalSchemaRuntime } from "../src/structured/final-schema.js";
 import { createFinalSchemaRuntime, readFinalSchemaOutput } from "../src/structured/final-schema.js";
-import { extractFinalJsonPayload, recoveryForwardedArgs } from "../src/structured/recovery.js";
+import {
+  extractFinalJsonPayload,
+  recoveryForwardedArgs,
+  retryForwardedArgs
+} from "../src/structured/recovery.js";
 
 describe("structured output", () => {
   it("ships a context-agnostic example schema", async () => {
@@ -97,6 +101,29 @@ describe("structured output", () => {
     expect(args).toContain("/tmp/current.jsonl");
     expect(args).not.toContain("/tmp/old.jsonl");
     expect(args).not.toContain("classify this");
+  });
+
+  it("builds retry args that re-prompt for a missing final_json call", () => {
+    const args = retryForwardedArgs([
+      "--tools",
+      "bash",
+      "-p",
+      "classify this",
+      "--session",
+      "/tmp/old.jsonl"
+    ]);
+
+    expect(args).toBeDefined();
+    const promptIndex = args?.lastIndexOf("-p") ?? -1;
+    const prompt = promptIndex < 0 ? "" : (args?.[promptIndex + 1] ?? "");
+    expect(prompt.startsWith("classify this")).toBe(true);
+    expect(prompt).toContain("did not call the final_json tool");
+    expect(args).not.toContain("--session");
+    expect(args).not.toContain("/tmp/old.jsonl");
+  });
+
+  it("returns no retry args when there is no prompt to re-issue", () => {
+    expect(retryForwardedArgs(["--status"])).toBeUndefined();
   });
 
   it("recovers pseudo final_json output in the same Pi session", async () => {

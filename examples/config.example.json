@@ -21,7 +21,6 @@
     "schema": "./schemas/classification.schema.json",
     "prompt_template": "./prompts/github-relevance-classifier.md",
     "topic_taxonomy": "./examples/profiles/openclaw-routing-topics.json",
-    "tools": ["bash", "final_json"],
     "reposhell_default_repo": "localpager",
     "reposhell_visible_repos": ["localpager"],
     "context": {

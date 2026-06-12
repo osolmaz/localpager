@@ -17,7 +17,11 @@ import {
   readFinalSchemaOutput
 } from "../structured/final-schema.js";
 import type { FinalSchemaRuntime } from "../structured/final-schema.js";
-import { findFinalJsonRecoveryCandidate, recoveryForwardedArgs } from "../structured/recovery.js";
+import {
+  findFinalJsonRecoveryCandidate,
+  recoveryForwardedArgs,
+  retryForwardedArgs
+} from "../structured/recovery.js";
 
 export async function run(args: readonly string[]): Promise<CommandResult> {
   try {
@@ -185,17 +189,17 @@ async function recoverFinalSchemaResult(
   outputPath: string
 ): Promise<CommandResult> {
   const candidate = await findFinalJsonRecoveryCandidate(options, startedAtMs);
-  if (candidate === undefined) {
+  const recoveryArgs =
+    candidate === undefined
+      ? retryForwardedArgs(options.forwardedArgs)
+      : recoveryForwardedArgs(options.forwardedArgs, candidate.sessionPath, candidate.payload);
+  if (recoveryArgs === undefined) {
     throw new Error("final_json was not called; no structured output was captured");
   }
   const recoveryPlan = await createLaunchPlan(
     {
       ...options,
-      forwardedArgs: recoveryForwardedArgs(
-        options.forwardedArgs,
-        candidate.sessionPath,
-        candidate.payload
-      )
+      forwardedArgs: recoveryArgs
     },
     runtimeConfig,
     model,

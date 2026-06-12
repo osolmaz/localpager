@@ -7,181 +7,14 @@ schema="${LOCALPAGER_CLASSIFIER_SCHEMA:-$root/schemas/classification.schema.json
 prompt_template="${LOCALPAGER_CLASSIFIER_PROMPT_TEMPLATE:-$root/prompts/github-relevance-classifier.md}"
 topic_taxonomy="${LOCALPAGER_CLASSIFIER_TOPIC_TAXONOMY:-}"
 github_context_file="${LOCALPAGER_CLASSIFIER_GITHUB_CONTEXT_FILE:-}"
-tools="${LOCALPAGER_CLASSIFIER_TOOLS:-final_json}"
-reposhell_socket="${LOCALPAGER_REPOSHELL_SOCKET:-}"
-reposhell_default_repo="${LOCALPAGER_REPOSHELL_DEFAULT_REPO:-}"
-reposhell_visible_repos="${LOCALPAGER_REPOSHELL_VISIBLE_REPOS:-}"
 
 if [[ $# -lt 1 ]]; then
-  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--model <model>] [--base-url <url>] [--context-window <n>] [--max-tokens <n>] [--temperature <n>] [--top-p <n>] [--seed <n>] [--presence-penalty <n>] [--frequency-penalty <n>] [--timeout-ms <n>] [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>] [--github-context-file <path>] [--tools <list>] [--reposhell-socket <path>] [--reposhell-default-repo <id>] [--reposhell-visible-repos <list>]" >&2
+  echo "usage: localpager-classifier <github-url-or-owner/repo#number> [--schema <path>] [--prompt-template <path>] [--topic-taxonomy <path>] [--github-context-file <path>] [pass-through localpager-agent options]" >&2
   exit 2
 fi
 
 target="$1"
 shift
-
-model="${LOCALPAGER_AGENT_MODEL:-auto}"
-base_url="${LOCALPAGER_AGENT_BASE_URL:-}"
-context_window="${LOCALPAGER_AGENT_CONTEXT_WINDOW:-}"
-max_tokens="${LOCALPAGER_AGENT_MAX_TOKENS:-}"
-temperature="${LOCALPAGER_AGENT_TEMPERATURE:-}"
-top_p="${LOCALPAGER_AGENT_TOP_P:-}"
-seed="${LOCALPAGER_AGENT_SEED:-}"
-presence_penalty="${LOCALPAGER_AGENT_PRESENCE_PENALTY:-}"
-frequency_penalty="${LOCALPAGER_AGENT_FREQUENCY_PENALTY:-}"
-timeout_ms="${LOCALPAGER_AGENT_TIMEOUT_MS:-}"
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --model)
-      if [[ $# -lt 2 ]]; then
-        echo "--model requires a value" >&2
-        exit 2
-      fi
-      model="$2"
-      shift 2
-      ;;
-    --base-url)
-      if [[ $# -lt 2 ]]; then
-        echo "--base-url requires a value" >&2
-        exit 2
-      fi
-      base_url="$2"
-      shift 2
-      ;;
-    --context-window)
-      if [[ $# -lt 2 ]]; then
-        echo "--context-window requires a value" >&2
-        exit 2
-      fi
-      context_window="$2"
-      shift 2
-      ;;
-    --max-tokens)
-      if [[ $# -lt 2 ]]; then
-        echo "--max-tokens requires a value" >&2
-        exit 2
-      fi
-      max_tokens="$2"
-      shift 2
-      ;;
-    --temperature)
-      if [[ $# -lt 2 ]]; then
-        echo "--temperature requires a value" >&2
-        exit 2
-      fi
-      temperature="$2"
-      shift 2
-      ;;
-    --top-p)
-      if [[ $# -lt 2 ]]; then
-        echo "--top-p requires a value" >&2
-        exit 2
-      fi
-      top_p="$2"
-      shift 2
-      ;;
-    --seed)
-      if [[ $# -lt 2 ]]; then
-        echo "--seed requires a value" >&2
-        exit 2
-      fi
-      seed="$2"
-      shift 2
-      ;;
-    --presence-penalty)
-      if [[ $# -lt 2 ]]; then
-        echo "--presence-penalty requires a value" >&2
-        exit 2
-      fi
-      presence_penalty="$2"
-      shift 2
-      ;;
-    --frequency-penalty)
-      if [[ $# -lt 2 ]]; then
-        echo "--frequency-penalty requires a value" >&2
-        exit 2
-      fi
-      frequency_penalty="$2"
-      shift 2
-      ;;
-    --timeout-ms)
-      if [[ $# -lt 2 ]]; then
-        echo "--timeout-ms requires a value" >&2
-        exit 2
-      fi
-      timeout_ms="$2"
-      shift 2
-      ;;
-    --schema)
-      if [[ $# -lt 2 ]]; then
-        echo "--schema requires a value" >&2
-        exit 2
-      fi
-      schema="$2"
-      shift 2
-      ;;
-    --prompt-template)
-      if [[ $# -lt 2 ]]; then
-        echo "--prompt-template requires a value" >&2
-        exit 2
-      fi
-      prompt_template="$2"
-      shift 2
-      ;;
-    --topic-taxonomy)
-      if [[ $# -lt 2 ]]; then
-        echo "--topic-taxonomy requires a value" >&2
-        exit 2
-      fi
-      topic_taxonomy="$2"
-      shift 2
-      ;;
-    --github-context-file)
-      if [[ $# -lt 2 ]]; then
-        echo "--github-context-file requires a value" >&2
-        exit 2
-      fi
-      github_context_file="$2"
-      shift 2
-      ;;
-    --tools)
-      if [[ $# -lt 2 ]]; then
-        echo "--tools requires a value" >&2
-        exit 2
-      fi
-      tools="$2"
-      shift 2
-      ;;
-    --reposhell-socket)
-      if [[ $# -lt 2 ]]; then
-        echo "--reposhell-socket requires a value" >&2
-        exit 2
-      fi
-      reposhell_socket="$2"
-      shift 2
-      ;;
-    --reposhell-default-repo)
-      if [[ $# -lt 2 ]]; then
-        echo "--reposhell-default-repo requires a value" >&2
-        exit 2
-      fi
-      reposhell_default_repo="$2"
-      shift 2
-      ;;
-    --reposhell-visible-repos)
-      if [[ $# -lt 2 ]]; then
-        echo "--reposhell-visible-repos requires a value" >&2
-        exit 2
-      fi
-      reposhell_visible_repos="$2"
-      shift 2
-      ;;
-    *)
-      echo "unsupported classifier argument: $1" >&2
-      exit 2
-      ;;
-  esac
-done
 
 expand_path() {
   case "$1" in
@@ -191,6 +24,57 @@ expand_path() {
   esac
 }
 
+# Flags the wrapper consumes itself feed the profile renderer below. Every other
+# flag is forwarded verbatim to localpager-agent, which owns model selection,
+# sampling, tool configuration, and the env defaults (LOCALPAGER_AGENT_*,
+# LOCALPAGER_REPOSHELL_*).
+require_value() {
+  if [[ $# -lt 2 ]]; then
+    echo "$1 requires a value" >&2
+    exit 2
+  fi
+}
+
+agent_args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --schema)
+      require_value "$@"
+      schema="$2"
+      shift 2
+      ;;
+    --prompt-template)
+      require_value "$@"
+      prompt_template="$2"
+      shift 2
+      ;;
+    --topic-taxonomy)
+      require_value "$@"
+      topic_taxonomy="$2"
+      shift 2
+      ;;
+    --github-context-file)
+      require_value "$@"
+      github_context_file="$2"
+      shift 2
+      ;;
+    --reposhell-socket)
+      require_value "$@"
+      agent_args+=(--reposhell-socket "$(expand_path "$2")")
+      shift 2
+      ;;
+    --*)
+      require_value "$@"
+      agent_args+=("$1" "$2")
+      shift 2
+      ;;
+    *)
+      echo "unsupported classifier argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
 schema="$(expand_path "$schema")"
 prompt_template="$(expand_path "$prompt_template")"
 if [[ -n "$topic_taxonomy" ]]; then
@@ -198,9 +82,6 @@ if [[ -n "$topic_taxonomy" ]]; then
 fi
 if [[ -n "$github_context_file" ]]; then
   github_context_file="$(expand_path "$github_context_file")"
-fi
-if [[ -n "$reposhell_socket" ]]; then
-  reposhell_socket="$(expand_path "$reposhell_socket")"
 fi
 
 if [[ ! -f "$prompt_template" ]]; then
@@ -266,88 +147,10 @@ echo "prompt: $prompt_path" >&2
 echo "schema: $schema_path" >&2
 echo "session: $session_dir" >&2
 
-agent_args=(
-  --model "$model"
-  --session-dir "$session_dir"
-  --final-schema "$schema_path"
-)
-if [[ -n "$base_url" ]]; then
-  agent_args+=(--base-url "$base_url")
-fi
-if [[ -n "$context_window" ]]; then
-  agent_args+=(--context-window "$context_window")
-fi
-if [[ -n "$max_tokens" ]]; then
-  agent_args+=(--max-tokens "$max_tokens")
-fi
-if [[ -n "$temperature" ]]; then
-  agent_args+=(--temperature "$temperature")
-fi
-if [[ -n "$top_p" ]]; then
-  agent_args+=(--top-p "$top_p")
-fi
-if [[ -n "$seed" ]]; then
-  agent_args+=(--seed "$seed")
-fi
-if [[ -n "$presence_penalty" ]]; then
-  agent_args+=(--presence-penalty "$presence_penalty")
-fi
-if [[ -n "$frequency_penalty" ]]; then
-  agent_args+=(--frequency-penalty "$frequency_penalty")
-fi
-if [[ -n "$timeout_ms" ]]; then
-  agent_args+=(--timeout-ms "$timeout_ms")
-fi
-if [[ -n "$tools" ]]; then
-  agent_args+=(--tools "$tools")
-fi
-if [[ -n "$reposhell_socket" ]]; then
-  agent_args+=(--reposhell-socket "$reposhell_socket")
-fi
-if [[ -n "$reposhell_default_repo" ]]; then
-  agent_args+=(--reposhell-default-repo "$reposhell_default_repo")
-fi
-if [[ -n "$reposhell_visible_repos" ]]; then
-  agent_args+=(--reposhell-visible-repos "$reposhell_visible_repos")
-fi
-
-stderr_path="$(mktemp)"
-stdout_path="$(mktemp)"
-cleanup() {
-  rm -f "$stderr_path" "$stdout_path"
-}
-trap cleanup EXIT
-
-set +e
+# localpager-agent owns the final_json tool and its own missing-output recovery,
+# so this is a single invocation: no wrapper-side retry.
 npm --prefix "$agent_dir" run -s localpager-agent -- \
-  "${agent_args[@]}" \
-  -p "$(cat "$prompt_path")" >"$stdout_path" 2>"$stderr_path"
-status=$?
-set -e
-
-if [[ "$status" -eq 0 ]]; then
-  cat "$stderr_path" >&2
-  cat "$stdout_path"
-  exit 0
-fi
-
-if ! grep -q "final_json was not called" "$stderr_path"; then
-  cat "$stderr_path" >&2
-  cat "$stdout_path"
-  exit "$status"
-fi
-
-fallback_prompt_path="$state_dir/prompts/$(date -u +%Y%m%dT%H%M%SZ)-$$-retry.md"
-{
-  cat "$prompt_path"
-  printf '\n\n'
-  printf 'Retry instruction: the previous model response failed because it did not call the final_json tool. Do not explain anything in prose. Call final_json exactly once with a JSON object that matches the schema.\n'
-} >"$fallback_prompt_path"
-
-echo "prompt: $fallback_prompt_path" >&2
-echo "schema: $schema_path" >&2
-echo "session: $session_dir" >&2
-
-npm --prefix "$agent_dir" run -s localpager-agent -- \
-  "${agent_args[@]}" \
-  -p "$(cat "$fallback_prompt_path")"
+  --session-dir "$session_dir" \
+  --final-schema "$schema_path" \
+  ${agent_args[@]+"${agent_args[@]}"} \
+  -p "$(cat "$prompt_path")"

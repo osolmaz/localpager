@@ -41,7 +41,6 @@ type Classifier struct {
 	Schema                string   `json:"schema"`
 	PromptTemplate        string   `json:"prompt_template"`
 	TopicTaxonomy         string   `json:"topic_taxonomy"`
-	Tools                 []string `json:"tools"`
 	ReposhellDefaultRepo  string   `json:"reposhell_default_repo"`
 	ReposhellVisibleRepos []string `json:"reposhell_visible_repos"`
 	Context               Context  `json:"context"`

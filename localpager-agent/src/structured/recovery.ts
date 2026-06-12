@@ -35,6 +35,18 @@ export function recoveryForwardedArgs(
   ];
 }
 
+export function retryForwardedArgs(forwardedArgs: readonly string[]): string[] | undefined {
+  const prompt = promptValue(forwardedArgs);
+  if (prompt === undefined) {
+    return undefined;
+  }
+  return [
+    ...withoutValueFlags(forwardedArgs, new Set(["-p", "--print", "--session"])),
+    "-p",
+    `${prompt}\n\n${retryInstruction}`
+  ];
+}
+
 export function extractFinalJsonPayload(text: string): Record<string, unknown> | undefined {
   return (
     extractPseudoToolPayload(text) ??
@@ -158,6 +170,17 @@ function explicitSessionPath(args: readonly string[]): string | undefined {
   return value === undefined ? undefined : path.resolve(value);
 }
 
+function promptValue(args: readonly string[]): string | undefined {
+  for (const flag of ["-p", "--print"]) {
+    const index = args.lastIndexOf(flag);
+    const value = index < 0 ? undefined : args[index + 1];
+    if (value !== undefined) {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 async function canRead(file: string): Promise<boolean> {
   try {
     await access(file, constants.R_OK);
@@ -182,6 +205,12 @@ function withoutValueFlags(args: readonly string[], flags: ReadonlySet<string>):
   }
   return kept;
 }
+
+const retryInstruction = [
+  "Retry instruction: your previous response did not call the final_json tool.",
+  "Do not call bash. Do not explain anything in prose, markdown, or JSON text.",
+  "Call final_json exactly once with a JSON object that matches the schema."
+].join("\n\n");
 
 function recoveryPrompt(payload: Record<string, unknown>): string {
   return [

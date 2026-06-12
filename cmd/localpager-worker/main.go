@@ -27,7 +27,6 @@ func main() {
 	flag.StringVar(&flags.classifierSchema, "classifier-schema", "", "classifier JSON schema path")
 	flag.StringVar(&flags.classifierPromptTemplate, "classifier-prompt-template", "", "classifier prompt template path")
 	flag.StringVar(&flags.classifierTopicTaxonomy, "classifier-topic-taxonomy", "", "classifier topic taxonomy path")
-	flag.StringVar(&flags.classifierTools, "classifier-tools", "", "comma-separated classifier tool allowlist")
 	flag.StringVar(&flags.reposhellSocket, "reposhell-socket", "", "reposhell Unix socket path")
 	flag.StringVar(&flags.reposhellDefaultRepo, "reposhell-default-repo", "", "default repo id for reposhell bash tool")
 	flag.StringVar(&flags.reposhellVisibleRepos, "reposhell-visible-repos", "", "comma-separated visible repo ids for reposhell bash tool")
@@ -90,7 +89,6 @@ func main() {
 		ClassifierSchema:           flags.classifierSchema,
 		ClassifierPromptTemplate:   flags.classifierPromptTemplate,
 		ClassifierTopicTaxonomy:    flags.classifierTopicTaxonomy,
-		ClassifierTools:            app.SplitCSV(flags.classifierTools),
 		ReposhellSocket:            flags.reposhellSocket,
 		ReposhellDefaultRepo:       flags.reposhellDefaultRepo,
 		ReposhellVisibleRepos:      app.SplitCSV(flags.reposhellVisibleRepos),
@@ -140,7 +138,6 @@ type workerFlags struct {
 	classifierSchema           string
 	classifierPromptTemplate   string
 	classifierTopicTaxonomy    string
-	classifierTools            string
 	reposhellSocket            string
 	reposhellDefaultRepo       string
 	reposhellVisibleRepos      string
@@ -217,9 +214,6 @@ func (flags *workerFlags) applyClassifierConfig(cfg config.Config, setFlags map[
 }
 
 func (flags *workerFlags) applyClassifierToolConfig(cfg config.Config, setFlags map[string]bool) {
-	if len(cfg.Classifier.Tools) > 0 && !config.FlagSet(setFlags, "classifier-tools") {
-		flags.classifierTools = strings.Join(cfg.Classifier.Tools, ",")
-	}
 	if cfg.Reposhell.Enabled && !config.FlagSet(setFlags, "reposhell-socket") {
 		flags.reposhellSocket = app.ReposhellSocket(cfg)
 	}

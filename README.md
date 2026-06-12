@@ -54,7 +54,6 @@ Notification policy is deployment config, not classifier logic:
     "schema": "~/.config/localpager/classification.schema.json",
     "prompt_template": "~/.config/localpager/classifier.prompt.md",
     "topic_taxonomy": "~/.config/localpager/topics.json",
-    "tools": ["bash", "final_json"],
     "reposhell_default_repo": "localpager",
     "reposhell_visible_repos": ["localpager"],
     "context": {
@@ -83,9 +82,11 @@ Notification policy is deployment config, not classifier logic:
 }
 ```
 
-When `classifier.tools` includes `bash`, run `reposhell serve` with matching
-`reposhell` config. The model sees a familiar bash-shaped tool, but Localpager
-enforces a read-only command allowlist against pinned repository snapshots. See
+When `reposhell` is enabled with a socket, run `reposhell serve` with matching
+`reposhell` config. `localpager-agent` owns tool exposure: it always provides
+`final_json` and adds a read-only `bash` tool whenever a reposhell socket is
+passed. The model sees a familiar bash-shaped tool, but Localpager enforces a
+read-only command allowlist against pinned repository snapshots. See
 [Reposhell](reposhell/README.md) for standalone setup, config, direct
 commands, allowed command shapes, service mode, and troubleshooting.
 
@@ -95,7 +96,10 @@ notification is created.
 Classifier prompts, topic taxonomies, and schemas should be configured as a
 deployment profile. See [Classifier Profiles](docs/2026-06-01-classifier-profiles.md).
 When `classifier.topic_taxonomy` is set, `localpager-classifier` generates a
-runtime schema that rejects topics outside that taxonomy.
+runtime schema that rejects topics outside that taxonomy. For the full
+worker → wrapper → renderer → agent chain, prompt placeholders, and schema-enum
+generation, see
+[Classifier Pipeline and Profile Rendering](docs/2026-06-12-classifier-pipeline-and-rendering.md).
 
 For OpenClaw maintainer routing, use
 `examples/profiles/openclaw-routing-v8.prompt.md` with the OpenClaw topic

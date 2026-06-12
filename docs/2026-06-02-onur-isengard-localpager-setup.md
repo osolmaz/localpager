@@ -118,7 +118,6 @@ The reposhell setup is:
     ]
   },
   "classifier": {
-    "tools": ["bash", "final_json"],
     "reposhell_default_repo": "openclaw",
     "reposhell_visible_repos": ["openclaw"]
   }
@@ -128,9 +127,10 @@ The reposhell setup is:
 Customize it by changing `reposhell.repos` for the repositories the service
 syncs, then changing `classifier.reposhell_default_repo` and
 `classifier.reposhell_visible_repos` for the repos a classifier profile may
-read. Keep `classifier.tools` at `["bash", "final_json"]` only when the
-reposhell service is enabled and healthy. The default refresh interval is one
-day; override it per repo only when a repo needs faster or slower updates.
+read. The classifier's read-only `bash` tool turns on automatically when the
+reposhell service is enabled and a socket is configured; `localpager-agent`
+always exposes `final_json`. The default refresh interval is one day; override
+it per repo only when a repo needs faster or slower updates.
 
 ## Verify State
 
