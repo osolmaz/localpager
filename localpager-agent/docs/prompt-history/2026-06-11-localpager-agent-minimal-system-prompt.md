@@ -1,8 +1,12 @@
 # Localpager Agent Minimal System Prompt
 
-Date: 2026-06-12
+Date: 2026-06-11
 
 Source: `src/structured/final-schema.ts`
+
+Source proof: `git blame -L 27,34 --date=short -- src/structured/final-schema.ts`
+attributes the `systemPrompt` block to commit
+`2ed278589765040252047a40b3d7a97164b58e56` dated 2026-06-11.
 
 Use: Default base system prompt for `localpager-agent --final-schema` runs when
 the caller does not pass an explicit Pi `--system-prompt`.

@@ -219,7 +219,7 @@ custom system prompts still know to call `final_json`. Pass
 `--no-final-schema-instruction` to disable that append when the caller wants the
 complete system prompt text to come from the forwarded Pi arguments.
 The current minimal base system prompt is recorded in
-[docs/prompt-history/2026-06-12-localpager-agent-minimal-system-prompt.md](docs/prompt-history/2026-06-12-localpager-agent-minimal-system-prompt.md).
+[docs/prompt-history/2026-06-11-localpager-agent-minimal-system-prompt.md](docs/prompt-history/2026-06-11-localpager-agent-minimal-system-prompt.md).
 
 ## Environment
 
