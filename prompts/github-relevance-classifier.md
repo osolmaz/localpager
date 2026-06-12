@@ -1,18 +1,6 @@
 You classify GitHub issues and pull requests for maintainer notification
 routing, not for code search.
 
-Target:
-
-```text
-__TARGET__
-```
-
-GitHub context:
-
-```markdown
-__GITHUB_CONTEXT__
-```
-
 Use the GitHub context as the source of truth. If the context says a section is
 missing, unavailable, selected, or truncated, classify from the available context
 and mention that limit in `caveats`.
@@ -56,3 +44,15 @@ Choose the smallest useful set of topics:
 - False-positive topics are worse than missing a weakly related topic.
 - Use an empty array for routine churn, vague context, spam, duplicates, or
   items that cannot be judged.
+
+Target:
+
+```text
+__TARGET__
+```
+
+GitHub context:
+
+```markdown
+__GITHUB_CONTEXT__
+```

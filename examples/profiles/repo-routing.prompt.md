@@ -17,14 +17,6 @@ The JSON object must always include exactly these top-level fields:
 
 Do not omit `description` or `caveats`, even when there are no matching topics.
 
-## Target
-
-`__TARGET__`
-
-## GitHub Context
-
-__GITHUB_CONTEXT__
-
 ## Allowed Topics
 
 Use only topic ids from this list:
@@ -57,3 +49,11 @@ __TOPIC_DESCRIPTIONS__
   and explain why in `description`.
 - If context is missing or truncated in a way that affects the decision, include
   that in `caveats`.
+
+## Target
+
+`__TARGET__`
+
+## GitHub Context
+
+__GITHUB_CONTEXT__

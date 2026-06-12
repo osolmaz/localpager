@@ -10,18 +10,6 @@ Required output shape:
 {"topics_of_interest":[],"description":"One concise evidence-backed sentence.","caveats":[]}
 ```
 
-## Target
-
-`__TARGET__`
-
-## GitHub Context
-
-__GITHUB_CONTEXT__
-
-Use this context as source of truth. If important sections are missing,
-unavailable, selected, or truncated, classify from what is available and mention
-material limits in `caveats`.
-
 ## Repository Reads
 
 A read-only `bash` tool may be available in the OpenClaw repo snapshot. Use it
@@ -165,3 +153,15 @@ Before final output:
   compatibility.
 - Do not use `config` merely because a feature adds an option. Route by what
   the option controls.
+
+## Target
+
+`__TARGET__`
+
+## GitHub Context
+
+__GITHUB_CONTEXT__
+
+Use this context as source of truth. If important sections are missing,
+unavailable, selected, or truncated, classify from what is available and mention
+material limits in `caveats`.
