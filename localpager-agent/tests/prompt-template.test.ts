@@ -6,6 +6,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { run } from "../src/cli/cli.js";
+import { plainSystemPrompt } from "../src/pi/launch.js";
 import { promptForwardedArgs, renderPromptTemplate } from "../src/prompts/template.js";
 
 describe("prompt templates", () => {
@@ -166,6 +167,8 @@ describe("prompt templates", () => {
         "--thinking",
         "minimal",
         "--no-context-files",
+        "--system-prompt",
+        plainSystemPrompt,
         "--no-tools",
         "-p",
         "classify"

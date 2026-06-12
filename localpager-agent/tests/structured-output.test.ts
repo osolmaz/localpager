@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { LocalpagerAgentOptions } from "../src/agent/options.js";
 import { run } from "../src/cli/cli.js";
 import type { RuntimeConfig } from "../src/pi/config.js";
-import { createLaunchPlan } from "../src/pi/launch.js";
+import { createLaunchPlan, plainSystemPrompt } from "../src/pi/launch.js";
 import { createSamplingRuntime } from "../src/sampling/request-extension.js";
 import type { FinalSchemaRuntime } from "../src/structured/final-schema.js";
 import { createFinalSchemaRuntime, readFinalSchemaOutput } from "../src/structured/final-schema.js";
@@ -279,6 +279,8 @@ describe("structured output", () => {
       "--thinking",
       "off",
       "--no-context-files",
+      "--system-prompt",
+      plainSystemPrompt,
       "--extension",
       "/tmp/reposhell-bash-extension.ts",
       "--append-system-prompt",
@@ -305,6 +307,8 @@ describe("structured output", () => {
       "--thinking",
       "off",
       "--no-context-files",
+      "--system-prompt",
+      plainSystemPrompt,
       "--no-tools",
       "-p",
       "inspect"
@@ -395,12 +399,29 @@ describe("structured output", () => {
       "--thinking",
       "off",
       "--no-context-files",
+      "--system-prompt",
+      plainSystemPrompt,
       "--extension",
       "/tmp/request-params-extension.ts",
       "--no-tools",
       "-p",
       "classify"
     ]);
+  });
+
+  it("preserves caller-supplied system prompts in plain mode", async () => {
+    const plan = await createLaunchPlan(
+      {
+        ...options("/tmp/localpager-agent-state"),
+        forwardedArgs: ["--system-prompt", "caller identity", "-p", "inspect"]
+      },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it"
+    );
+
+    expect(plan.args.filter((arg) => arg === "--system-prompt")).toHaveLength(1);
+    expect(plan.args).toContain("caller identity");
+    expect(plan.args).not.toContain(plainSystemPrompt);
   });
 
   it("rejects caller-supplied bash allowlist instead of exposing default Pi bash", async () => {

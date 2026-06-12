@@ -107,6 +107,12 @@ function structuredOutputArgs(
   ];
 }
 
+export const plainSystemPrompt = [
+  "You are localpager-agent, a fast assistant running on a local model.",
+  "Answer directly and keep responses concise.",
+  "Use only the tools available in this run, and only when needed."
+].join("\n");
+
 function plainOutputArgs(
   forwardedArgs: readonly string[],
   reposhellRuntime: ReposhellRuntime | undefined,
@@ -115,6 +121,7 @@ function plainOutputArgs(
   rejectCallerToolFlags(forwardedArgs);
   if (reposhellRuntime === undefined) {
     return [
+      ...plainSystemPromptArgs(forwardedArgs),
       ...samplingExtensionArgs(samplingRuntime),
       ...withOwnedToolArgs(forwardedArgs, {
         reposhellEnabled: false,
@@ -123,6 +130,7 @@ function plainOutputArgs(
     ];
   }
   return [
+    ...plainSystemPromptArgs(forwardedArgs),
     ...reposhellExtensionArgs(reposhellRuntime),
     ...samplingExtensionArgs(samplingRuntime),
     ...withOwnedToolArgs(forwardedArgs, {
@@ -130,6 +138,10 @@ function plainOutputArgs(
       finalJsonRequired: false
     })
   ];
+}
+
+function plainSystemPromptArgs(forwardedArgs: readonly string[]): string[] {
+  return hasSystemPrompt(forwardedArgs) ? [] : ["--system-prompt", plainSystemPrompt];
 }
 
 function reposhellExtensionArgs(runtime: ReposhellRuntime | undefined): string[] {
