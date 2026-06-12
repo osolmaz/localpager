@@ -112,6 +112,12 @@ To keep many rollouts tractable:
   gets an extra penalty beyond the individual false-positive labels. Report topic
   micro-F1, per-topic precision, and per-topic recall alongside this objective,
   but select candidates by the weighted score.
+- The metric must be game-resistant: proposing random extra labels must never
+  help a candidate. A predicted label only improves the score when it is present
+  in the row's gold label set. Every extra allowed label is a false positive,
+  increases the over-labeling penalty when it exceeds the gold count, and should
+  be surfaced in ASI feedback as label spam. Invalid labels are schema failures,
+  not partial credit.
 - Feedback / ASI (μ_f): the per-row, per-topic mistakes turned into short
   natural-language notes, e.g. "item 412: predicted `config`; gold has none — an
   option was added but config behavior is not the subject." This is the same
@@ -129,6 +135,12 @@ To keep many rollouts tractable:
 - Three-way split of the curated dataset: a feedback/minibatch pool, a
   `D_pareto` validation set for candidate selection, and a held-out test set the
   optimizer never sees (report final transfer on it).
+- Treat `ds4.jsonl` as the authoritative golden set. The gold labels for scoring
+  are exactly the `topics_of_interest` values recorded on each row in
+  `ds4.jsonl`; the optimizer must not reinterpret, relabel, broaden, or
+  adjudicate them during a run. Loader normalization is limited to deterministic
+  parsing, de-duplication, ordering for stable output, and validation that labels
+  are in the configured taxonomy.
 - Pin sampling: temperature 0, fixed seed, matching the production worker.
 - Log the dataset revision, v9.1 seed prompt path, loaded 12B model identifier,
   concurrency, every candidate, its scores, and the chosen prompt to a run
