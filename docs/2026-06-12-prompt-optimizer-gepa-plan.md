@@ -340,13 +340,14 @@ scored `0.5` (`acp`, `gateway` vs the same DS4 gold). Optimizer live defaults
 should therefore use 12B, concurrency 2, and the larger output cap unless a
 run is explicitly marked as E4B smoke/debug.
 
-Live GEPA note from 2026-06-13: the first 12B continuation candidate is saved at
-`prompt-optimizer/results/2026-06-13-gepa-12b-twelve-best.routing_policy.md`.
-It improves the external 12B mean from `0.5016` to `0.5244` over rows 1-18
-of Shaun's ordered set, but the evidence is still noisy: the external rows 1-12
-re-evaluation had one structural `final_json` failure, and only rows 13-18 were
-held out from the second GEPA run. Treat this as a candidate worth further
-validation, not as a production prompt replacement yet.
+Live GEPA note from 2026-06-13: the best current 12B candidate is saved at
+`prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md`.
+Across all 60 rows of Shaun's ordered set, it improves the external 12B mean
+from `0.4322` to `0.4912`, improves micro-F1 from `0.6510` to `0.6818`,
+reduces false positives from `29` to `23`, reduces over-labeling events from
+`2` to `1`, and eliminates three structural `final_json` failures. It increases
+false negatives from `60` to `61`, so it is more precise but still needs human
+review before replacing a deployed OpenClaw prompt template.
 
 ## Open questions
 

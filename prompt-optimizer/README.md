@@ -64,10 +64,22 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-candida
   --harness localpager-agent \
   --model gemma-12b-q4km-reason \
   --max-tokens 1536 \
-  --routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-twelve-best.routing_policy.md \
-  --candidate-name gepa-12b-twelve-best \
+  --routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md \
+  --candidate-name gepa-12b-six-best \
   --limit 6 \
   --offset 12
+```
+
+The current best reviewed artifact from the first 60-row validation is:
+
+```text
+prompt-optimizer/results/2026-06-13-gepa-12b-six-best.prompt.md
+```
+
+Its editable routing-policy block is:
+
+```text
+prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md
 ```
 
 GEPA optimization is explicit because a live run can take a long time:
@@ -85,7 +97,7 @@ To continue from a saved candidate instead of the v9.1 seed prompt, pass
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
-  --seed-routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-twelve-best.routing_policy.md \
+  --seed-routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md \
   --max-metric-calls 30 \
   --row-limit 12 \
   --reflection-minibatch-size 4 \

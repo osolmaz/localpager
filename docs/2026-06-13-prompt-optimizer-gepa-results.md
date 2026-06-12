@@ -32,7 +32,13 @@ v9.1 using Shaun's ordered `gepa-good-60` set. All gold labels are the canonical
 | first 12B GEPA candidate | 7-12 | 12B | 0.4917 | small held-out gain |
 | second 12B GEPA candidate | 1-12 | 12B | 0.5158 | external re-eval; one structural failure |
 | v9.1 seed | 13-18 | 12B | 0.5000 | held-out from second 12B run |
+| first 12B GEPA candidate | 13-18 | 12B | 0.5833 | fill-in comparison |
 | second 12B GEPA candidate | 13-18 | 12B | 0.5417 | held-out gain |
+| v9.1 seed | 19-30 | 12B | 0.3946 | larger untouched validation slice |
+| first 12B GEPA candidate | 19-30 | 12B | 0.4552 | validation gain; zero structural failures |
+| second 12B GEPA candidate | 19-30 | 12B | 0.4134 | smaller gain; more over-labeling |
+| v9.1 seed | 31-60 | 12B | 0.4056 | remaining held-out half |
+| first 12B GEPA candidate | 31-60 | 12B | 0.4687 | validation gain; zero structural failures |
 
 Combined external 12B scores:
 
@@ -40,38 +46,67 @@ Combined external 12B scores:
   `+0.0351`.
 - Second 12B GEPA candidate, rows 1-18: `0.5244` vs seed `0.5016`, delta
   `+0.0228`.
+- First 12B GEPA candidate, rows 1-30: `0.5137` vs seed `0.4588`, delta
+  `+0.0549`; 11 wins, 12 ties, 7 losses; 12 false positives, 26 false
+  negatives, 1 over-labeling event, and 0 structural failures.
+- Second 12B GEPA candidate, rows 1-30: `0.4800` vs seed `0.4588`, delta
+  `+0.0212`; 12 wins, 8 ties, 10 losses; 16 false positives, 17 false
+  negatives, 6 over-labeling events, and 2 structural failures.
+- The v9.1 seed on rows 1-30 had 15 false positives, 24 false negatives, 2
+  over-labeling events, and 2 structural failures.
+- First 12B GEPA candidate, rows 1-60: `0.4912` vs seed `0.4322`, delta
+  `+0.0590`; 21 wins, 26 ties, 13 losses; 23 false positives, 61 false
+  negatives, 1 over-labeling event, and 0 structural failures.
+- The v9.1 seed on rows 1-60 had 29 false positives, 60 false negatives, 2
+  over-labeling events, and 3 structural failures.
+
+Micro metrics over rows 1-60:
+
+| candidate | precision | recall | F1 |
+| --- | ---: | ---: | ---: |
+| v9.1 seed | 0.7411 | 0.5804 | 0.6510 |
+| first 12B GEPA candidate | 0.7965 | 0.5960 | 0.6818 |
 
 ## Current Best Candidate
 
-The tracked candidate is:
+The tracked assembled prompt is:
 
 ```text
-prompt-optimizer/results/2026-06-13-gepa-12b-twelve-best.routing_policy.md
+prompt-optimizer/results/2026-06-13-gepa-12b-six-best.prompt.md
+```
+
+The editable routing-policy block is:
+
+```text
+prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md
 ```
 
 Candidate SHA-256:
 
 ```text
-6ab4227828618436d7f81662b5cc4993fb5b30557e3e56616801dbec6d2da34a
+f4b161bb9bbaf366f1d4f1841243d73544bbd3c553ca6be5eb2818e757007187
 ```
 
 The main improvements are explicit rules for:
 
 - `model_serving` vs `telemetry_usage`.
-- `exec_tools`, `sandboxing`, and `approvals`.
-- `acp`, `acpx`, and permission-mode labels.
-- `config`, `security`, and `mcp_tooling` policy/conformance cases.
+- policy/config/security/MCP conformance cases.
+- tighter cardinality guidance and keyword suppression.
+- avoiding random extra labels unless they route to a central maintainer bucket.
 
 ## Scrutiny
 
-This is progress, not final evidence. The strongest concern is that the
-second-generation candidate scored `0.6101` inside the GEPA run on rows 1-12,
-but external re-evaluation on the same slice scored `0.5158` after one
-`final_json` structural failure. That gap means the local 12B harness has enough
-run-to-run variance that single-pass scores should not be treated as definitive.
+This is progress, not final evidence. The later continuation candidate looked
+better inside its GEPA run, but external validation exposed more over-labeling
+and two structural failures over the rows 1-30 comparison. The earlier first-12B
+candidate is now the better current artifact because it has the larger external
+mean-score gain, fewer false positives than v9.1, fewer over-labeling events,
+and zero structural failures on the checked rows.
 
-The candidate is still worth keeping because it improved the rows 13-18 held-out
-slice and did not rely on random extra labels. The next promotion gate should be
-a repeated 12B evaluation on a larger held-out slice of the remaining 42 rows,
-ideally with per-row win/tie/loss analysis against v9.1 and the first 12B
-candidate.
+The first candidate still misses one more gold label than v9.1 on rows 1-60, so
+it may be slightly conservative. That tradeoff held on rows 31-60: the candidate
+kept lower false positives, slightly improved recall, and eliminated structural
+failures across the full 60-row set. The remaining risk is qualitative: some
+losses are large, especially ACP/session/gateway cases where the candidate drops
+a central secondary label. A human should review those losses before replacing a
+deployed OpenClaw prompt template.
