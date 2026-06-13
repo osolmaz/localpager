@@ -113,3 +113,10 @@ Summarize a live or completed GEPA run without making model calls:
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli report-run \
   --run-dir prompt-optimizer/out/gepa-12b-row30-prop16-from-proper-20260613T172903Z
 ```
+
+Write a self-contained score report with iteration and candidate-score charts:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli plot-run \
+  --run-dir prompt-optimizer/out/gepa-12b-row30-prop16-from-proper-20260613T172903Z
+```

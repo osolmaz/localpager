@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from prompt_optimizer.report import summarize_gepa_run, summarize_run_log
+from prompt_optimizer.report import render_gepa_run_report, summarize_gepa_run, summarize_run_log, write_gepa_run_report
 
 
 class ReportTest(unittest.TestCase):
@@ -58,6 +58,70 @@ class ReportTest(unittest.TestCase):
             self.assertEqual(summary["result"]["best_idx"], 1)
             self.assertEqual(summary["result"]["num_candidates"], 2)
             self.assertEqual(summary["result"]["val_aggregate_scores"], [0.4, 0.6])
+
+    def test_render_gepa_run_report_includes_score_charts(self) -> None:
+        html = render_gepa_run_report(
+            {
+                "run_dir": "prompt-optimizer/out/example",
+                "run_log": {
+                    "base_score": 0.4,
+                    "proposal_attempts": 2,
+                    "accepted_full_eval_candidates": 1,
+                    "rejected_candidates": 1,
+                    "selected_events": [
+                        {"iteration": 1, "candidate_idx": 0, "score": 0.4},
+                        {"iteration": 2, "candidate_idx": 1, "score": 0.6},
+                    ],
+                    "proposal_events": [
+                        {
+                            "iteration": 1,
+                            "old_subsample_sum": 2.0,
+                            "new_subsample_sum": 1.0,
+                            "delta": -1.0,
+                            "accepted_for_full_eval": False,
+                        },
+                        {
+                            "iteration": 2,
+                            "old_subsample_sum": 2.0,
+                            "new_subsample_sum": 3.0,
+                            "delta": 1.0,
+                            "accepted_for_full_eval": True,
+                        },
+                    ],
+                    "better_valset_events": [{"iteration": 2, "score": 0.6}],
+                },
+                "result": {
+                    "best_idx": 1,
+                    "total_metric_calls": 12,
+                    "num_candidates": 2,
+                    "val_aggregate_scores": [0.4, 0.6],
+                },
+            }
+        )
+
+        self.assertIn("Validation Score Over Iterations", html)
+        self.assertIn("Proposal Subsample Delta", html)
+        self.assertIn("Final Candidate Scores", html)
+        self.assertIn("accepted", html)
+        self.assertIn("rejected", html)
+
+    def test_write_gepa_run_report_writes_default_html_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            (run_dir / "run_log.txt").write_text(
+                "\n".join(
+                    [
+                        "Iteration 0: Base program full valset score: 0.4 over 2 / 2 examples",
+                        "Iteration 1: Selected program 0 score: 0.4",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            output_path = write_gepa_run_report(run_dir)
+
+            self.assertEqual(output_path, run_dir / "score_report.html")
+            self.assertIn("Validation Score Over Iterations", output_path.read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":
