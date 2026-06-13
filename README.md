@@ -108,6 +108,8 @@ profile encodes the DS4/Gemma prompt work: notification routing, title-first
 centrality, one-topic default, a second-topic gate, and false-positive
 suppression for broad topics such as `local_model_providers`, `reliability`,
 `api_surface`, `tool_calling`, and `config`.
+`examples/profiles/openclaw-routing-topics.v2.json` is a staged v2 taxonomy for
+review only; current examples and defaults still use `openclaw-routing-topics.json`.
 
 Before the classifier runs, Localpager renders GitHub context into the prompt:
 stored title/body/labels plus optional comments, changed files, and selected PR
