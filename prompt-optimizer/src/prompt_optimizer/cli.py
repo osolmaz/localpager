@@ -78,6 +78,7 @@ def main() -> None:
     optimize.add_argument("--output-dir", type=Path, default=None)
     optimize.add_argument("--row-limit", type=int, default=None)
     optimize.add_argument("--max-metric-calls", type=int, required=True)
+    optimize.add_argument("--max-candidate-proposals", type=int, default=None)
     optimize.add_argument("--reflection-minibatch-size", type=int, default=4)
     optimize.add_argument("--seed", type=int, default=0)
     optimize.add_argument("--seed-routing-policy", type=Path, default=None)
@@ -175,6 +176,7 @@ def _optimize(args: argparse.Namespace) -> str:
     config = GEPARunConfig(
         output_dir=output_dir,
         max_metric_calls=args.max_metric_calls,
+        max_candidate_proposals=args.max_candidate_proposals,
         reflection_minibatch_size=args.reflection_minibatch_size,
         seed=args.seed,
         row_limit=args.row_limit,

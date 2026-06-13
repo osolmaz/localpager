@@ -99,6 +99,7 @@ To continue from a saved candidate instead of the v9.1 seed prompt, pass
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --seed-routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md \
   --max-metric-calls 30 \
+  --max-candidate-proposals 8 \
   --row-limit 12 \
   --reflection-minibatch-size 4 \
   --concurrency 2 \

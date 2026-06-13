@@ -52,6 +52,7 @@ class HarnessConfig:
 class GEPARunConfig:
     output_dir: Path
     max_metric_calls: int
+    max_candidate_proposals: int | None = None
     reflection_minibatch_size: int = 4
     seed: int = 0
     row_limit: int | None = None
@@ -169,6 +170,11 @@ def run_gepa(
         else seed_candidate(inputs.prompt_parts)
     )
     config.output_dir.mkdir(parents=True, exist_ok=True)
+    stop_callbacks = None
+    if config.max_candidate_proposals is not None:
+        from gepa.utils import MaxCandidateProposalsStopper
+
+        stop_callbacks = [MaxCandidateProposalsStopper(config.max_candidate_proposals)]
     result = gepa.optimize(
         seed_candidate=initial_candidate,
         trainset=rows,
@@ -176,6 +182,7 @@ def run_gepa(
         adapter=adapter,
         reflection_lm=CodexReflectionLM(),
         max_metric_calls=config.max_metric_calls,
+        stop_callbacks=stop_callbacks,
         reflection_minibatch_size=config.reflection_minibatch_size,
         run_dir=str(config.output_dir),
         seed=config.seed,

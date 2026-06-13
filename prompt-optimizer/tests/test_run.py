@@ -91,6 +91,7 @@ class RunTest(unittest.TestCase):
                 GEPARunConfig(
                     output_dir=output_dir,
                     max_metric_calls=2,
+                    max_candidate_proposals=16,
                     seed_routing_policy="## Goal\nBetter policy\n",
                     harness=HarnessConfig(model="gemma-test", concurrency=2),
                 ),
@@ -101,6 +102,7 @@ class RunTest(unittest.TestCase):
             self.assertTrue((output_dir / "best.routing_policy.md").exists())
             saved_summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(saved_summary["config"]["harness"]["model"], "gemma-test")
+            self.assertEqual(saved_summary["config"]["max_candidate_proposals"], 16)
             self.assertEqual(saved_summary["config"]["seed_routing_policy_chars"], 22)
             self.assertIsNotNone(saved_summary["config"]["seed_routing_policy_sha256"])
             self.assertIn("Better policy", (output_dir / "best.prompt.md").read_text(encoding="utf-8"))
