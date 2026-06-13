@@ -24,6 +24,90 @@ def summarize_gepa_run(run_dir: Path) -> dict[str, Any]:
     }
 
 
+def summarize_evaluation_file(path: Path) -> dict[str, Any]:
+    """Summarize an evaluate-candidate JSON artifact without model calls."""
+
+    return summarize_evaluation_report(_read_json(path), source_path=path)
+
+
+def summarize_evaluation_report(report: Any, *, source_path: Path | None = None) -> dict[str, Any]:
+    if not isinstance(report, dict):
+        raise ValueError("evaluation report must be a JSON object")
+    rows = report.get("row_reports")
+    if not isinstance(rows, list):
+        raise ValueError("evaluation report must include row_reports")
+
+    total_tp = 0
+    total_fp = 0
+    total_fn = 0
+    total_gold = 0
+    total_predicted = 0
+    exact_matches = 0
+    over_label_events = 0
+    over_label_total = 0
+    structural_failures = 0
+    per_topic: dict[str, dict[str, int]] = {}
+
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        gold = _string_list(row.get("gold_topics"))
+        predicted = _string_list(row.get("predicted_topics"))
+        gold_set = set(gold)
+        predicted_set = set(predicted)
+        true_positives = predicted_set & gold_set
+        false_positives = predicted_set - gold_set
+        false_negatives = gold_set - predicted_set
+
+        total_tp += len(true_positives)
+        total_fp += len(false_positives)
+        total_fn += len(false_negatives)
+        total_gold += len(gold)
+        total_predicted += len(predicted)
+        exact_matches += int(false_positives == set() and false_negatives == set())
+        over_label_count = max(0, len(predicted) - len(gold))
+        over_label_events += int(over_label_count > 0)
+        over_label_total += over_label_count
+        structural_failures += int(row.get("error") is not None)
+
+        for topic in true_positives:
+            _topic_counts(per_topic, topic)["true_positives"] += 1
+        for topic in false_positives:
+            _topic_counts(per_topic, topic)["false_positives"] += 1
+        for topic in false_negatives:
+            _topic_counts(per_topic, topic)["false_negatives"] += 1
+
+    precision = _ratio(total_tp, total_tp + total_fp)
+    recall = _ratio(total_tp, total_tp + total_fn)
+    row_count = len(rows)
+    return {
+        "source_path": str(source_path) if source_path is not None else None,
+        "candidate": report.get("candidate"),
+        "rows": row_count,
+        "mean_score": report.get("mean_score"),
+        "true_positives": total_tp,
+        "false_positives": total_fp,
+        "false_negatives": total_fn,
+        "precision": precision,
+        "recall": recall,
+        "micro_f1": _f1(precision, recall),
+        "exact_matches": exact_matches,
+        "over_label_events": over_label_events,
+        "over_label_total": over_label_total,
+        "structural_failures": structural_failures,
+        "mean_gold_labels": total_gold / row_count if row_count else 0.0,
+        "mean_predicted_labels": total_predicted / row_count if row_count else 0.0,
+        "per_topic": {
+            topic: {
+                **counts,
+                "precision": _ratio(counts["true_positives"], counts["true_positives"] + counts["false_positives"]),
+                "recall": _ratio(counts["true_positives"], counts["true_positives"] + counts["false_negatives"]),
+            }
+            for topic, counts in sorted(per_topic.items())
+        },
+    }
+
+
 def summarize_run_log(text: str) -> dict[str, Any]:
     base_score: float | None = None
     selected_events: list[dict[str, Any]] = []
@@ -230,6 +314,31 @@ def _number_list(value: Any) -> list[float]:
     if not isinstance(value, list):
         return []
     return [float(item) for item in value if isinstance(item, (int, float))]
+
+
+def _string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value if isinstance(item, str)]
+
+
+def _topic_counts(per_topic: dict[str, dict[str, int]], topic: str) -> dict[str, int]:
+    return per_topic.setdefault(
+        topic,
+        {
+            "true_positives": 0,
+            "false_positives": 0,
+            "false_negatives": 0,
+        },
+    )
+
+
+def _ratio(numerator: int, denominator: int) -> float:
+    return numerator / denominator if denominator else 0.0
+
+
+def _f1(precision: float, recall: float) -> float:
+    return 2 * precision * recall / (precision + recall) if precision + recall else 0.0
 
 
 def _optional_float(value: Any) -> float | None:

@@ -120,3 +120,10 @@ Write a self-contained score report with iteration and candidate-score charts:
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli plot-run \
   --run-dir prompt-optimizer/out/gepa-12b-row30-prop16-from-proper-20260613T172903Z
 ```
+
+Summarize a saved 60-row validation JSON without making model calls:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summarize-evaluation \
+  --evaluation prompt-optimizer/out/validation-12b-row30-prop16-best-YYYYMMDDTHHMMSSZ/gepa-12b-row30-prop16-best-limit60.json
+```

@@ -5,7 +5,13 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from prompt_optimizer.report import render_gepa_run_report, summarize_gepa_run, summarize_run_log, write_gepa_run_report
+from prompt_optimizer.report import (
+    render_gepa_run_report,
+    summarize_evaluation_report,
+    summarize_gepa_run,
+    summarize_run_log,
+    write_gepa_run_report,
+)
 
 
 class ReportTest(unittest.TestCase):
@@ -122,6 +128,47 @@ class ReportTest(unittest.TestCase):
 
             self.assertEqual(output_path, run_dir / "score_report.html")
             self.assertIn("Validation Score Over Iterations", output_path.read_text(encoding="utf-8"))
+
+    def test_summarize_evaluation_report_counts_final_metrics(self) -> None:
+        summary = summarize_evaluation_report(
+            {
+                "candidate": "candidate-a",
+                "mean_score": 0.4,
+                "row_reports": [
+                    {
+                        "gold_topics": ["acp"],
+                        "predicted_topics": ["acp"],
+                        "error": None,
+                    },
+                    {
+                        "gold_topics": ["security"],
+                        "predicted_topics": ["security", "config"],
+                        "error": None,
+                    },
+                    {
+                        "gold_topics": ["gateway", "sessions"],
+                        "predicted_topics": [],
+                        "error": "final_json was not called",
+                    },
+                ],
+            }
+        )
+
+        self.assertEqual(summary["candidate"], "candidate-a")
+        self.assertEqual(summary["rows"], 3)
+        self.assertEqual(summary["true_positives"], 2)
+        self.assertEqual(summary["false_positives"], 1)
+        self.assertEqual(summary["false_negatives"], 2)
+        self.assertAlmostEqual(summary["precision"], 2 / 3)
+        self.assertAlmostEqual(summary["recall"], 0.5)
+        self.assertAlmostEqual(summary["micro_f1"], 4 / 7)
+        self.assertEqual(summary["exact_matches"], 1)
+        self.assertEqual(summary["over_label_events"], 1)
+        self.assertEqual(summary["over_label_total"], 1)
+        self.assertEqual(summary["structural_failures"], 1)
+        self.assertAlmostEqual(summary["mean_gold_labels"], 4 / 3)
+        self.assertEqual(summary["mean_predicted_labels"], 1.0)
+        self.assertEqual(summary["per_topic"]["config"]["false_positives"], 1)
 
 
 if __name__ == "__main__":
