@@ -16,6 +16,7 @@ from prompt_optimizer.dataset import (
 from prompt_optimizer.harness import ClassifierHarness
 from prompt_optimizer.metric import SCORING_CONFIG
 from prompt_optimizer.prompt import DEFAULT_SEED_PROMPT_PATH, load_seed_prompt
+from prompt_optimizer.report import summarize_gepa_run
 from prompt_optimizer.run import (
     DEFAULT_CONCURRENCY,
     DEFAULT_MAX_TOKENS,
@@ -85,6 +86,9 @@ def main() -> None:
     optimize.add_argument("--concurrency", type=int, default=DEFAULT_CONCURRENCY)
     _add_harness_args(optimize)
 
+    report_run = subparsers.add_parser("report-run", help="summarize a GEPA run directory")
+    report_run.add_argument("--run-dir", type=Path, required=True)
+
     args = parser.parse_args()
     if args.command == "summary":
         print(_summary(args.ds4, args.feedback_manifest, args.taxonomy, args.seed_prompt))
@@ -97,6 +101,9 @@ def main() -> None:
         return
     if args.command == "optimize":
         print(_optimize(args))
+        return
+    if args.command == "report-run":
+        print(json.dumps(summarize_gepa_run(args.run_dir), indent=2, sort_keys=True))
         return
     parser.print_help()
 

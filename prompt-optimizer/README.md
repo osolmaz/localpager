@@ -106,3 +106,10 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --model gemma-12b-q4km-reason \
   --max-tokens 1536
 ```
+
+Summarize a live or completed GEPA run without making model calls:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli report-run \
+  --run-dir prompt-optimizer/out/gepa-12b-row30-prop16-from-proper-20260613T172903Z
+```
