@@ -329,6 +329,44 @@ Stretch goal for the same time box: classify one Shaun row through
 `localpager-agent` with a mock or live model path and parse `final_json`. Do not
 block the required first slice on a slow 12B rollout.
 
+## Successful run targets
+
+These are the targets for calling a GEPA run successful. They are not minimum
+smoke-run thresholds.
+
+GEPA run:
+
+- `proposal_attempts >= 16`.
+- `distinct_candidates >= 8` including baseline.
+- `accepted_full_eval_candidates >= 6`.
+- `max_metric_calls >= 480`.
+- `row_limit >= 30` if runtime allows. If runtime forces `row_limit = 18`,
+  require stronger external validation before promotion.
+- `concurrency = 2` for 12B runs.
+- No OOM, model-server instability, hidden retry storm, or untracked stale
+  classifier processes competing for the loaded model.
+
+External 60-row validation against v9.1 on the DS4 gold labels:
+
+- Mean weighted score: `>= 0.54`.
+- Absolute improvement over v9.1: `>= +0.10`.
+- Micro-F1: `>= 0.70`.
+- Precision: `>= 0.80`.
+- Recall: `>= 0.61`.
+- False positives: `<= 20`.
+- False negatives: `<= 58`.
+- Over-label events: `0` or `1`.
+- Structural failures: `0`.
+- Exact matches: `>= 15`.
+
+Anti-hacking success checks:
+
+- Mean predicted labels per row must not increase by more than `+0.10`.
+- The prompt must not gain score by proposing broad or random extra labels.
+- Any score gain with a false-positive regression is not a successful run.
+- The winning prompt must beat both v9.1 and the earlier GEPA-six prompt on the
+  same 60-row validation set.
+
 Live smoke note from 2026-06-13: row `openclaw-openclaw-48940` now runs through
 the production `scripts/localpager-classifier` -> `localpager-agent` path. With
 12B and `--max-tokens 512`, the model exhausted the output cap during reasoning
