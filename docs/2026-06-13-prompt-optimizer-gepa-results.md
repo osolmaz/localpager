@@ -156,24 +156,90 @@ Scrutiny:
   structural miss to another row and worsened the row-47/50 window score, so it
   was not promoted.
 
+## 2026-06-14 Cardinality Repair
+
+After the prop20 GEPA continuation, a manual hardcase repair was tested with a
+larger 4096-token output cap. The first repair improved aggregate quality but
+failed the anti-hacking/cardinality gates:
+
+| candidate | mean score | precision | recall | F1 | FP | FN | over-label events | structural failures | exact | mean predicted labels |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| prop20 best, 1536 tokens | 0.5936 | 0.8707 | 0.6689 | 0.7566 | 15 | 50 | 2 | 4 | 24 | 1.9333 |
+| hardcase repair v2, 4096 tokens | 0.7729 | 0.9343 | 0.8477 | 0.8889 | 9 | 23 | 4 | 0 | 38 | 2.2833 |
+| hardcase repair v3 cardinality cap, 4096 tokens | 0.6233 | 0.9375 | 0.6954 | 0.7985 | 7 | 46 | 0 | 0 | 19 | 1.8667 |
+
+The v2 repair was not promoted because its `2.2833` predicted labels per row
+was `+0.4167` above v9.1's `1.8667`, which would let the model buy recall by
+adding many more labels. A simulation showed that truncating v2 predictions to
+two labels would still clear the quality gates, so v3 added a strict two-label
+cardinality budget.
+
+Promoted v3 artifacts:
+
+```text
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-cardinality-repair.prompt.md
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-cardinality-repair.routing_policy.md
+```
+
+Routing-policy SHA-256:
+
+```text
+b2576ca027148e109a1e72029c192ea9e26be486508671ec7c11025ac80f948b
+```
+
+External 60-row validation artifact:
+
+```text
+prompt-optimizer/out/validation-manual-hardcase-repair-v3-cardinality-max4096-20260614T103814Z/manual-hardcase-repair-v3-cardinality-max4096-limit60.json
+```
+
+Strict gate check:
+
+| metric | target | observed | result |
+| --- | ---: | ---: | --- |
+| mean weighted score | >= 0.5400 | 0.6233 | pass |
+| score delta vs v9.1 | >= +0.1000 | +0.1911 | pass |
+| micro-F1 | >= 0.7000 | 0.7985 | pass |
+| precision | >= 0.8000 | 0.9375 | pass |
+| recall | >= 0.6100 | 0.6954 | pass |
+| false positives | <= 20 | 7 | pass |
+| false negatives | <= 58 | 46 | pass |
+| over-label events | 0 or 1 | 0 | pass |
+| structural failures | 0 | 0 | pass |
+| exact matches | >= 15 | 19 | pass |
+| mean predicted labels delta vs v9.1 | <= +0.10 | +0.0000 | pass |
+| 12B concurrency | 2 | 2 | pass |
+| OOM / retry storm | none | none observed | pass |
+
+Scrutiny:
+
+- This is the first candidate in the sequence that clears all strict gates on
+  Shaun's 60-row set, including structural reliability and cardinality.
+- The result is validation-set-informed: the manual repair used failures from
+  the same 60 rows. Treat it as a strong candidate artifact, not as clean
+  holdout evidence.
+- The two-label cap is intentionally conservative. It lowers recall versus v2,
+  but it prevents score hacking by random or contextual extra labels and still
+  beats the v9.1 baseline by a wide margin.
+
 ## Current Best Candidate
 
 The tracked assembled prompt is:
 
 ```text
-prompt-optimizer/results/2026-06-14-gepa-12b-prop20-best.prompt.md
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-cardinality-repair.prompt.md
 ```
 
 The editable routing-policy block is:
 
 ```text
-prompt-optimizer/results/2026-06-14-gepa-12b-prop20-best.routing_policy.md
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-cardinality-repair.routing_policy.md
 ```
 
 Candidate SHA-256:
 
 ```text
-5ff17ce59da5ff6c98c7241f10a12e7ebb908b415c51a6aad631ad9d83a686e5
+b2576ca027148e109a1e72029c192ea9e26be486508671ec7c11025ac80f948b
 ```
 
 The main improvements are explicit rules for:
@@ -182,16 +248,12 @@ The main improvements are explicit rules for:
 - policy/config/security/MCP conformance cases.
 - tighter cardinality guidance and keyword suppression.
 - avoiding random extra labels unless they route to a central maintainer bucket.
+- a strict two-label output cap, so the model cannot improve by proposing more
+  labels.
 
 ## Scrutiny
 
-This is the current best aggregate artifact, but not a deployment-ready win by
-the plan's strict gates. It materially improves the classifier's score and false
-positive profile, while keeping cardinality under control, but it still has
-format-following failures under the 1536-token classifier budget.
-
-The next useful experiment should target structural reliability directly rather
-than chasing more topic rules: either shorten the routing policy, alter the
-runtime wrapper to suppress long reasoning more aggressively, or run a GEPA
-variant whose feedback set includes the observed final_json failures and whose
-scoring function makes structural failure a hard loss.
+This is the current best strict-gate artifact. The strongest caveat is that the
+manual repair was informed by the same 60-row validation set, so a fresh holdout
+or larger DS4 slice is still needed before treating the result as deployment
+evidence.
