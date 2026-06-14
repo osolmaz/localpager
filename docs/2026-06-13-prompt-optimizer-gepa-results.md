@@ -67,24 +67,113 @@ Micro metrics over rows 1-60:
 | v9.1 seed | 0.7411 | 0.5804 | 0.6510 |
 | first 12B GEPA candidate | 0.7965 | 0.5960 | 0.6818 |
 
+## 2026-06-14 Proper GEPA Continuation
+
+The completed continuation run is:
+
+```text
+prompt-optimizer/out/gepa-12b-row30-prop20-continuation-20260614T021448Z
+```
+
+It was seeded from the previous proper best routing policy and run with 12B,
+row limit 30, reflection minibatch 4, concurrency 2, max metric calls 720, and
+`max_candidate_proposals=20`. The higher proposal cap was intentional: GEPA's
+stopper count did not map one-to-one to the logged `proposal_attempts`, and two
+earlier continuations stopped at 15 logged attempts.
+
+Run gates:
+
+| gate | target | observed | result |
+| --- | ---: | ---: | --- |
+| proposal attempts | >= 16 | 20 | pass |
+| accepted full-eval candidates | >= 6 | 18 | pass |
+| distinct candidates including seed | >= 8 | 19 | pass |
+| metric calls | >= 480 | 730 | pass |
+| row limit | >= 30 if runtime allows | 30 | pass |
+| 12B concurrency | 2 | 2 | pass |
+| OOM / retry storm | none | none observed | pass |
+
+The best internal 30-row validation score was `0.7404` at candidate index 2.
+The tracked artifacts are:
+
+```text
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-best.prompt.md
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-best.routing_policy.md
+```
+
+Routing-policy SHA-256:
+
+```text
+5ff17ce59da5ff6c98c7241f10a12e7ebb908b415c51a6aad631ad9d83a686e5
+```
+
+External 60-row validation artifact:
+
+```text
+prompt-optimizer/out/validation-12b-row30-prop16-best-20260614T081931Z/gepa-12b-row30-prop16-best-limit60.json
+```
+
+External 60-row metrics:
+
+| metric | target | observed | result |
+| --- | ---: | ---: | --- |
+| mean weighted score | >= 0.5400 | 0.5936 | pass |
+| score delta vs v9.1 | >= +0.1000 | +0.1613 | pass |
+| micro-F1 | >= 0.7000 | 0.7566 | pass |
+| precision | >= 0.8000 | 0.8707 | pass |
+| recall | >= 0.6100 | 0.6689 | pass |
+| false positives | <= 20 | 15 | pass |
+| false negatives | <= 58 | 50 | pass |
+| over-label events | 0 or 1 | 2 | fail |
+| structural failures | 0 | 4 | fail |
+| exact matches | >= 15 | 24 | pass |
+| mean predicted labels delta vs v9.1 | <= +0.10 | +0.067 | pass |
+
+Comparison against earlier 60-row references:
+
+| candidate | mean score | precision | recall | F1 | FP | FN | over-label events | structural failures | exact |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| v9.1 seed | 0.4322 | 0.7411 | 0.5804 | 0.6510 | 29 | 60 | 2 | 3 | 10 |
+| first 12B GEPA candidate | 0.4912 | 0.7965 | 0.5960 | 0.6818 | 23 | 61 | 1 | 0 | 12 |
+| previous proper best | 0.5355 | 0.7778 | 0.6712 | 0.7206 | 28 | 48 | 5 | 2 | 21 |
+| 2026-06-14 prop20 best | 0.5936 | 0.8707 | 0.6689 | 0.7566 | 15 | 50 | 2 | 4 | 24 |
+
+Scrutiny:
+
+- This is the strongest aggregate result so far and clearly beats v9.1,
+  GEPA-six, and the previous proper best on mean score, precision, F1, false
+  positives, and exact matches.
+- It is not a clean success by the plan because structural failures regressed
+  to 4 and over-label events are 2 rather than 0 or 1.
+- The mean predicted labels per row is `1.9333`, up from v9.1's `1.8667` on the
+  same 60-row split artifacts. The +0.067 increase stays below the anti-hacking
+  cardinality guardrail.
+- The structural failures are all `final_json was not called`; transcript
+  inspection showed the model exhausting the 1536-token output budget in
+  reasoning before tool-calling on at least one failing row.
+- A manual tail-only `final_json` guard was tested on the two small windows that
+  contain the four observed structural failures. It fixed some rows but moved a
+  structural miss to another row and worsened the row-47/50 window score, so it
+  was not promoted.
+
 ## Current Best Candidate
 
 The tracked assembled prompt is:
 
 ```text
-prompt-optimizer/results/2026-06-13-gepa-12b-six-best.prompt.md
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-best.prompt.md
 ```
 
 The editable routing-policy block is:
 
 ```text
-prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-best.routing_policy.md
 ```
 
 Candidate SHA-256:
 
 ```text
-f4b161bb9bbaf366f1d4f1841243d73544bbd3c553ca6be5eb2818e757007187
+5ff17ce59da5ff6c98c7241f10a12e7ebb908b415c51a6aad631ad9d83a686e5
 ```
 
 The main improvements are explicit rules for:
@@ -96,17 +185,13 @@ The main improvements are explicit rules for:
 
 ## Scrutiny
 
-This is progress, not final evidence. The later continuation candidate looked
-better inside its GEPA run, but external validation exposed more over-labeling
-and two structural failures over the rows 1-30 comparison. The earlier first-12B
-candidate is now the better current artifact because it has the larger external
-mean-score gain, fewer false positives than v9.1, fewer over-labeling events,
-and zero structural failures on the checked rows.
+This is the current best aggregate artifact, but not a deployment-ready win by
+the plan's strict gates. It materially improves the classifier's score and false
+positive profile, while keeping cardinality under control, but it still has
+format-following failures under the 1536-token classifier budget.
 
-The first candidate still misses one more gold label than v9.1 on rows 1-60, so
-it may be slightly conservative. That tradeoff held on rows 31-60: the candidate
-kept lower false positives, slightly improved recall, and eliminated structural
-failures across the full 60-row set. The remaining risk is qualitative: some
-losses are large, especially ACP/session/gateway cases where the candidate drops
-a central secondary label. A human should review those losses before replacing a
-deployed OpenClaw prompt template.
+The next useful experiment should target structural reliability directly rather
+than chasing more topic rules: either shorten the routing policy, alter the
+runtime wrapper to suppress long reasoning more aggressively, or run a GEPA
+variant whose feedback set includes the observed final_json failures and whose
+scoring function makes structural failure a hard loss.
