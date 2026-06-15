@@ -32,9 +32,11 @@ export async function createReposhellRuntime(
     extensionPath,
     instruction: [
       "A read-only bash tool is available for inspecting configured repository snapshots.",
-      "Use bash only when the GitHub context is ambiguous or repo files are needed to classify correctly.",
-      "Prefer concise commands such as pwd, ls, find, rg, grep, sed -n, cat, head, git show --name-only, and git grep.",
-      "Do not use bash for routine classification when the provided GitHub context is sufficient."
+      "Use bash only when one repository lookup is needed to resolve ambiguity.",
+      "Commands already start in the configured default repository snapshot; do not use cd or absolute /home paths.",
+      'Use one simple read-only command with plain arguments, such as `rg -n "text" path`, `git grep -n "text" -- path`, `sed -n "1,120p" path`, `cat path`, `head -40 path`, `ls path`, `find path -maxdepth 2 -type f`, `pwd`, or `git show --name-only --oneline REV`.',
+      "Never use command chaining, fallback commands, pipes, redirects, subshells, interpreters, network commands, package managers, or shell metacharacters.",
+      "If one simple command is not enough, skip bash or answer from the supplied context."
     ].join("\n")
   };
 }
@@ -73,12 +75,13 @@ function extensionSource(
     "  pi.registerTool({",
     '    name: "bash",',
     '    label: "Bash",',
-    '    description: "Run a read-only bash command in configured repository snapshots.",',
-    '    promptSnippet: "Use bash to read repository files when needed. Commands are read-only and start in the configured default repo.",',
+    '    description: "Run one simple read-only repository inspection command. No cd, pipes, redirects, command chaining, fallbacks, interpreters, network, package managers, or absolute /home paths.",',
+    '    promptSnippet: "Use bash only for one simple read-only repository lookup. Commands already start in the configured default repo. Valid examples: rg -n \\"text\\" path, git grep -n \\"text\\" -- path, sed -n \\"1,120p\\" path, cat path, head -40 path, ls path, find path -maxdepth 2 -type f. Never use cd, &&, ||, |, ;, redirects, subshells, interpreters, network, package managers, or absolute /home paths.",',
     "    promptGuidelines: [",
-    '      "Use bash only when repository files are needed to resolve ambiguity.",',
-    '      "Prefer rg, find, sed -n, cat, head, and git grep for concise inspection.",',
-    '      "Do not attempt write, network, package-manager, interpreter, pipeline, or redirect commands."',
+    '      "Use bash only when one repository lookup is needed to resolve ambiguity.",',
+    '      "Commands start in the configured default repository snapshot; do not use cd or absolute /home paths.",',
+    '      "Use exactly one simple command with plain arguments, such as rg -n, git grep -n, sed -n, cat, head, ls, find, pwd, or git show --name-only.",',
+    '      "Do not use command chaining, fallback commands, pipes, redirects, subshells, interpreters, network, package managers, or shell metacharacters."',
     "    ],",
     "    parameters: {",
     '      type: "object",',
