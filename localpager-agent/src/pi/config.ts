@@ -39,6 +39,7 @@ function modelsConfig(
   discoveredContextWindow?: number
 ): unknown {
   const contextWindow = options.contextWindow ?? discoveredContextWindow;
+  const compat = modelCompat(model);
   return {
     providers: {
       [options.providerId]: {
@@ -53,7 +54,8 @@ function modelsConfig(
           withoutUndefined({
             id: model,
             name: `Local model (${model})`,
-            reasoning: options.thinking !== "off",
+            reasoning: options.thinking !== "off" || compat !== undefined,
+            compat,
             input: ["text"],
             contextWindow,
             maxTokens: options.maxTokens,
@@ -68,6 +70,27 @@ function modelsConfig(
       }
     }
   };
+}
+
+type ThinkingFormat = "deepseek" | "qwen-chat-template";
+
+function modelCompat(model: string): { readonly thinkingFormat: ThinkingFormat } | undefined {
+  const thinkingFormat = thinkingFormatForModel(model);
+  return thinkingFormat === undefined ? undefined : { thinkingFormat };
+}
+
+function thinkingFormatForModel(model: string): ThinkingFormat | undefined {
+  const normalized = model.toLowerCase();
+  if (normalized.includes("qwen")) {
+    return "qwen-chat-template";
+  }
+  if (normalized.includes("deepseek")) {
+    return "deepseek";
+  }
+  if (normalized.includes("gemma-12b") || normalized.includes("gemma-4-12b")) {
+    return "qwen-chat-template";
+  }
+  return undefined;
 }
 
 function withoutUndefined(value: Record<string, unknown>): Record<string, unknown> {
