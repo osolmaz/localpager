@@ -19,6 +19,7 @@ from prompt_optimizer.run import (
     OptimizerInputs,
     evaluate_routing_policy,
     evaluate_seed,
+    load_evalstate_optimizer_inputs,
     seed_candidate,
     write_result_artifacts,
 )
@@ -96,6 +97,52 @@ class RunTest(unittest.TestCase):
 
         self.assertEqual(set(candidate), {ROUTING_POLICY_COMPONENT})
         self.assertIn("## Goal", candidate[ROUTING_POLICY_COMPONENT])
+
+    def test_evalstate_inputs_default_to_overlay_only_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            taxonomy = root / "topics.json"
+            train = root / "feedback300.jsonl"
+            pareto = root / "pareto60.jsonl"
+            heldout = root / "bench78.jsonl"
+            taxonomy.write_text(json.dumps({"topics": {"acp": {}, "gateway": {}}}), encoding="utf-8")
+            row = json.dumps(
+                {
+                    "id": "openclaw-openclaw-1",
+                    "target": "openclaw/openclaw github_pr #1: Gateway ACP work",
+                    "github_context": "\n".join(
+                        [
+                            "GitHub item:",
+                            "- Repository: openclaw/openclaw",
+                            "- Type: github_pr",
+                            "- Number: 1",
+                            "- URL: https://github.com/openclaw/openclaw/pull/1",
+                            "- Title: Gateway ACP work",
+                        ]
+                    ),
+                    "expected_topics": ["acp", "gateway"],
+                    "title": "Gateway ACP work",
+                }
+            )
+            for path in (train, pareto, heldout):
+                path.write_text(row + "\n", encoding="utf-8")
+
+            inputs = load_evalstate_optimizer_inputs(
+                train_path=train,
+                pareto_path=pareto,
+                heldout_path=heldout,
+                taxonomy_path=taxonomy,
+            )
+        candidate = seed_candidate(inputs.prompt_parts)
+        routing_policy = candidate[ROUTING_POLICY_COMPONENT]
+
+        self.assertIn("# Decision Procedure", routing_policy)
+        self.assertIn("# Suppression Rules", routing_policy)
+        self.assertNotIn("Allowed topic IDs", routing_policy)
+        self.assertNotIn("## Evalstate Taxonomy", routing_policy)
+        self.assertNotIn("__ALLOWED_TOPICS_JSON__", routing_policy)
+        self.assertIn("## Evalstate Taxonomy", inputs.prompt_parts.prefix)
+        self.assertIn("## Target", inputs.prompt_parts.suffix)
 
     def test_write_result_artifacts_writes_best_prompt(self) -> None:
         inputs = _inputs()

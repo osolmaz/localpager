@@ -5,13 +5,21 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+PROMPT_OPTIMIZER_ROOT = Path(__file__).resolve().parents[2]
+
 DEFAULT_SEED_PROMPT_PATH = Path(
     "/home/bob/oc/openclaw-classification-dataset/prompts/"
     "localpager-openclaw-routing-v9.1-monologue-cap.hbs"
 )
-DEFAULT_EVALSTATE_SEED_PROMPT_PATH = Path(
-    "/home/bob/oc/openclaw-classification-dataset/prompts/"
-    "localpager-openclaw-routing-v10-production.hbs"
+DEFAULT_EVALSTATE_SEED_PROMPT_PATH = (
+    PROMPT_OPTIMIZER_ROOT
+    / "prompts"
+    / "localpager-openclaw-routing-v10-overlay-scaffold.hbs"
+)
+DEFAULT_EVALSTATE_SEED_OVERLAY_PATH = (
+    PROMPT_OPTIMIZER_ROOT
+    / "prompts"
+    / "localpager-openclaw-routing-v10-overlay-seed.md"
 )
 
 REQUIRED_PLACEHOLDERS = (
@@ -20,6 +28,7 @@ REQUIRED_PLACEHOLDERS = (
     "__ALLOWED_TOPICS_JSON__",
     "__TOPIC_DESCRIPTIONS__",
 )
+ROUTING_POLICY_OVERLAY_PLACEHOLDER = "__ROUTING_POLICY_OVERLAY__"
 
 ROUTING_POLICY_START = "\n## Goal\n"
 ROUTING_POLICY_START_MARKERS = (
@@ -65,17 +74,33 @@ def load_seed_prompt(path: Path = DEFAULT_SEED_PROMPT_PATH) -> PromptParts:
     return split_seed_prompt(normalize_template_variables(source))
 
 
+def load_overlay_seed_prompt(
+    scaffold_path: Path = DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
+    overlay_path: Path = DEFAULT_EVALSTATE_SEED_OVERLAY_PATH,
+) -> PromptParts:
+    try:
+        scaffold = scaffold_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise PromptError(f"missing prompt scaffold: {scaffold_path}") from exc
+    try:
+        overlay = overlay_path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise PromptError(f"missing seed overlay: {overlay_path}") from exc
+    return split_overlay_seed_prompt(normalize_template_variables(scaffold), overlay)
+
+
 def normalize_template_variables(template: str) -> str:
     replacements = {
         r"\{\{\s*target\s*\}\}": "__TARGET__",
         r"\{\{\{\s*github_context\s*\}\}\}": "__GITHUB_CONTEXT__",
         r"\{\{\{\s*allowed_topics_json\s*\}\}\}": "__ALLOWED_TOPICS_JSON__",
         r"\{\{\{\s*topic_descriptions\s*\}\}\}": "__TOPIC_DESCRIPTIONS__",
+        r"\{\{\{?\s*routing_policy_overlay\s*\}?\}\}": ROUTING_POLICY_OVERLAY_PLACEHOLDER,
     }
     normalized = template
     for pattern, replacement in replacements.items():
         normalized = re.sub(pattern, replacement, normalized)
-    validate_placeholders(normalized)
+    validate_placeholders(normalized, allow_overlay_placeholder=True)
     return normalized
 
 
@@ -98,10 +123,25 @@ def split_seed_prompt(template: str) -> PromptParts:
     return parts
 
 
-def validate_placeholders(template: str) -> None:
+def split_overlay_seed_prompt(scaffold: str, overlay: str) -> PromptParts:
+    count = scaffold.count(ROUTING_POLICY_OVERLAY_PLACEHOLDER)
+    if count != 1:
+        raise PromptError(
+            "prompt scaffold must contain exactly one routing policy overlay "
+            f"placeholder: {ROUTING_POLICY_OVERLAY_PLACEHOLDER}"
+        )
+    prefix, suffix = scaffold.split(ROUTING_POLICY_OVERLAY_PLACEHOLDER, maxsplit=1)
+    parts = PromptParts(prefix=prefix, routing_policy=overlay, suffix=suffix)
+    parts.assemble(parts.routing_policy)
+    return parts
+
+
+def validate_placeholders(template: str, *, allow_overlay_placeholder: bool = False) -> None:
     missing = [placeholder for placeholder in REQUIRED_PLACEHOLDERS if placeholder not in template]
     if missing:
         raise PromptError(f"missing required placeholder(s): {', '.join(missing)}")
+    if not allow_overlay_placeholder and ROUTING_POLICY_OVERLAY_PLACEHOLDER in template:
+        raise PromptError(f"unreplaced routing policy overlay placeholder remains: {ROUTING_POLICY_OVERLAY_PLACEHOLDER}")
     handlebars_left = re.findall(r"\{\{\{?\s*[A-Za-z0-9_]+\s*\}?\}\}", template)
     if handlebars_left:
         raise PromptError(f"un-normalized Handlebars variables remain: {', '.join(sorted(set(handlebars_left)))}")

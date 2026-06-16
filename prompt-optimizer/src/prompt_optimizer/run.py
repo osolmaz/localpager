@@ -29,9 +29,11 @@ from prompt_optimizer.harness import (
     StaticClassifierHarness,
 )
 from prompt_optimizer.prompt import (
+    DEFAULT_EVALSTATE_SEED_OVERLAY_PATH,
     DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
     DEFAULT_SEED_PROMPT_PATH,
     PromptParts,
+    load_overlay_seed_prompt,
     load_seed_prompt,
 )
 from prompt_optimizer.reflection import CodexReflectionLM
@@ -99,6 +101,7 @@ def load_evalstate_optimizer_inputs(
     heldout_path: Path = DEFAULT_EVALSTATE_HELDOUT_PATH,
     taxonomy_path: Path = DEFAULT_V2_TAXONOMY_PATH,
     seed_prompt_path: Path = DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
+    seed_overlay_path: Path = DEFAULT_EVALSTATE_SEED_OVERLAY_PATH,
 ) -> OptimizerInputs:
     allowed_topics = load_taxonomy(taxonomy_path)
     train_pool = build_evalstate_pool(train_path, taxonomy_path, split_name="feedback")
@@ -107,7 +110,7 @@ def load_evalstate_optimizer_inputs(
         pareto_rows=load_evalstate_split(pareto_path, allowed_topics, split_name="pareto"),
         heldout_rows=load_evalstate_split(heldout_path, allowed_topics, split_name="heldout"),
         allowed_topics=allowed_topics,
-        prompt_parts=load_seed_prompt(seed_prompt_path),
+        prompt_parts=load_overlay_seed_prompt(seed_prompt_path, seed_overlay_path),
         dataset_name="evalstate-openclaw-git-labels",
     )
 

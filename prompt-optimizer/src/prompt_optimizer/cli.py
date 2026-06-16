@@ -19,9 +19,9 @@ from prompt_optimizer.dataset import (
 from prompt_optimizer.harness import ClassifierHarness
 from prompt_optimizer.metric import SCORING_CONFIG
 from prompt_optimizer.prompt import (
+    DEFAULT_EVALSTATE_SEED_OVERLAY_PATH,
     DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
     DEFAULT_SEED_PROMPT_PATH,
-    load_seed_prompt,
 )
 from prompt_optimizer.report import summarize_evaluation_file, summarize_gepa_run, write_gepa_run_report
 from prompt_optimizer.run import (
@@ -133,8 +133,9 @@ def _summary(args: argparse.Namespace) -> str:
     inputs = _load_inputs(args)
     taxonomy = _taxonomy_path(args)
     seed_prompt = _seed_prompt_path(args)
+    seed_overlay = _seed_overlay_path(args)
     topics = load_taxonomy(taxonomy)
-    prompt = load_seed_prompt(seed_prompt)
+    prompt = inputs.prompt_parts
     payload = {
         "dataset": args.dataset,
         "dataset_name": inputs.dataset_name,
@@ -162,6 +163,7 @@ def _summary(args: argparse.Namespace) -> str:
         payload["train_split"] = str(args.train_split)
         payload["pareto_split"] = str(args.pareto_split)
         payload["heldout_split"] = str(args.heldout_split)
+        payload["seed_overlay_path"] = str(seed_overlay)
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
@@ -237,6 +239,7 @@ def _add_input_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--heldout-split", type=Path, default=DEFAULT_EVALSTATE_HELDOUT_PATH)
     parser.add_argument("--taxonomy", type=Path, default=None)
     parser.add_argument("--seed-prompt", type=Path, default=None)
+    parser.add_argument("--seed-overlay", type=Path, default=None)
 
 
 def _add_eval_split_arg(parser: argparse.ArgumentParser) -> None:
@@ -281,6 +284,7 @@ def _load_inputs(args: argparse.Namespace):
             heldout_path=args.heldout_split,
             taxonomy_path=taxonomy,
             seed_prompt_path=seed_prompt,
+            seed_overlay_path=_seed_overlay_path(args),
         )
     return load_optimizer_inputs(
         ds4_path=args.ds4,
@@ -313,6 +317,12 @@ def _seed_prompt_path(args: argparse.Namespace) -> Path:
     if args.seed_prompt is not None:
         return args.seed_prompt
     return DEFAULT_EVALSTATE_SEED_PROMPT_PATH if args.dataset == "evalstate" else DEFAULT_SEED_PROMPT_PATH
+
+
+def _seed_overlay_path(args: argparse.Namespace) -> Path | None:
+    if args.seed_overlay is not None:
+        return args.seed_overlay
+    return DEFAULT_EVALSTATE_SEED_OVERLAY_PATH if args.dataset == "evalstate" else None
 
 
 def die(message: str) -> NoReturn:

@@ -103,15 +103,15 @@ allowed to, and can never break the placeholder, label, or schema contract. The
 template is assembled as: frozen scaffold + the current `routing_policy`
 overlay + fixed target/context suffix.
 
-Implementation target:
+Implemented artifact split:
 
-- Add a GEPA-specific scaffold file, for example
-  `prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
-- Add a separate seed overlay file, for example
-  `prompts/localpager-openclaw-routing-v10-overlay-seed.md`.
-- Make evalstate mode load the scaffold as the prompt wrapper and the seed
+- GEPA-specific scaffold:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
+- Seed overlay:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-seed.md`.
+- Evalstate mode loads the scaffold as the prompt wrapper and the seed
   overlay as `seed_candidate["routing_policy"]`.
-- Add tests proving that evalstate candidates do not include topic definitions,
+- Tests prove that evalstate candidates do not include topic definitions,
   schema text, or the label enum, and that rendering reconstructs a full
   Localpager prompt with the overlay inserted.
 
@@ -231,10 +231,10 @@ with the v2 topic taxonomy and a v10-based overlay scaffold:
   `examples/profiles/openclaw-routing-topics.v2.json`.
 - Fixed scaffold source:
   `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`.
-- Planned GEPA scaffold artifact:
-  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
-- Planned seed overlay artifact:
-  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-overlay-seed.md`.
+- GEPA scaffold artifact:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
+- Seed overlay artifact:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-seed.md`.
 
 The production v10 prompt is the source for the fixed contract, not the GEPA
 candidate. The optimizer must only propose replacements for the overlay seed.

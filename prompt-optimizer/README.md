@@ -39,7 +39,7 @@ The implementation covers:
 - validating labels against the OpenClaw taxonomy
 - normalizing prompt templates into Localpager placeholders
 - extracting the editable `routing_policy` block
-- planning evalstate's v10 scaffold plus overlay-only GEPA candidate boundary
+- supporting evalstate's v10 scaffold plus overlay-only GEPA candidate boundary
 - scoring predictions with Shaun/evalstate's row-aware multilabel metric
 - evaluating candidates through a mockable GEPA adapter shape
 - invoking the production `scripts/localpager-classifier` wrapper through a
@@ -73,10 +73,10 @@ Evalstate mode uses these defaults:
 - taxonomy: `examples/profiles/openclaw-routing-topics.v2.json`
 - fixed scaffold source:
   `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`
-- planned GEPA scaffold:
-  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`
-- planned seed overlay:
-  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-overlay-seed.md`
+- GEPA scaffold:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`
+- seed overlay:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-seed.md`
 - live model:
   `nvidia/Qwen3.6-35B-A3B-NVFP4` on `http://127.0.0.1:8000/v1`
 - live concurrency: `4`
