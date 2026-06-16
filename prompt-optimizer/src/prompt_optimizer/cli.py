@@ -25,6 +25,7 @@ from prompt_optimizer.prompt import (
 )
 from prompt_optimizer.report import summarize_evaluation_file, summarize_gepa_run, write_gepa_run_report
 from prompt_optimizer.run import (
+    DEFAULT_BASE_URL,
     DEFAULT_CONCURRENCY,
     DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
@@ -146,6 +147,13 @@ def _summary(args: argparse.Namespace) -> str:
         "seed_prompt_sha256": prompt.template_sha256,
         "routing_policy_sha256": prompt.routing_policy_sha256,
         "scoring": asdict(SCORING_CONFIG),
+        "live_harness_defaults": {
+            "model": DEFAULT_MODEL,
+            "base_url": DEFAULT_BASE_URL,
+            "concurrency": DEFAULT_CONCURRENCY,
+            "thinking": "medium",
+            "max_tokens": DEFAULT_MAX_TOKENS,
+        },
     }
     if args.dataset == "ds4":
         payload["ds4_path"] = str(args.ds4)
@@ -245,7 +253,7 @@ def _add_harness_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--max-tokens", type=int, default=DEFAULT_MAX_TOKENS)
     parser.add_argument("--thinking", default="medium")
     parser.add_argument("--timeout-ms", type=int, default=900_000)
-    parser.add_argument("--base-url", default=None)
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--context-window", type=int, default=None)
     parser.add_argument("--state-dir", type=Path, default=None)
 

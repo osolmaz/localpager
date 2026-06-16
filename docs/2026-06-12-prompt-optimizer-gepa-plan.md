@@ -88,7 +88,7 @@ lab transfers to deployment:
   (`scripts/localpager-render-profile.mjs`) so placeholders and the
   taxonomy-derived schema enum match exactly.
 - Run it through `localpager-classifier` → `localpager-agent` → Pi → the
-  already-loaded local 12B model → `final_json`.
+  Qwen vLLM endpoint → `final_json`.
 
 The runtime classifier harness is `localpager-agent`. The Python
 `prompt-optimizer` harness is only a driver: it assembles candidate prompt files,
@@ -101,18 +101,18 @@ To keep many rollouts tractable:
 - Pre-fetch and cache each dataset row's GitHub context once (pass
   `--github-context-file`), so rollouts never re-hit GitHub.
 - Keep the model server warm.
-- Run at concurrency 2: at most two classifier calls in flight against the local
-  12B model.
+- Run Qwen through vLLM at concurrency 4, matching the c4 serving profile's
+  `--max-num-seqs 4`.
 - Use `--thinking medium` for saved benchmark settings and future local
   classifier benchmark runs unless the experiment is explicitly marked as a
   different thinking-level comparison.
-- Use `--max-tokens 4096` for 12B classifier rollouts. This is the current
+- Use `--max-tokens 4096` for Qwen classifier rollouts. This is the current
   recommended cap for avoiding `final_json` structural failures on long
-  reasoning rows while keeping concurrency at 2.
-- If 12B rollout speed blocks iteration, use `gemma-e4b-reason-test` for
-  smoke/debug runs and explicitly marked exploratory optimizer iterations. E4B
-  scores are not transfer evidence: any candidate selected or filtered with E4B
-  must be re-evaluated on the 12B model before promotion, validation, or final
+  reasoning rows while keeping concurrency at 4.
+- If Qwen rollout speed blocks iteration, use `gemma-e4b-reason-test` for
+  smoke/debug runs and explicitly marked exploratory optimizer iterations.
+  E4B scores are not transfer evidence: any candidate selected or filtered with
+  E4B must be re-evaluated on Qwen before promotion, validation, or final
   reporting.
 - Add the one production-side seam below so rows stream through a warm process
   instead of spawning Pi per row.
@@ -150,11 +150,12 @@ To keep many rollouts tractable:
 
 ## Models
 
-- Task / evaluator LM: the already-loaded local 12B model we actually serve.
-  Non-negotiable for transfer; the prompt is tuned to that loaded model's quirks.
+- Task / evaluator LM: `nvidia/Qwen3.6-35B-A3B-NVFP4` served through vLLM at
+  `http://127.0.0.1:8000/v1`, using concurrency 4. Non-negotiable for transfer;
+  the prompt is tuned to that served model's quirks.
 - Fast fallback LM: `gemma-e4b-reason-test`, for smoke/debug runs or
   budget-limited exploration only. Log fallback use clearly and never compare E4B
-  scores directly against 12B scores.
+  scores directly against Qwen scores.
 - Reflection / proposer LM: Codex. Prefer a direct non-interactive Codex CLI
   bridge (`codex exec -`) wrapped as GEPA's `reflection_lm`; pass the reflection
   prompt on stdin and capture the final response from stdout or
@@ -224,8 +225,8 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --max-candidate-proposals 16 \
   --reflection-minibatch-size 4 \
   --concurrency 4 \
-  --model SERVED_MODEL_ID \
-  --base-url http://127.0.0.1:VLLM_PORT/v1 \
+  --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
+  --base-url http://127.0.0.1:8000/v1 \
   --thinking medium \
   --max-tokens 4096
 ```
@@ -392,7 +393,7 @@ tested first slice exists even if no full GEPA optimization run has completed:
 
 Stretch goal for the same time box: classify one Shaun row through
 `localpager-agent` with a mock or live model path and parse `final_json`. Do not
-block the required first slice on a slow 12B rollout.
+block the required first slice on a slow live rollout.
 
 ## Successful run targets
 
@@ -407,10 +408,10 @@ GEPA run:
 - `max_metric_calls >= 480`.
 - `row_limit >= 30` if runtime allows. If runtime forces `row_limit = 18`,
   require stronger external validation before promotion.
-- `concurrency = 2` for 12B runs.
+- `concurrency = 4` for Qwen/vLLM runs.
 - `thinking = medium` for saved benchmark settings and future local classifier
   benchmark runs.
-- `max_tokens = 4096` for 12B classifier rollouts.
+- `max_tokens = 4096` for Qwen classifier rollouts.
 - No OOM, model-server instability, hidden retry storm, or untracked stale
   classifier processes competing for the loaded model.
 
@@ -444,10 +445,10 @@ scored `0.25` (`acp`, `gateway`, `sessions` vs DS4 gold `acp`, `gateway`,
 `agent_runtime`). With 12B and `--max-tokens 1536`, `final_json` parsed and
 scored `0.5` (`acp`, `gateway` vs the same DS4 gold). Later 60-row validation
 showed `1536` can still produce `final_json was not called` failures on harder
-rows, so the current recommended 12B rollout cap is `--max-tokens 4096`.
-Optimizer live defaults should therefore use 12B, concurrency 2,
-`--thinking medium`, and `--max-tokens 4096` unless a run is explicitly marked
-as E4B smoke/debug or a thinking-level comparison.
+rows, so the current recommended rollout cap remains `--max-tokens 4096`.
+Optimizer live defaults now use Qwen/vLLM, concurrency 4, `--thinking medium`,
+and `--max-tokens 4096` unless a run is explicitly marked as E4B smoke/debug or
+a thinking-level comparison.
 
 Live GEPA note from 2026-06-13: the best current 12B candidate is saved at
 `prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md`.
@@ -461,7 +462,7 @@ review before replacing a deployed OpenClaw prompt template.
 ## Open questions
 
 - Exact rollout budget vs. wall-clock threshold for switching exploratory runs
-  from the already-loaded local 12B model to `gemma-e4b-reason-test`.
+  from Qwen/vLLM to `gemma-e4b-reason-test`.
 - Whether to ever optimize more than the prompt (schema or topic list); if so,
   the library's `optimize_anything` / adapter framing is the fit, and the
   candidate grows beyond `routing_policy`.

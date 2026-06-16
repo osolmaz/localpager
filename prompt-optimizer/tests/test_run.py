@@ -10,6 +10,9 @@ from prompt_optimizer.dataset import DS4Row, FeedbackManifestRow, FeedbackPoolRo
 from prompt_optimizer.harness import StaticClassifierHarness
 from prompt_optimizer.prompt import normalize_template_variables, split_seed_prompt
 from prompt_optimizer.run import (
+    DEFAULT_BASE_URL,
+    DEFAULT_CONCURRENCY,
+    DEFAULT_MODEL,
     GEPARunConfig,
     HarnessConfig,
     OptimizerInputs,
@@ -21,6 +24,17 @@ from prompt_optimizer.run import (
 
 
 class RunTest(unittest.TestCase):
+    def test_live_harness_defaults_use_qwen_c4_profile(self) -> None:
+        config = HarnessConfig()
+
+        self.assertEqual(DEFAULT_MODEL, "nvidia/Qwen3.6-35B-A3B-NVFP4")
+        self.assertEqual(DEFAULT_BASE_URL, "http://127.0.0.1:8000/v1")
+        self.assertEqual(DEFAULT_CONCURRENCY, 4)
+        self.assertEqual(config.model, DEFAULT_MODEL)
+        self.assertEqual(config.base_url, DEFAULT_BASE_URL)
+        self.assertEqual(config.concurrency, 4)
+        self.assertEqual(config.thinking, "medium")
+
     def test_evaluate_seed_reports_scores(self) -> None:
         inputs = _inputs()
 

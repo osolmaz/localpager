@@ -53,7 +53,9 @@ real one-row classifier smoke through the production wrapper, pass:
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --harness localpager-agent \
-  --model gemma-12b-q4km-reason \
+  --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
+  --base-url http://127.0.0.1:8000/v1 \
+  --concurrency 4 \
   --max-tokens 4096 \
   --limit 1
 ```
@@ -69,6 +71,10 @@ Evalstate mode uses these defaults:
 - taxonomy: `examples/profiles/openclaw-routing-topics.v2.json`
 - seed prompt:
   `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`
+- live model:
+  `nvidia/Qwen3.6-35B-A3B-NVFP4` on `http://127.0.0.1:8000/v1`
+- live concurrency: `4`
+- thinking: `medium`
 
 Static smoke checks do not make model calls:
 
@@ -103,7 +109,9 @@ run:
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-candidate \
   --harness localpager-agent \
-  --model gemma-12b-q4km-reason \
+  --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
+  --base-url http://127.0.0.1:8000/v1 \
+  --concurrency 4 \
   --max-tokens 4096 \
   --routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md \
   --candidate-name gepa-12b-six-best \
@@ -130,7 +138,9 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --dataset evalstate \
   --max-metric-calls 20 \
   --row-limit 4 \
-  --model gemma-12b-q4km-reason \
+  --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
+  --base-url http://127.0.0.1:8000/v1 \
+  --concurrency 4 \
   --thinking medium \
   --max-tokens 4096
 ```
@@ -145,8 +155,9 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --max-candidate-proposals 8 \
   --row-limit 12 \
   --reflection-minibatch-size 4 \
-  --concurrency 2 \
-  --model gemma-12b-q4km-reason \
+  --concurrency 4 \
+  --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
+  --base-url http://127.0.0.1:8000/v1 \
   --thinking medium \
   --max-tokens 4096
 ```

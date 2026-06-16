@@ -36,9 +36,10 @@ from prompt_optimizer.prompt import (
 )
 from prompt_optimizer.reflection import CodexReflectionLM
 
-DEFAULT_MODEL = "gemma-12b-q4km-reason"
+DEFAULT_MODEL = "nvidia/Qwen3.6-35B-A3B-NVFP4"
+DEFAULT_BASE_URL = "http://127.0.0.1:8000/v1"
 FALLBACK_MODEL = "gemma-e4b-reason-test"
-DEFAULT_CONCURRENCY = 2
+DEFAULT_CONCURRENCY = 4
 
 
 @dataclass(frozen=True)
@@ -57,7 +58,7 @@ class HarnessConfig:
     concurrency: int = DEFAULT_CONCURRENCY
     max_tokens: int = DEFAULT_MAX_TOKENS
     timeout_ms: int = 900_000
-    base_url: str | None = None
+    base_url: str | None = DEFAULT_BASE_URL
     context_window: int | None = None
     thinking: str = "medium"
     state_dir: Path | None = None
