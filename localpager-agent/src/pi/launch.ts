@@ -67,7 +67,10 @@ export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {
     stdio,
     env: { ...process.env, ...plan.env }
   });
-  child.stdout?.resume();
+  let stdoutTail = "";
+  child.stdout?.on("data", (chunk: Buffer | string) => {
+    stdoutTail = tailText(stdoutTail + chunk.toString());
+  });
   return await new Promise<number>((resolve, reject) => {
     child.on("error", reject);
     child.on("exit", (code, signal) => {
@@ -75,9 +78,19 @@ export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {
         process.kill(process.pid, signal);
         return;
       }
+      if ((code ?? 0) !== 0 && stdoutTail.trim() !== "") {
+        process.stderr.write(stdoutTail);
+        if (!stdoutTail.endsWith("\n")) {
+          process.stderr.write("\n");
+        }
+      }
       resolve(code ?? 0);
     });
   });
+}
+
+function tailText(value: string, maxChars = 8000): string {
+  return value.length <= maxChars ? value : value.slice(value.length - maxChars);
 }
 
 function structuredOutputArgs(

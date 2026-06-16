@@ -1,0 +1,251 @@
+{
+  "candidate": "seed",
+  "exact_matches": 46,
+  "false_negatives": 32,
+  "false_positives": 14,
+  "mean_gold_labels": 1.8461538461538463,
+  "mean_predicted_labels": 1.6153846153846154,
+  "mean_score": 0.7685897435897436,
+  "micro_f1": 0.8296296296296296,
+  "over_label_events": 3,
+  "over_label_total": 4,
+  "per_topic": {
+    "acp": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 5
+    },
+    "acpx": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4
+    },
+    "agent_runtime": {
+      "false_negatives": 1,
+      "false_positives": 1,
+      "precision": 0.8,
+      "recall": 0.8,
+      "true_positives": 4
+    },
+    "api_surface": {
+      "false_negatives": 1,
+      "false_positives": 1,
+      "precision": 0.6666666666666666,
+      "recall": 0.6666666666666666,
+      "true_positives": 2
+    },
+    "approvals": {
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.75,
+      "true_positives": 3
+    },
+    "auth_identity": {
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "true_positives": 1
+    },
+    "browser_automation": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4
+    },
+    "chat_integrations": {
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.8333333333333334,
+      "true_positives": 5
+    },
+    "codex": {
+      "false_negatives": 3,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.4,
+      "true_positives": 2
+    },
+    "coding_agent_integrations": {
+      "false_negatives": 1,
+      "false_positives": 3,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0
+    },
+    "config": {
+      "false_negatives": 3,
+      "false_positives": 1,
+      "precision": 0.75,
+      "recall": 0.5,
+      "true_positives": 3
+    },
+    "cron_automation": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4
+    },
+    "docs": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 6
+    },
+    "exec_tools": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 5
+    },
+    "gateway": {
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.75,
+      "true_positives": 3
+    },
+    "hooks": {
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.75,
+      "true_positives": 3
+    },
+    "inference_api": {
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.8,
+      "true_positives": 4
+    },
+    "mcp_tooling": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4
+    },
+    "memory": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4
+    },
+    "model_lifecycle": {
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.8,
+      "true_positives": 4
+    },
+    "notifications": {
+      "false_negatives": 2,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "true_positives": 2
+    },
+    "packaging_deployment": {
+      "false_negatives": 1,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.75,
+      "true_positives": 3
+    },
+    "queueing": {
+      "false_negatives": 2,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "true_positives": 2
+    },
+    "reliability": {
+      "false_negatives": 1,
+      "false_positives": 3,
+      "precision": 0.625,
+      "recall": 0.8333333333333334,
+      "true_positives": 5
+    },
+    "sandboxing": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4
+    },
+    "security": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 5
+    },
+    "self_hosted_inference": {
+      "false_negatives": 2,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "true_positives": 2
+    },
+    "sessions": {
+      "false_negatives": 0,
+      "false_positives": 3,
+      "precision": 0.625,
+      "recall": 1.0,
+      "true_positives": 5
+    },
+    "skills_plugins": {
+      "false_negatives": 2,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.6,
+      "true_positives": 3
+    },
+    "telemetry_usage": {
+      "false_negatives": 2,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 0.5,
+      "true_positives": 2
+    },
+    "tests_ci": {
+      "false_negatives": 0,
+      "false_positives": 1,
+      "precision": 0.8,
+      "recall": 1.0,
+      "true_positives": 4
+    },
+    "tool_calling": {
+      "false_negatives": 4,
+      "false_positives": 1,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0
+    },
+    "ui_tui": {
+      "false_negatives": 0,
+      "false_positives": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 5
+    }
+  },
+  "precision": 0.8888888888888888,
+  "recall": 0.7777777777777778,
+  "rows": 78,
+  "source_path": "/home/bob/repos/localpager/prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-20260616T172947Z/heldout-seed-v10-qwen-medium-c4-20260617T0626/evaluation.json",
+  "structural_failures": 0,
+  "true_positives": 112
+}

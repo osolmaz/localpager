@@ -3,12 +3,12 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { LocalpagerAgentOptions } from "../src/agent/options.js";
 import { run } from "../src/cli/cli.js";
 import type { RuntimeConfig } from "../src/pi/config.js";
-import { createLaunchPlan, plainSystemPrompt } from "../src/pi/launch.js";
+import { createLaunchPlan, execLaunchPlan, plainSystemPrompt } from "../src/pi/launch.js";
 import { createSamplingRuntime } from "../src/sampling/request-extension.js";
 import type { FinalSchemaRuntime } from "../src/structured/final-schema.js";
 import { createFinalSchemaRuntime, readFinalSchemaOutput } from "../src/structured/final-schema.js";
@@ -221,6 +221,34 @@ describe("structured output", () => {
 
     expect(plan.args).toContain("--tools");
     expect(plan.args).toContain("final_json");
+  });
+
+  it("surfaces child stdout on schema-mode launch failure", async () => {
+    const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-launch-fail-"));
+    const stderrWrite = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const scriptPath = path.join(stateDir, "fake-pi-fail.mjs");
+      await writeFile(
+        scriptPath,
+        'process.stdout.write("backend rejected request\\n"); process.exit(7);',
+        "utf8"
+      );
+
+      const code = await execLaunchPlan({
+        command: `node ${scriptPath}`,
+        args: [],
+        env: {},
+        stdinMode: "ignore",
+        finalSchemaOutputPath: path.join(stateDir, "final-output.json")
+      });
+
+      const stderrText = stderrWrite.mock.calls.map((call) => String(call[0])).join("");
+      expect(code).toBe(7);
+      expect(stderrText).toContain("backend rejected request");
+    } finally {
+      stderrWrite.mockRestore();
+      await rm(stateDir, { recursive: true, force: true });
+    }
   });
 
   it("preserves caller-supplied system prompts in schema mode", async () => {

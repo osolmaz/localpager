@@ -1,0 +1,34 @@
+{
+  "best_idx": 16,
+  "best_prompt_path": "/home/bob/repos/localpager/prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-20260616T172947Z/best.prompt.md",
+  "best_routing_policy_path": "/home/bob/repos/localpager/prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-20260616T172947Z/best.routing_policy.md",
+  "best_score": 0.6979444444444444,
+  "config": {
+    "dataset_name": "evalstate-openclaw-git-labels",
+    "harness": {
+      "base_url": "http://127.0.0.1:8000/v1",
+      "concurrency": 4,
+      "context_window": null,
+      "max_tokens": 8192,
+      "model": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+      "state_dir": "/home/bob/repos/localpager/prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-20260616T172947Z/classifier-state",
+      "thinking": "medium",
+      "timeout_ms": 900000,
+      "topic_taxonomy_path": "/home/bob/repos/localpager/examples/profiles/openclaw-routing-topics.v2.json"
+    },
+    "max_candidate_proposals": 32,
+    "max_metric_calls": 1440,
+    "output_dir": "/home/bob/repos/localpager/prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-20260616T172947Z",
+    "reflection_minibatch_size": 4,
+    "row_limit": null,
+    "seed": 0,
+    "seed_routing_policy_chars": null,
+    "seed_routing_policy_sha256": null
+  },
+  "created_at": "2026-06-16T21:54:53.441926+00:00",
+  "dataset_name": "evalstate-openclaw-git-labels",
+  "num_candidates": 20,
+  "num_full_val_evals": 20,
+  "result_path": "/home/bob/repos/localpager/prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-20260616T172947Z/gepa-result.json",
+  "total_metric_calls": 1452
+}
