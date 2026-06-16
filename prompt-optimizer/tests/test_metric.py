@@ -15,17 +15,19 @@ class MetricTest(unittest.TestCase):
         self.assertGreater(extra.loss, exact.loss)
         self.assertLess(extra.score, exact.score)
         self.assertAlmostEqual(extra.precision, 0.5)
-        self.assertAlmostEqual(extra.cardinality_closeness, 0.5)
+        self.assertAlmostEqual(extra.row_jaccard, 0.5)
+        self.assertEqual(extra.row_exact, 0.0)
         self.assertEqual(extra.false_positives, ("gateway",))
         self.assertEqual(extra.over_label_count, 1)
 
-    def test_false_positive_costs_more_than_false_negative(self) -> None:
+    def test_false_positive_and_false_negative_are_balanced_without_policy_penalty(self) -> None:
         allowed = {"acp", "gateway"}
         false_positive = score_row(["acp"], ["acp", "gateway"], allowed)
         false_negative = score_row(["acp", "gateway"], ["acp"], allowed)
 
-        self.assertGreater(false_positive.loss, false_negative.loss)
-        self.assertLess(false_positive.score, false_negative.score)
+        self.assertEqual(false_positive.policy_penalty, 0.0)
+        self.assertEqual(false_negative.policy_penalty, 0.0)
+        self.assertAlmostEqual(false_positive.score, false_negative.score)
 
     def test_invalid_predicted_label_fails(self) -> None:
         with self.assertRaisesRegex(InvalidLabelError, "not in taxonomy"):
@@ -43,15 +45,28 @@ class MetricTest(unittest.TestCase):
         self.assertAlmostEqual(batch.micro_precision, 2 / 3)
         self.assertAlmostEqual(batch.micro_recall, 2 / 3)
         self.assertAlmostEqual(batch.micro_f1, 2 / 3)
-        self.assertAlmostEqual(batch.micro_fbeta, 2 / 3)
+        self.assertAlmostEqual(batch.avg_row_jaccard, 0.5)
+        self.assertEqual(batch.avg_row_exact, 0.0)
 
     def test_empty_gold_and_empty_prediction_is_perfect(self) -> None:
         row = score_row([], [], {"acp"})
 
         self.assertEqual(row.score, 1.0)
         self.assertEqual(row.loss, 0.0)
-        self.assertEqual(row.exact_match, 1.0)
-        self.assertEqual(row.cardinality_closeness, 1.0)
+        self.assertEqual(row.row_exact, 1.0)
+        self.assertEqual(row.row_jaccard, 1.0)
+
+    def test_policy_penalty_hurts_duplicates_and_over_cardinality(self) -> None:
+        row = score_row(
+            ["acp", "gateway", "reliability"],
+            ["acp", "gateway", "reliability", "docs", "docs"],
+            {"acp", "gateway", "reliability", "docs"},
+        )
+
+        self.assertEqual(row.duplicate_label_count, 1)
+        self.assertEqual(row.over_cardinality_count, 1)
+        self.assertAlmostEqual(row.policy_penalty, 0.15)
+        self.assertLess(row.score, row.row_jaccard)
 
     def test_asi_notes_surface_label_spam(self) -> None:
         row = score_row(["acp"], ["acp", "gateway"], {"acp", "gateway"})

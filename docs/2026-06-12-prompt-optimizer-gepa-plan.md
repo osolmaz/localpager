@@ -119,31 +119,30 @@ To keep many rollouts tractable:
 
 ## Scoring and ASI
 
-- Optimization metric (μ): a precision-weighted multilabel routing score
-  against the DS4 labels. Use the same shape as the evalstate/Shaun
-  label-generator scorer, but flip the recall-leaning terms to precision so
-  false positives and random extra labels are punished more strongly:
+- Optimization metric (μ): Shaun/evalstate's later row-aware multilabel routing
+  score against the gold labels:
 
   ```text
-  score = 0.55 * Fβ(β=0.5)
-        + 0.20 * topic_micro_f1
-        + 0.15 * topic_micro_precision
-        + 0.07 * cardinality_closeness
-        + 0.03 * exact_match
+  score = 0.60 * row_jaccard
+        + 0.20 * row_topic_f1
+        + 0.20 * row_exact
+        - policy_penalties
   ```
 
-  `Fβ(β=0.5)` weights precision more than recall. The explicit
-  `topic_micro_precision` term makes extra wrong labels hurt selection directly.
-  `cardinality_closeness` penalizes candidates whose predicted label count drifts
-  from the gold label count, and `exact_match` keeps pressure on the whole set.
-  Report topic micro-F1, per-topic precision, and per-topic recall alongside this
-  objective, but select candidates by the weighted score.
+  `row_jaccard` is `TP / (TP + FP + FN)` for the row's topic set.
+  `row_topic_f1` is the row-level topic F1. `row_exact` is 1 only when the
+  predicted set exactly matches the gold set. `policy_penalties` apply when a
+  candidate breaks the label policy, currently duplicate predicted labels and
+  more than 3 predicted labels. This scorer is balanced rather than
+  recall-leaning: false positives and false negatives both reduce Jaccard, F1,
+  and exact match. Report topic micro-F1, per-topic precision, and per-topic
+  recall alongside this objective, but select candidates by the weighted score.
 - The metric must be game-resistant: proposing random extra labels must never
   help a candidate. A predicted label only improves the score when it is present
   in the row's gold label set. Every extra allowed label is a false positive,
-  reduces precision and Fβ, can reduce cardinality closeness when it exceeds the
-  gold count, and should be surfaced in ASI feedback as label spam. Invalid
-  labels are schema failures, not partial credit.
+  reduces row Jaccard and row F1, prevents exact match, and should be surfaced in
+  ASI feedback as label spam. Invalid labels are schema failures, not partial
+  credit.
 - Feedback / ASI (μ_f): the per-row, per-topic mistakes turned into short
   natural-language notes, e.g. "item 412: predicted `config`; gold has none — an
   option was added but config behavior is not the subject." This is the same

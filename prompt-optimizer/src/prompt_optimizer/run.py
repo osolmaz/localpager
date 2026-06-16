@@ -252,12 +252,15 @@ def evaluation_report(
                         "false_positives": list(row_score.false_positives),
                         "false_negatives": list(row_score.false_negatives),
                         "over_label_count": row_score.over_label_count,
+                        "duplicate_label_count": row_score.duplicate_label_count,
+                        "over_cardinality_count": row_score.over_cardinality_count,
                         "precision": row_score.precision,
                         "recall": row_score.recall,
                         "f1": row_score.f1,
-                        "fbeta": row_score.fbeta,
-                        "cardinality_closeness": row_score.cardinality_closeness,
-                        "exact_match": row_score.exact_match,
+                        "row_jaccard": row_score.row_jaccard,
+                        "row_topic_f1": row_score.row_topic_f1,
+                        "row_exact": row_score.row_exact,
+                        "policy_penalty": row_score.policy_penalty,
                         "loss": row_score.loss,
                     }
                 )

@@ -35,7 +35,7 @@ The implementation covers:
 - validating labels against the OpenClaw taxonomy
 - normalizing the v9.1 prompt template into Localpager placeholders
 - extracting the editable `routing_policy` block
-- scoring predictions with a precision-weighted multilabel metric
+- scoring predictions with Shaun/evalstate's row-aware multilabel metric
 - evaluating candidates through a mockable GEPA adapter shape
 - invoking the production `scripts/localpager-classifier` wrapper through a
   tested subprocess harness
@@ -57,20 +57,19 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
 
 ## Scoring
 
-The optimizer uses an evalstate-shaped scorer with precision-weighted terms:
+The optimizer uses Shaun/evalstate's later row-aware scorer:
 
 ```text
-score = 0.55 * Fβ(β=0.5)
-      + 0.20 * topic_micro_f1
-      + 0.15 * topic_micro_precision
-      + 0.07 * cardinality_closeness
-      + 0.03 * exact_match
+score = 0.60 * row_jaccard
+      + 0.20 * row_topic_f1
+      + 0.20 * row_exact
+      - policy_penalties
 ```
 
-This keeps the score bounded from 0 to 1. It is intentionally stricter about
-false positives than false negatives: `Fβ(β=0.5)` and the explicit precision
-term make random extra labels hurt, while `cardinality_closeness` penalizes
-label-count drift.
+This keeps the score bounded from 0 to 1. The scorer is balanced rather than
+recall-leaning: false positives and false negatives both reduce row Jaccard,
+row topic F1, and exact row match. Current policy penalties cover duplicate
+predicted labels and more than 3 predicted labels.
 
 Use `--offset` with `--limit` to check held-out slices of Shaun's ordered
 60-row set. Saved routing-policy candidates can be scored without another GEPA
