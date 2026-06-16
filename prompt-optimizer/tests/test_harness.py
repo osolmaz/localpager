@@ -173,6 +173,14 @@ printf '%s\\n' '{{"topics_of_interest":["acp"],"description":"ok","caveats":[]}}
             self.assertIn("openclaw/openclaw github_pr #1: Saved target", capture_args.read_text(encoding="utf-8"))
             self.assertEqual(capture_context.read_text(encoding="utf-8"), "Saved GitHub context\n")
 
+    def test_localpager_agent_harness_state_dir_env_is_absolute(self) -> None:
+        harness = LocalpagerAgentHarness(model="gemma-test", state_dir=Path("relative-state-dir"))
+
+        env = harness._env()
+
+        self.assertTrue(Path(env["LOCALPAGER_CLASSIFIER_STATE_DIR"]).is_absolute())
+        self.assertTrue(env["LOCALPAGER_CLASSIFIER_STATE_DIR"].endswith("relative-state-dir"))
+
 
 def _pool_row() -> FeedbackPoolRow:
     ds4 = _ds4_row(title="ACP runtime", raw={"body": "Runtime details."})

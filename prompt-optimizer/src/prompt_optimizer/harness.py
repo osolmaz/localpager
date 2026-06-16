@@ -125,7 +125,7 @@ class LocalpagerAgentHarness:
         if self.context_window is not None:
             env["LOCALPAGER_AGENT_CONTEXT_WINDOW"] = str(self.context_window)
         if self.state_dir is not None:
-            env["LOCALPAGER_CLASSIFIER_STATE_DIR"] = str(self.state_dir)
+            env["LOCALPAGER_CLASSIFIER_STATE_DIR"] = str(self.state_dir.resolve())
         return env
 
 
