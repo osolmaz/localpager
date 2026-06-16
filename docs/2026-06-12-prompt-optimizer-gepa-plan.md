@@ -54,15 +54,38 @@ The tool lives at `prompt-optimizer/` and is isolated from the Go build and CI:
 
 ## What GEPA optimizes (the candidate)
 
-Seed the run from the OpenClaw classification dataset prompt
+DS4 compatibility mode seeds from the OpenClaw classification dataset prompt
 `prompts/localpager-openclaw-routing-v9.1-monologue-cap.hbs` in
 `dutifuldev/openclaw-classification-dataset` at revision
 `8d1088276425ca72a5313c18cde4adef20ffe194`.
 
-The candidate is the editable routing-policy block of that v9.1 prompt, not the
-whole template. The scaffold stays frozen: output-shape rules, repository-read
-instructions, the v9.1 inner-monologue cap, topic placeholders, and target /
-GitHub-context placeholders.
+Evalstate v2 mode must use an overlay-only GEPA candidate. The v10 prompt is
+not optimized directly. Instead, split it into:
+
+- a fixed v10-based scaffold containing only stable task contract text:
+  task framing, evalstate v2 label list, evalstate topic definitions, output
+  schema, input placeholders, valid-label constraints, and max-3-label output
+  constraints;
+- one mutable routing-policy overlay placeholder, rendered into the scaffold
+  at runtime.
+
+The initial evalstate GEPA candidate should be a separate overlay seed file,
+not the full v10 prompt. Use Shaun/evalstate's overlay shape:
+
+```text
+Decision Procedure
+Cardinality Rules
+Boundary Overlays
+Suppression Rules
+```
+
+The overlay candidate may contain compact decision rules, tie-breakers,
+centrality tests, false-positive suppression rules, and false-negative recovery
+rules. It must not restate topic definitions, the allowed-topic enum, cue-word
+lists, the deliverable test, the output schema, or the cardinality law. Those
+belong to the fixed scaffold. If current v10 text mixes heuristic policy into
+the fixed body, move that policy text into the overlay seed or delete it if it
+duplicates evalstate's fixed definitions.
 
 The optimizer should normalize the dataset Handlebars variables
 (`{{target}}`, `{{{github_context}}}`, `{{{allowed_topics_json}}}`,
@@ -76,8 +99,21 @@ seed_candidate = {"routing_policy": "<the decision rules + cue tables>"}
 ```
 
 This is GEPA's "module" notion. It guarantees GEPA can only rewrite prose it is
-allowed to, and can never break the placeholder or schema contract. The template
-is assembled as: frozen scaffold + the current `routing_policy` block.
+allowed to, and can never break the placeholder, label, or schema contract. The
+template is assembled as: frozen scaffold + the current `routing_policy`
+overlay + fixed target/context suffix.
+
+Implementation target:
+
+- Add a GEPA-specific scaffold file, for example
+  `prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
+- Add a separate seed overlay file, for example
+  `prompts/localpager-openclaw-routing-v10-overlay-seed.md`.
+- Make evalstate mode load the scaffold as the prompt wrapper and the seed
+  overlay as `seed_candidate["routing_policy"]`.
+- Add tests proving that evalstate candidates do not include topic definitions,
+  schema text, or the label enum, and that rendering reconstructs a full
+  Localpager prompt with the overlay inserted.
 
 ## Evaluation harness (the transfer rule)
 
@@ -184,7 +220,7 @@ To keep many rollouts tractable:
 ### Evalstate v2 split setup
 
 For the next GEPA run, use evalstate's published OpenClaw Git-label dataset
-with the v2 topic taxonomy and v10 prompt:
+with the v2 topic taxonomy and a v10-based overlay scaffold:
 
 - Feedback/minibatch pool: `feedback300.jsonl`.
 - Pareto validation set for GEPA candidate selection: `pareto60.jsonl`.
@@ -193,8 +229,15 @@ with the v2 topic taxonomy and v10 prompt:
   `/home/bob/repos/openclaw-git-labels/data/splits/`.
 - Local taxonomy:
   `examples/profiles/openclaw-routing-topics.v2.json`.
-- Local seed prompt:
+- Fixed scaffold source:
   `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`.
+- Planned GEPA scaffold artifact:
+  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
+- Planned seed overlay artifact:
+  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-overlay-seed.md`.
+
+The production v10 prompt is the source for the fixed contract, not the GEPA
+candidate. The optimizer must only propose replacements for the overlay seed.
 
 The evalstate rows already include the saved `target`, `github_context`, and
 `expected_topics`. For this dataset, the gold labels are exactly

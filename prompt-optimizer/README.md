@@ -2,8 +2,9 @@
 
 Offline tooling for improving the OpenClaw routing prompt with GEPA. The
 optimizer can read either the original DS4/Shaun 60-row setup or evalstate's
-published OpenClaw Git-label splits. DS4 mode starts from the v9.1 seed prompt;
-evalstate mode starts from the v10 prompt and v2 topic taxonomy.
+published OpenClaw Git-label splits. DS4 mode starts from the v9.1 seed prompt.
+Evalstate mode uses the v2 topic taxonomy with a v10-based fixed scaffold and
+an overlay-only routing-policy candidate.
 
 This package does not run inside the Localpager worker. It is a lab tool whose
 production output is a reviewed prompt file.
@@ -38,6 +39,7 @@ The implementation covers:
 - validating labels against the OpenClaw taxonomy
 - normalizing prompt templates into Localpager placeholders
 - extracting the editable `routing_policy` block
+- planning evalstate's v10 scaffold plus overlay-only GEPA candidate boundary
 - scoring predictions with Shaun/evalstate's row-aware multilabel metric
 - evaluating candidates through a mockable GEPA adapter shape
 - invoking the production `scripts/localpager-classifier` wrapper through a
@@ -69,8 +71,12 @@ Evalstate mode uses these defaults:
 - held-out reporting set:
   `/home/bob/repos/openclaw-git-labels/data/splits/bench78.jsonl`
 - taxonomy: `examples/profiles/openclaw-routing-topics.v2.json`
-- seed prompt:
+- fixed scaffold source:
   `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`
+- planned GEPA scaffold:
+  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`
+- planned seed overlay:
+  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-overlay-seed.md`
 - live model:
   `nvidia/Qwen3.6-35B-A3B-NVFP4` on `http://127.0.0.1:8000/v1`
 - live concurrency: `4`
@@ -86,6 +92,24 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --eval-split pareto \
   --limit 1
 ```
+
+Evalstate GEPA should not mutate the whole v10 prompt. The v10-based scaffold
+keeps the task contract fixed: label list, topic definitions, schema, input
+format, valid-label constraints, and max-3-label output constraints. GEPA only
+mutates the routing-policy overlay inserted into that scaffold. The overlay
+should keep Shaun/evalstate's compact section shape:
+
+```text
+Decision Procedure
+Cardinality Rules
+Boundary Overlays
+Suppression Rules
+```
+
+Overlay candidates may add decision rules, centrality tests, boundary
+tie-breakers, and suppression rules. They must not restate topic definitions,
+the allowed-topic enum, cue-word lists, the output schema, or the cardinality
+law.
 
 ## Scoring
 
