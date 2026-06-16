@@ -252,6 +252,12 @@ def evaluation_report(
                         "false_positives": list(row_score.false_positives),
                         "false_negatives": list(row_score.false_negatives),
                         "over_label_count": row_score.over_label_count,
+                        "precision": row_score.precision,
+                        "recall": row_score.recall,
+                        "f1": row_score.f1,
+                        "fbeta": row_score.fbeta,
+                        "cardinality_closeness": row_score.cardinality_closeness,
+                        "exact_match": row_score.exact_match,
                         "loss": row_score.loss,
                     }
                 )

@@ -14,6 +14,8 @@ class MetricTest(unittest.TestCase):
         self.assertEqual(exact.loss, 0.0)
         self.assertGreater(extra.loss, exact.loss)
         self.assertLess(extra.score, exact.score)
+        self.assertAlmostEqual(extra.precision, 0.5)
+        self.assertAlmostEqual(extra.cardinality_closeness, 0.5)
         self.assertEqual(extra.false_positives, ("gateway",))
         self.assertEqual(extra.over_label_count, 1)
 
@@ -23,6 +25,7 @@ class MetricTest(unittest.TestCase):
         false_negative = score_row(["acp", "gateway"], ["acp"], allowed)
 
         self.assertGreater(false_positive.loss, false_negative.loss)
+        self.assertLess(false_positive.score, false_negative.score)
 
     def test_invalid_predicted_label_fails(self) -> None:
         with self.assertRaisesRegex(InvalidLabelError, "not in taxonomy"):
@@ -40,6 +43,15 @@ class MetricTest(unittest.TestCase):
         self.assertAlmostEqual(batch.micro_precision, 2 / 3)
         self.assertAlmostEqual(batch.micro_recall, 2 / 3)
         self.assertAlmostEqual(batch.micro_f1, 2 / 3)
+        self.assertAlmostEqual(batch.micro_fbeta, 2 / 3)
+
+    def test_empty_gold_and_empty_prediction_is_perfect(self) -> None:
+        row = score_row([], [], {"acp"})
+
+        self.assertEqual(row.score, 1.0)
+        self.assertEqual(row.loss, 0.0)
+        self.assertEqual(row.exact_match, 1.0)
+        self.assertEqual(row.cardinality_closeness, 1.0)
 
     def test_asi_notes_surface_label_spam(self) -> None:
         row = score_row(["acp"], ["acp", "gateway"], {"acp", "gateway"})

@@ -13,7 +13,7 @@ from prompt_optimizer.dataset import DEFAULT_TAXONOMY_PATH, DS4Row, FeedbackPool
 
 DEFAULT_CLASSIFIER_COMMAND = REPO_ROOT / "scripts/localpager-classifier"
 DEFAULT_SCHEMA_PATH = REPO_ROOT / "schemas/classification.schema.json"
-DEFAULT_MAX_TOKENS = 1536
+DEFAULT_MAX_TOKENS = 4096
 
 
 @dataclass(frozen=True)

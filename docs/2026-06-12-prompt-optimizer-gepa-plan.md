@@ -119,24 +119,31 @@ To keep many rollouts tractable:
 
 ## Scoring and ASI
 
-- Optimization metric (μ): a weighted multilabel routing score computed from
-  false positives, false negatives, and over-labeling against the DS4 labels.
-  Initial row loss:
+- Optimization metric (μ): a precision-weighted multilabel routing score
+  against the DS4 labels. Use the same shape as the evalstate/Shaun
+  label-generator scorer, but flip the recall-leaning terms to precision so
+  false positives and random extra labels are punished more strongly:
 
   ```text
-  2.0 * false_positives + 1.0 * false_negatives + 0.5 * max(0, predicted_count - gold_count)
+  score = 0.55 * Fβ(β=0.5)
+        + 0.20 * topic_micro_f1
+        + 0.15 * topic_micro_precision
+        + 0.07 * cardinality_closeness
+        + 0.03 * exact_match
   ```
 
-  False positives are intentionally worse than false negatives, and over-labeling
-  gets an extra penalty beyond the individual false-positive labels. Report topic
-  micro-F1, per-topic precision, and per-topic recall alongside this objective,
-  but select candidates by the weighted score.
+  `Fβ(β=0.5)` weights precision more than recall. The explicit
+  `topic_micro_precision` term makes extra wrong labels hurt selection directly.
+  `cardinality_closeness` penalizes candidates whose predicted label count drifts
+  from the gold label count, and `exact_match` keeps pressure on the whole set.
+  Report topic micro-F1, per-topic precision, and per-topic recall alongside this
+  objective, but select candidates by the weighted score.
 - The metric must be game-resistant: proposing random extra labels must never
   help a candidate. A predicted label only improves the score when it is present
   in the row's gold label set. Every extra allowed label is a false positive,
-  increases the over-labeling penalty when it exceeds the gold count, and should
-  be surfaced in ASI feedback as label spam. Invalid labels are schema failures,
-  not partial credit.
+  reduces precision and Fβ, can reduce cardinality closeness when it exceeds the
+  gold count, and should be surfaced in ASI feedback as label spam. Invalid
+  labels are schema failures, not partial credit.
 - Feedback / ASI (μ_f): the per-row, per-topic mistakes turned into short
   natural-language notes, e.g. "item 412: predicted `config`; gold has none — an
   option was added but config behavior is not the subject." This is the same

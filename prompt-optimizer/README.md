@@ -35,7 +35,7 @@ The implementation covers:
 - validating labels against the OpenClaw taxonomy
 - normalizing the v9.1 prompt template into Localpager placeholders
 - extracting the editable `routing_policy` block
-- scoring predictions with a false-positive-heavy multilabel metric
+- scoring predictions with a precision-weighted multilabel metric
 - evaluating candidates through a mockable GEPA adapter shape
 - invoking the production `scripts/localpager-classifier` wrapper through a
   tested subprocess harness
@@ -54,6 +54,23 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --max-tokens 4096 \
   --limit 1
 ```
+
+## Scoring
+
+The optimizer uses an evalstate-shaped scorer with precision-weighted terms:
+
+```text
+score = 0.55 * Fβ(β=0.5)
+      + 0.20 * topic_micro_f1
+      + 0.15 * topic_micro_precision
+      + 0.07 * cardinality_closeness
+      + 0.03 * exact_match
+```
+
+This keeps the score bounded from 0 to 1. It is intentionally stricter about
+false positives than false negatives: `Fβ(β=0.5)` and the explicit precision
+term make random extra labels hurt, while `cardinality_closeness` penalizes
+label-count drift.
 
 Use `--offset` with `--limit` to check held-out slices of Shaun's ordered
 60-row set. Saved routing-policy candidates can be scored without another GEPA
@@ -89,7 +106,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --max-metric-calls 20 \
   --row-limit 4 \
   --model gemma-12b-q4km-reason \
-  --max-tokens 1536
+  --max-tokens 4096
 ```
 
 To continue from a saved candidate instead of the v9.1 seed prompt, pass
