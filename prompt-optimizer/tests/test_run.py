@@ -12,6 +12,7 @@ from prompt_optimizer.prompt import normalize_template_variables, split_seed_pro
 from prompt_optimizer.run import (
     DEFAULT_BASE_URL,
     DEFAULT_CONCURRENCY,
+    DEFAULT_MAX_TOKENS,
     DEFAULT_MODEL,
     GEPARunConfig,
     HarnessConfig,
@@ -34,6 +35,8 @@ class RunTest(unittest.TestCase):
         self.assertEqual(config.base_url, DEFAULT_BASE_URL)
         self.assertEqual(config.concurrency, 4)
         self.assertEqual(config.thinking, "medium")
+        self.assertEqual(config.max_tokens, 8192)
+        self.assertEqual(DEFAULT_MAX_TOKENS, 8192)
 
     def test_evaluate_seed_reports_scores(self) -> None:
         inputs = _inputs()

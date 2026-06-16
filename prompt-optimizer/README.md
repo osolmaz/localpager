@@ -56,7 +56,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
   --base-url http://127.0.0.1:8000/v1 \
   --concurrency 4 \
-  --max-tokens 4096 \
+  --max-tokens 8192 \
   --limit 1
 ```
 
@@ -75,6 +75,7 @@ Evalstate mode uses these defaults:
   `nvidia/Qwen3.6-35B-A3B-NVFP4` on `http://127.0.0.1:8000/v1`
 - live concurrency: `4`
 - thinking: `medium`
+- GEPA max output tokens: `8192`
 
 Static smoke checks do not make model calls:
 
@@ -112,7 +113,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-candida
   --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
   --base-url http://127.0.0.1:8000/v1 \
   --concurrency 4 \
-  --max-tokens 4096 \
+  --max-tokens 8192 \
   --routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md \
   --candidate-name gepa-12b-six-best \
   --limit 6 \
@@ -142,7 +143,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --base-url http://127.0.0.1:8000/v1 \
   --concurrency 4 \
   --thinking medium \
-  --max-tokens 4096
+  --max-tokens 8192
 ```
 
 To continue from a saved candidate instead of the v9.1 seed prompt, pass
@@ -159,7 +160,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
   --base-url http://127.0.0.1:8000/v1 \
   --thinking medium \
-  --max-tokens 4096
+  --max-tokens 8192
 ```
 
 Summarize a live or completed GEPA run without making model calls:

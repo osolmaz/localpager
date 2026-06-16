@@ -106,7 +106,7 @@ To keep many rollouts tractable:
 - Use `--thinking medium` for saved benchmark settings and future local
   classifier benchmark runs unless the experiment is explicitly marked as a
   different thinking-level comparison.
-- Use `--max-tokens 4096` for Qwen classifier rollouts. This is the current
+- Use `--max-tokens 8192` for Qwen classifier rollouts. This is the current
   recommended cap for avoiding `final_json` structural failures on long
   reasoning rows while keeping concurrency at 4.
 - If Qwen rollout speed blocks iteration, use `gemma-e4b-reason-test` for
@@ -228,7 +228,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
   --base-url http://127.0.0.1:8000/v1 \
   --thinking medium \
-  --max-tokens 4096
+  --max-tokens 8192
 ```
 
 Do not start this run until the code and static smoke checks have passed.
@@ -411,7 +411,7 @@ GEPA run:
 - `concurrency = 4` for Qwen/vLLM runs.
 - `thinking = medium` for saved benchmark settings and future local classifier
   benchmark runs.
-- `max_tokens = 4096` for Qwen classifier rollouts.
+- `max_tokens = 8192` for Qwen classifier rollouts.
 - No OOM, model-server instability, hidden retry storm, or untracked stale
   classifier processes competing for the loaded model.
 
@@ -445,9 +445,9 @@ scored `0.25` (`acp`, `gateway`, `sessions` vs DS4 gold `acp`, `gateway`,
 `agent_runtime`). With 12B and `--max-tokens 1536`, `final_json` parsed and
 scored `0.5` (`acp`, `gateway` vs the same DS4 gold). Later 60-row validation
 showed `1536` can still produce `final_json was not called` failures on harder
-rows, so the current recommended rollout cap remains `--max-tokens 4096`.
+rows, so the current recommended rollout cap remains `--max-tokens 8192`.
 Optimizer live defaults now use Qwen/vLLM, concurrency 4, `--thinking medium`,
-and `--max-tokens 4096` unless a run is explicitly marked as E4B smoke/debug or
+and `--max-tokens 8192` unless a run is explicitly marked as E4B smoke/debug or
 a thinking-level comparison.
 
 Live GEPA note from 2026-06-13: the best current 12B candidate is saved at
