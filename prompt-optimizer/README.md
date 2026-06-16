@@ -1,8 +1,8 @@
 # Localpager Prompt Optimizer
 
-Experimental offline tooling for improving the OpenClaw routing prompt with
-GEPA. The optimizer reads the canonical DS4 dataset, starts from the v9.1 seed
-prompt, and scores candidates against Localpager routing labels.
+Offline tooling for improving the OpenClaw routing prompt with GEPA. The
+optimizer reads the canonical DS4 dataset, starts from the v9.1 seed prompt,
+and scores candidates against Localpager routing labels.
 
 This package does not run inside the Localpager worker. It is a lab tool whose
 production output is a reviewed prompt file.
@@ -26,9 +26,9 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed --
 The summary command expects the local dataset checkout and Shaun feedback set
 paths described in `docs/2026-06-12-prompt-optimizer-gepa-plan.md`.
 
-## Current Scope
+## Scope
 
-The first implementation slice covers:
+The implementation covers:
 
 - loading canonical `ds4.jsonl`
 - loading Shaun's `gepa-good-60` row identities
@@ -51,7 +51,7 @@ real one-row classifier smoke through the production wrapper, pass:
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --harness localpager-agent \
   --model gemma-12b-q4km-reason \
-  --max-tokens 1536 \
+  --max-tokens 4096 \
   --limit 1
 ```
 
@@ -63,23 +63,23 @@ run:
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-candidate \
   --harness localpager-agent \
   --model gemma-12b-q4km-reason \
-  --max-tokens 1536 \
+  --max-tokens 4096 \
   --routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md \
   --candidate-name gepa-12b-six-best \
   --limit 6 \
   --offset 12
 ```
 
-The current best reviewed artifact from the first 60-row validation is:
+The current best reviewed artifact from the 60-row validation sequence is:
 
 ```text
-prompt-optimizer/results/2026-06-13-gepa-12b-six-best.prompt.md
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-cardinality-repair.prompt.md
 ```
 
 Its editable routing-policy block is:
 
 ```text
-prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md
+prompt-optimizer/results/2026-06-14-gepa-12b-prop20-cardinality-repair.routing_policy.md
 ```
 
 GEPA optimization is explicit because a live run can take a long time:
@@ -104,7 +104,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --reflection-minibatch-size 4 \
   --concurrency 2 \
   --model gemma-12b-q4km-reason \
-  --max-tokens 1536
+  --max-tokens 4096
 ```
 
 Summarize a live or completed GEPA run without making model calls:

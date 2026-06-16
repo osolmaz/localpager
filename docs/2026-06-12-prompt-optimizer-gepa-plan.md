@@ -6,8 +6,10 @@ date: 2026-06-12
 
 # Prompt Optimizer (GEPA) — Plan
 
-This plans a `prompt-optimizer/` tool that uses GEPA to improve the Localpager
-classifier prompt. It is a plan only; no code is committed yet.
+This records the design used by the `prompt-optimizer/` tool that uses GEPA to
+improve the Localpager classifier prompt. The implementation lives under
+`prompt-optimizer/` and the reviewed prompt artifacts live under
+`prompt-optimizer/results/`.
 
 ## Goal
 
@@ -41,8 +43,8 @@ better version of that artifact.
 
 The tool lives at `prompt-optimizer/` and is isolated from the Go build and CI:
 
-- Own `pyproject.toml` with a pinned `gepa` dependency plus an OpenAI-compatible
-  client; virtualenv is gitignored.
+- Own `pyproject.toml` with a GEPA dependency plus an OpenAI-compatible client;
+  virtualenv is gitignored.
 - Touches neither `go.mod` nor `localpager-agent/package.json`.
 - Excluded from `scripts/check.sh` and the Go/slophammer gates. Optional own
   gates (`ruff`, `pytest`) may be added later; none are required while it is

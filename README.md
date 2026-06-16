@@ -8,8 +8,9 @@ structured result, and sends matching notifications to Discord.
 This repository is an early extraction of a working triage prototype. The
 current code is intentionally small: it provides the worker, queue, GitHub and
 gitcrawl source adapters, classifier command boundary, SQLite state, Discord
-delivery, a bundled local model runner in `localpager-agent/`, and a small
-`localpager` operations CLI.
+delivery, a bundled local model runner in `localpager-agent/`, offline prompt
+optimization tooling in `prompt-optimizer/`, and a small `localpager`
+operations CLI.
 
 ## Current Commands
 
@@ -101,13 +102,13 @@ worker → wrapper → renderer → agent chain, prompt placeholders, and schema
 generation, see
 [Classifier Pipeline and Profile Rendering](docs/2026-06-12-classifier-pipeline-and-rendering.md).
 
-For OpenClaw maintainer routing, use
-`examples/profiles/openclaw-routing-v8.prompt.md` with the OpenClaw topic
-keyword taxonomy in `examples/profiles/openclaw-routing-topics.json`. That
-profile encodes the DS4/Gemma prompt work: notification routing, title-first
-centrality, one-topic default, a second-topic gate, and false-positive
-suppression for broad topics such as `local_model_providers`, `reliability`,
-`api_surface`, `tool_calling`, and `config`.
+For OpenClaw maintainer routing, use a deployment prompt profile generated from
+the OpenClaw classification dataset with the OpenClaw topic keyword taxonomy in
+`examples/profiles/openclaw-routing-topics.json`. The repo also keeps historical
+v8 examples under `examples/profiles/` and the GEPA-reviewed candidate artifacts
+under `prompt-optimizer/results/`. The current prompt-optimizer artifact adds
+strict cardinality guidance, false-positive suppression, and label-spam
+resistance for maintainer-routing labels.
 `examples/profiles/openclaw-routing-topics.v2.json` is a staged v2 taxonomy for
 review only; current examples and defaults still use `openclaw-routing-topics.json`.
 
@@ -124,7 +125,8 @@ Machine-specific runtime values, such as the loaded model context window,
 parallelism, context truncation budget, and DS4/LM Studio exclusivity rules,
 belong in a deployment setup document. See
 [Onur's Isengard Setup](docs/2026-06-02-onur-isengard-localpager-setup.md) for
-the current OpenClaw/Gemma deployment.
+the current OpenClaw/Gemma deployment. For Qwen NVFP4 through vLLM, see
+[vLLM Qwen NVFP4 LocalPager Setup](docs/2026-06-16-vllm-qwen36-nvfp4-localpager.md).
 
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:
