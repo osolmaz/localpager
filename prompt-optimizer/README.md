@@ -201,6 +201,15 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli plot-run \
   --run-dir prompt-optimizer/out/gepa-12b-row30-prop16-from-proper-20260613T172903Z
 ```
 
+Write a self-contained prompt diff report for every saved candidate in a GEPA
+run. The page has left/right dropdowns for comparing either the editable
+routing policy or the assembled full prompt:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli plot-prompt-diffs \
+  --run-dir prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-YYYYMMDDTHHMMSSZ
+```
+
 Summarize a saved 60-row validation JSON without making model calls:
 
 ```sh

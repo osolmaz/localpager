@@ -6,6 +6,8 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from prompt_optimizer.prompt import load_overlay_seed_prompt
+
 
 _NUMBER = r"([0-9]+(?:\.[0-9]+)?)"
 
@@ -199,6 +201,59 @@ def write_gepa_run_report(run_dir: Path, output_path: Path | None = None) -> Pat
     return output_path
 
 
+def write_prompt_diff_report(run_dir: Path, output_dir: Path | None = None) -> Path:
+    """Write an HTML report for comparing every saved GEPA candidate prompt."""
+
+    candidates = _read_json(run_dir / "candidates.json")
+    if not isinstance(candidates, list):
+        raise ValueError(f"missing candidate list: {run_dir / 'candidates.json'}")
+
+    prompt_parts = load_overlay_seed_prompt()
+    versions = []
+    for index, candidate in enumerate(candidates):
+        if not isinstance(candidate, dict):
+            continue
+        routing_policy = candidate.get("routing_policy")
+        if not isinstance(routing_policy, str):
+            continue
+        prompt = prompt_parts.assemble(routing_policy)
+        versions.append(
+            {
+                "slug": f"candidate-{index:02d}",
+                "label": f"Candidate {index}",
+                "routing_policy": routing_policy,
+                "prompt": prompt,
+                "routing_policy_lines": len(routing_policy.splitlines()),
+                "prompt_lines": len(prompt.splitlines()),
+            }
+        )
+    if not versions:
+        raise ValueError(f"no routing_policy candidates found in: {run_dir / 'candidates.json'}")
+
+    if output_dir is None:
+        output_dir = run_dir / "prompt-diffs"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    (output_dir / "prompt-diff-summary.json").write_text(
+        json.dumps(
+            [
+                {
+                    "slug": version["slug"],
+                    "label": version["label"],
+                    "routing_policy_lines": version["routing_policy_lines"],
+                    "prompt_lines": version["prompt_lines"],
+                }
+                for version in versions
+            ],
+            indent=2,
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    output_path = output_dir / "index.html"
+    output_path.write_text(render_prompt_diff_report(run_dir, versions), encoding="utf-8")
+    return output_path
+
+
 def render_gepa_run_report(summary: dict[str, Any]) -> str:
     run_log = summary.get("run_log") or {}
     result = summary.get("result") or {}
@@ -285,6 +340,56 @@ def render_gepa_run_report(summary: dict[str, Any]) -> str:
             ),
             _proposal_table(proposal_events),
             "</main>",
+            "</body>",
+            "</html>",
+            "",
+        ]
+    )
+
+
+def render_prompt_diff_report(run_dir: Path, versions: list[dict[str, Any]]) -> str:
+    """Render a dropdown-based candidate prompt diff report."""
+
+    payload = json.dumps(versions).replace("</", "<\\/")
+    return "\n".join(
+        [
+            "<!doctype html>",
+            '<html lang="en">',
+            "<head>",
+            '<meta charset="utf-8">',
+            '<meta name="viewport" content="width=device-width, initial-scale=1">',
+            f"<title>{escape(run_dir.name)} prompt diffs</title>",
+            "<style>",
+            _PROMPT_DIFF_CSS,
+            "</style>",
+            "</head>",
+            "<body>",
+            "<main>",
+            f"<h1>{escape(run_dir.name)} Prompt Diffs</h1>",
+            f"<p class=\"muted\">Run directory: <code>{escape(str(run_dir))}</code></p>",
+            '<section class="panel">',
+            "<h2>Compare Candidates</h2>",
+            '<div class="controls">',
+            '<label>Left<select id="leftVersion"></select></label>',
+            '<label>Right<select id="rightVersion"></select></label>',
+            '<label>Content<select id="contentKind"><option value="routing_policy">Routing policy</option>'
+            '<option value="prompt">Full prompt</option></select></label>',
+            '<label>Lines<select id="lineMode"><option value="changed">Changed with context</option>'
+            '<option value="all">All lines</option></select></label>',
+            '<button id="swapButton" type="button">Swap</button>',
+            "</div>",
+            '<p class="muted" id="summaryLine"></p>',
+            '<div class="scroll" id="diffTable"></div>',
+            "</section>",
+            '<section class="panel">',
+            "<h2>Candidate Files</h2>",
+            '<div class="scroll"><table id="versionTable"></table></div>',
+            "</section>",
+            "</main>",
+            "<script>",
+            f"const versions = {payload};",
+            _PROMPT_DIFF_JS,
+            "</script>",
             "</body>",
             "</html>",
             "",
@@ -646,4 +751,299 @@ th {
   color: #475569;
   font-weight: 700;
 }
+""".strip()
+
+
+_PROMPT_DIFF_CSS = """
+:root {
+  color-scheme: light;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #111827;
+  background: #f8fafc;
+}
+body {
+  margin: 0;
+}
+main {
+  width: min(1360px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  line-height: 1.2;
+}
+h2 {
+  margin: 0 0 16px;
+  font-size: 18px;
+}
+code,
+pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.muted {
+  color: #64748b;
+}
+.panel {
+  margin-top: 16px;
+  padding: 18px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+.controls {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+label {
+  grid-column: span 3;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+select,
+button {
+  min-height: 36px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #111827;
+  padding: 6px 8px;
+  font: inherit;
+  text-transform: none;
+}
+button {
+  grid-column: span 1;
+  cursor: pointer;
+  background: #eef6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+.scroll {
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+th,
+td {
+  padding: 8px 9px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+}
+th {
+  background: #f1f5f9;
+  color: #475569;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.diff-table {
+  table-layout: fixed;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+}
+.diff-table col.num {
+  width: 58px;
+}
+.diff-table col.code {
+  width: calc((100% - 116px) / 2);
+}
+.diff-table td {
+  padding: 0;
+  border-bottom: 0;
+}
+.diff-table .num-cell {
+  color: #64748b;
+  text-align: right;
+  padding: 1px 8px;
+  user-select: none;
+  background: #f8fafc;
+  border-right: 1px solid #e5e7eb;
+}
+.diff-table .code-cell {
+  min-height: 20px;
+  padding: 1px 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.diff-table .add .right-code,
+.diff-table .replace .right-code {
+  background: #eaf7ef;
+}
+.diff-table .del .left-code,
+.diff-table .replace .left-code {
+  background: #fff0f0;
+}
+.diff-table .gap .code-cell,
+.diff-table .empty {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+@media (max-width: 900px) {
+  label,
+  button {
+    grid-column: 1 / -1;
+  }
+}
+""".strip()
+
+
+_PROMPT_DIFF_JS = r"""
+const bySlug = Object.fromEntries(versions.map(version => [version.slug, version]));
+const controls = {
+  left: document.getElementById("leftVersion"),
+  right: document.getElementById("rightVersion"),
+  kind: document.getElementById("contentKind"),
+  lines: document.getElementById("lineMode"),
+};
+const summaryLine = document.getElementById("summaryLine");
+const diffTable = document.getElementById("diffTable");
+const versionTable = document.getElementById("versionTable");
+
+function esc(value) {
+  return String(value).replace(/[&<>"']/g, ch => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  }[ch]));
+}
+
+function fillSelect(select, selected) {
+  select.innerHTML = versions
+    .map(version => `<option value="${esc(version.slug)}">${esc(version.label)}</option>`)
+    .join("");
+  select.value = selected;
+}
+
+function splitLines(text) {
+  return String(text).replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+}
+
+function lcsRows(leftLines, rightLines) {
+  const n = leftLines.length;
+  const m = rightLines.length;
+  const dp = Array.from({length: n + 1}, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--) {
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = leftLines[i] === rightLines[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const ops = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (leftLines[i] === rightLines[j]) {
+      ops.push({type: "same", left: leftLines[i++], right: rightLines[j++]});
+    } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+      ops.push({type: "del", left: leftLines[i++]});
+    } else {
+      ops.push({type: "add", right: rightLines[j++]});
+    }
+  }
+  while (i < n) ops.push({type: "del", left: leftLines[i++]});
+  while (j < m) ops.push({type: "add", right: rightLines[j++]});
+
+  const rows = [];
+  let leftNo = 1;
+  let rightNo = 1;
+  for (let index = 0; index < ops.length;) {
+    if (ops[index].type === "same") {
+      rows.push({type: "same", leftNo: leftNo++, rightNo: rightNo++, left: ops[index].left, right: ops[index].right});
+      index++;
+      continue;
+    }
+    const deleted = [];
+    const added = [];
+    while (index < ops.length && ops[index].type !== "same") {
+      if (ops[index].type === "del") deleted.push(ops[index].left);
+      else added.push(ops[index].right);
+      index++;
+    }
+    const count = Math.max(deleted.length, added.length);
+    for (let offset = 0; offset < count; offset++) {
+      const hasLeft = offset < deleted.length;
+      const hasRight = offset < added.length;
+      rows.push({
+        type: hasLeft && hasRight ? "replace" : (hasLeft ? "del" : "add"),
+        leftNo: hasLeft ? leftNo++ : "",
+        rightNo: hasRight ? rightNo++ : "",
+        left: hasLeft ? deleted[offset] : "",
+        right: hasRight ? added[offset] : "",
+      });
+    }
+  }
+  return rows;
+}
+
+function withContext(rows) {
+  if (controls.lines.value === "all") return rows;
+  const keep = new Set();
+  rows.forEach((row, index) => {
+    if (row.type !== "same") {
+      for (let near = Math.max(0, index - 2); near <= Math.min(rows.length - 1, index + 2); near++) keep.add(near);
+    }
+  });
+  const result = [];
+  let previous = -1;
+  for (const index of [...keep].sort((a, b) => a - b)) {
+    if (previous >= 0 && index > previous + 1) {
+      result.push({type: "gap", leftNo: "...", rightNo: "...", left: "...", right: "..."});
+    }
+    result.push(rows[index]);
+    previous = index;
+  }
+  return result;
+}
+
+function render() {
+  const left = bySlug[controls.left.value];
+  const right = bySlug[controls.right.value];
+  const kind = controls.kind.value;
+  const leftLines = splitLines(left[kind]);
+  const rightLines = splitLines(right[kind]);
+  const rows = lcsRows(leftLines, rightLines);
+  const changed = rows.filter(row => row.type !== "same").length;
+  const shown = withContext(rows);
+  summaryLine.textContent = `${left.label} -> ${right.label}; ${kind.replace("_", " ")}; ${changed} changed rows.`;
+  const body = shown.map(row => {
+    const leftEmpty = row.leftNo === "" ? " empty" : "";
+    const rightEmpty = row.rightNo === "" ? " empty" : "";
+    return `<tr class="${esc(row.type)}"><td class="num-cell">${esc(row.leftNo)}</td><td class="code-cell left-code${leftEmpty}">${esc(row.left)}</td><td class="num-cell">${esc(row.rightNo)}</td><td class="code-cell right-code${rightEmpty}">${esc(row.right)}</td></tr>`;
+  }).join("");
+  diffTable.innerHTML = `<table class="diff-table"><colgroup><col class="num"><col class="code"><col class="num"><col class="code"></colgroup><thead><tr><th colspan="2">${esc(left.label)}</th><th colspan="2">${esc(right.label)}</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function renderVersionTable() {
+  const rows = versions.map(version => `<tr><td><strong>${esc(version.label)}</strong><br><code>${esc(version.slug)}</code></td><td>${version.routing_policy_lines}</td><td>${version.prompt_lines}</td></tr>`).join("");
+  versionTable.innerHTML = `<thead><tr><th>Candidate</th><th>Routing policy lines</th><th>Full prompt lines</th></tr></thead><tbody>${rows}</tbody>`;
+}
+
+fillSelect(controls.left, versions[0].slug);
+fillSelect(controls.right, versions[Math.max(versions.length - 1, 0)].slug);
+for (const control of Object.values(controls)) control.addEventListener("change", render);
+document.getElementById("swapButton").addEventListener("click", () => {
+  const previousLeft = controls.left.value;
+  controls.left.value = controls.right.value;
+  controls.right.value = previousLeft;
+  render();
+});
+renderVersionTable();
+render();
 """.strip()

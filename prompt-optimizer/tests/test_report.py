@@ -7,10 +7,12 @@ from pathlib import Path
 
 from prompt_optimizer.report import (
     render_gepa_run_report,
+    render_prompt_diff_report,
     summarize_evaluation_report,
     summarize_gepa_run,
     summarize_run_log,
     write_gepa_run_report,
+    write_prompt_diff_report,
 )
 
 
@@ -128,6 +130,56 @@ class ReportTest(unittest.TestCase):
 
             self.assertEqual(output_path, run_dir / "score_report.html")
             self.assertIn("Validation Score Over Iterations", output_path.read_text(encoding="utf-8"))
+
+    def test_write_prompt_diff_report_writes_candidate_dropdown_html(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            run_dir = Path(tmp)
+            (run_dir / "candidates.json").write_text(
+                json.dumps(
+                    [
+                        {"routing_policy": "# Decision Procedure\n\nUse the title first.\n"},
+                        {"routing_policy": "# Decision Procedure\n\nUse the target and title first.\n"},
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            output_path = write_prompt_diff_report(run_dir)
+
+            self.assertEqual(output_path, run_dir / "prompt-diffs" / "index.html")
+            html = output_path.read_text(encoding="utf-8")
+            self.assertIn("Compare Candidates", html)
+            self.assertIn("Candidate 0", html)
+            self.assertIn("Candidate 1", html)
+            summary = json.loads((run_dir / "prompt-diffs" / "prompt-diff-summary.json").read_text(encoding="utf-8"))
+            self.assertEqual([item["slug"] for item in summary], ["candidate-00", "candidate-01"])
+
+    def test_render_prompt_diff_report_embeds_versions(self) -> None:
+        html = render_prompt_diff_report(
+            Path("prompt-optimizer/out/example"),
+            [
+                {
+                    "slug": "candidate-00",
+                    "label": "Candidate 0",
+                    "routing_policy": "left",
+                    "prompt": "full left",
+                    "routing_policy_lines": 1,
+                    "prompt_lines": 1,
+                },
+                {
+                    "slug": "candidate-01",
+                    "label": "Candidate 1",
+                    "routing_policy": "right",
+                    "prompt": "full right",
+                    "routing_policy_lines": 1,
+                    "prompt_lines": 1,
+                },
+            ],
+        )
+
+        self.assertIn("Prompt Diffs", html)
+        self.assertIn("leftVersion", html)
+        self.assertIn("candidate-01", html)
 
     def test_summarize_evaluation_report_counts_final_metrics(self) -> None:
         summary = summarize_evaluation_report(

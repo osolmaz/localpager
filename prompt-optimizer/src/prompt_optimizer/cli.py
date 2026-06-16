@@ -23,7 +23,12 @@ from prompt_optimizer.prompt import (
     DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
     DEFAULT_SEED_PROMPT_PATH,
 )
-from prompt_optimizer.report import summarize_evaluation_file, summarize_gepa_run, write_gepa_run_report
+from prompt_optimizer.report import (
+    summarize_evaluation_file,
+    summarize_gepa_run,
+    write_gepa_run_report,
+    write_prompt_diff_report,
+)
 from prompt_optimizer.run import (
     DEFAULT_BASE_URL,
     DEFAULT_CONCURRENCY,
@@ -101,6 +106,13 @@ def main() -> None:
     plot_run.add_argument("--run-dir", type=Path, required=True)
     plot_run.add_argument("--output", type=Path, default=None)
 
+    plot_prompt_diffs = subparsers.add_parser(
+        "plot-prompt-diffs",
+        help="write an HTML report for comparing saved GEPA candidate prompts",
+    )
+    plot_prompt_diffs.add_argument("--run-dir", type=Path, required=True)
+    plot_prompt_diffs.add_argument("--output-dir", type=Path, default=None)
+
     summarize_eval = subparsers.add_parser("summarize-evaluation", help="summarize an evaluation JSON artifact")
     summarize_eval.add_argument("--evaluation", type=Path, required=True)
 
@@ -122,6 +134,9 @@ def main() -> None:
         return
     if args.command == "plot-run":
         print(str(write_gepa_run_report(args.run_dir, args.output)))
+        return
+    if args.command == "plot-prompt-diffs":
+        print(str(write_prompt_diff_report(args.run_dir, args.output_dir)))
         return
     if args.command == "summarize-evaluation":
         print(json.dumps(summarize_evaluation_file(args.evaluation), indent=2, sort_keys=True))
