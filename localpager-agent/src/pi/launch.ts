@@ -12,6 +12,7 @@ export type LaunchPlan = {
   readonly command: string;
   readonly args: readonly string[];
   readonly env: Readonly<Record<string, string>>;
+  readonly stdinMode: "inherit" | "ignore";
   readonly finalSchemaOutputPath: string | undefined;
 };
 
@@ -47,6 +48,7 @@ export async function createLaunchPlan(
       ...forwardedArgs
     ],
     finalSchemaOutputPath: finalSchemaRuntime?.outputPath,
+    stdinMode: finalSchemaRuntime === undefined ? "inherit" : "ignore",
     env: {
       PI_CODING_AGENT_DIR: runtimeConfig.configDir,
       PI_CODING_AGENT_SESSION_DIR: options.sessionDir,
@@ -59,7 +61,7 @@ export async function createLaunchPlan(
 
 export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {
   const stdio: StdioOptions =
-    plan.finalSchemaOutputPath === undefined ? "inherit" : ["inherit", "pipe", "inherit"];
+    plan.finalSchemaOutputPath === undefined ? "inherit" : [plan.stdinMode, "pipe", "inherit"];
   const child = spawn(shellCommand(plan.command, plan.args), {
     shell: true,
     stdio,

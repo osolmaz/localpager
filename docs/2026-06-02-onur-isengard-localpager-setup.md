@@ -222,6 +222,42 @@ Rule of thumb: if LM Studio is loaded with `--parallel N`, keep
 reason. If the model context length changes, update both the LM Studio load
 command and `worker.agent_context_window`.
 
+## Switch To vLLM Qwen NVFP4
+
+Use `docs/2026-06-16-vllm-qwen36-nvfp4-localpager.md` for the reusable setup.
+The short version is:
+
+1. Start the vLLM server:
+
+   ```bash
+   /home/bob/.config/localpager/start-vllm-qwen36-nvfp4.sh
+   ```
+
+2. Point Localpager at the OpenAI-compatible vLLM endpoint:
+
+   ```json
+   {
+     "worker": {
+       "max_concurrency": 4,
+       "model": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+       "agent_base_url": "http://127.0.0.1:8000/v1",
+       "agent_context_window": 32768,
+       "agent_max_tokens": 4096,
+       "agent_timeout_ms": 120000
+     }
+   }
+   ```
+
+3. Restart the worker:
+
+   ```bash
+   systemctl --user restart localpager-worker.service
+   ```
+
+For this setup, vLLM is one model per server process. `worker.max_concurrency`
+should stay at or below the vLLM `--max-num-seqs` value. The Qwen NVFP4 c4
+profile uses `--max-num-seqs 4`.
+
 ## Change GitHub Context Budget
 
 Edit only this block in `/home/bob/.config/localpager/config.json`:

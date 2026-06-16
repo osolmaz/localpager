@@ -170,6 +170,11 @@ localpager-agent \
   --prompt-vars-file ./examples/prompts/binary-classifier.vars.json
 ```
 
+During schema runs, localpager-agent closes Pi stdin and captures Pi stdout so
+the command prints only the final validated JSON. If the model exhausts its
+output budget before calling `final_json`, the command exits with a structured
+output error rather than printing partial prose.
+
 ## Options
 
 - `--backend <openai-compatible|pi-builtin>`: backend wiring mode. Default: `openai-compatible`

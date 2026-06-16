@@ -14,7 +14,8 @@ Localpager Agent does not modify Pi and does not proxy the model API. Instead, i
 2. It generates a Pi extension that registers a `final_json` tool with that schema as its parameters.
 3. It starts Pi with that extension plus an extra instruction telling the model to call `final_json` when the work is done.
 4. If reposhell is configured, Pi can use that read-only `bash` tool during the investigation.
-5. When the model calls `final_json`, Pi validates the tool arguments against the schema, the extension writes the JSON to disk, and the run terminates.
+5. When the model calls `final_json`, Pi validates the tool arguments against
+   the schema, the extension writes the JSON to disk, and the run terminates.
 6. Localpager Agent prints only the captured JSON.
 
 This keeps the agent loop freeform while making the final answer structured.
@@ -75,7 +76,12 @@ as `--tools`, `-t`, `--no-tools`, and `-nt` are rejected. Schema runs expose
 `final_json`; reposhell runs expose read-only `bash`; other Pi tools are not
 passed through.
 
-`--final-schema` also requires Pi print mode (`-p`, `--print`, or `--prompt-template`). Localpager Agent suppresses Pi's normal stdout during schema runs so it can print only the captured JSON, which is not compatible with Pi's interactive terminal UI.
+`--final-schema` also requires Pi print mode (`-p`, `--print`, or
+`--prompt-template`). Localpager Agent suppresses Pi's normal stdout during
+schema runs so it can print only the captured JSON, which is not compatible
+with Pi's interactive terminal UI. Schema runs close Pi stdin instead of
+inheriting the caller's stdin; this keeps batch runs from accidentally feeding
+terminal input to Pi while stdout is reserved for the captured JSON.
 
 ## Example Schema
 
@@ -118,6 +124,9 @@ passed through.
 
 The schema must be a JSON object schema with root `type: "object"`.
 
-If the model never calls `final_json`, localpager-agent exits with a clear error instead of printing unstructured text.
+If the model never calls `final_json`, localpager-agent exits with a clear error
+instead of printing unstructured text. For long prompts on thinking models,
+choose a large enough `--max-tokens` budget for the model to finish reasoning
+and still call `final_json`.
 
 This design works even when the local OpenAI-compatible backend does not support OpenAI `response_format: { type: "json_schema" }`, because Pi validates the final tool arguments before executing the tool.

@@ -56,9 +56,56 @@ describe("Pi runtime config", () => {
         "gemma-12b-q4km-reason"
       );
       const models = JSON.parse(await readFile(runtime.modelsPath, "utf8")) as {
-        providers: Record<string, { models: readonly { reasoning?: boolean }[] }>;
+        providers: Record<
+          string,
+          { models: readonly { reasoning?: boolean; compat?: { thinkingFormat?: string } }[] }
+        >;
       };
       expect(models.providers["local-openai"]?.models[0]?.reasoning).toBe(true);
+      expect(models.providers["local-openai"]?.models[0]?.compat).toEqual({
+        thinkingFormat: "qwen-chat-template"
+      });
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps known reasoning model metadata when thinking is disabled", async () => {
+    const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-test-"));
+    try {
+      const runtime = await writeRuntimeConfig(options(stateDir), "gemma-4-12b-it");
+      const models = JSON.parse(await readFile(runtime.modelsPath, "utf8")) as {
+        providers: Record<
+          string,
+          { models: readonly { reasoning?: boolean; compat?: { thinkingFormat?: string } }[] }
+        >;
+      };
+      expect(models.providers["local-openai"]?.models[0]).toMatchObject({
+        reasoning: true,
+        compat: { thinkingFormat: "qwen-chat-template" }
+      });
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+
+  it("maps local Qwen and DeepSeek model ids to Pi thinking formats", async () => {
+    const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-test-"));
+    try {
+      const qwenRuntime = await writeRuntimeConfig(options(stateDir), "qwen3.6-35b-a3b-mtp");
+      const qwenModels = JSON.parse(await readFile(qwenRuntime.modelsPath, "utf8")) as {
+        providers: Record<string, { models: readonly { compat?: { thinkingFormat?: string } }[] }>;
+      };
+      const deepseekRuntime = await writeRuntimeConfig(options(stateDir), "deepseek-v4-pro");
+      const deepseekModels = JSON.parse(await readFile(deepseekRuntime.modelsPath, "utf8")) as {
+        providers: Record<string, { models: readonly { compat?: { thinkingFormat?: string } }[] }>;
+      };
+      expect(qwenModels.providers["local-openai"]?.models[0]?.compat).toEqual({
+        thinkingFormat: "qwen-chat-template"
+      });
+      expect(deepseekModels.providers["local-openai"]?.models[0]?.compat).toEqual({
+        thinkingFormat: "deepseek"
+      });
     } finally {
       await rm(stateDir, { recursive: true, force: true });
     }

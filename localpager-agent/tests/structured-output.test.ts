@@ -185,6 +185,7 @@ describe("structured output", () => {
     );
 
     expect(plan.finalSchemaOutputPath).toBe("/tmp/final-output.json");
+    expect(plan.stdinMode).toBe("ignore");
     expect(plan.args).toEqual([
       "--provider",
       "local-openai",
@@ -271,6 +272,7 @@ describe("structured output", () => {
     );
 
     expect(plan.finalSchemaOutputPath).toBeUndefined();
+    expect(plan.stdinMode).toBe("inherit");
     expect(plan.args).toEqual([
       "--provider",
       "local-openai",

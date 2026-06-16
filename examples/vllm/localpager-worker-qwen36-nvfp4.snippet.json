@@ -1,0 +1,10 @@
+{
+  "worker": {
+    "max_concurrency": 4,
+    "model": "nvidia/Qwen3.6-35B-A3B-NVFP4",
+    "agent_base_url": "http://127.0.0.1:8000/v1",
+    "agent_context_window": 32768,
+    "agent_max_tokens": 4096,
+    "agent_timeout_ms": 120000
+  }
+}

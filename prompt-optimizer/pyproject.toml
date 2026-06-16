@@ -1,0 +1,19 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
+[project]
+name = "localpager-prompt-optimizer"
+version = "0.1.0"
+description = "Offline GEPA prompt optimizer for Localpager classifier prompts"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "gepa==0.1.1",
+]
+
+[project.scripts]
+localpager-prompt-optimizer = "prompt_optimizer.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prompt_optimizer"]
