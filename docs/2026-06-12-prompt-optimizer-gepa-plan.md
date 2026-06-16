@@ -101,6 +101,12 @@ To keep many rollouts tractable:
 - Keep the model server warm.
 - Run at concurrency 2: at most two classifier calls in flight against the local
   12B model.
+- Use `--thinking medium` for saved benchmark settings and future local
+  classifier benchmark runs unless the experiment is explicitly marked as a
+  different thinking-level comparison.
+- Use `--max-tokens 4096` for 12B classifier rollouts. This is the current
+  recommended cap for avoiding `final_json` structural failures on long
+  reasoning rows while keeping concurrency at 2.
 - If 12B rollout speed blocks iteration, use `gemma-e4b-reason-test` for
   smoke/debug runs and explicitly marked exploratory optimizer iterations. E4B
   scores are not transfer evidence: any candidate selected or filtered with E4B
@@ -343,6 +349,9 @@ GEPA run:
 - `row_limit >= 30` if runtime allows. If runtime forces `row_limit = 18`,
   require stronger external validation before promotion.
 - `concurrency = 2` for 12B runs.
+- `thinking = medium` for saved benchmark settings and future local classifier
+  benchmark runs.
+- `max_tokens = 4096` for 12B classifier rollouts.
 - No OOM, model-server instability, hidden retry storm, or untracked stale
   classifier processes competing for the loaded model.
 
@@ -374,9 +383,12 @@ and never called `final_json`; this should be treated as a structural failure,
 not a classifier score. With E4B and the same row/cap, `final_json` parsed and
 scored `0.25` (`acp`, `gateway`, `sessions` vs DS4 gold `acp`, `gateway`,
 `agent_runtime`). With 12B and `--max-tokens 1536`, `final_json` parsed and
-scored `0.5` (`acp`, `gateway` vs the same DS4 gold). Optimizer live defaults
-should therefore use 12B, concurrency 2, and the larger output cap unless a
-run is explicitly marked as E4B smoke/debug.
+scored `0.5` (`acp`, `gateway` vs the same DS4 gold). Later 60-row validation
+showed `1536` can still produce `final_json was not called` failures on harder
+rows, so the current recommended 12B rollout cap is `--max-tokens 4096`.
+Optimizer live defaults should therefore use 12B, concurrency 2,
+`--thinking medium`, and `--max-tokens 4096` unless a run is explicitly marked
+as E4B smoke/debug or a thinking-level comparison.
 
 Live GEPA note from 2026-06-13: the best current 12B candidate is saved at
 `prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md`.
