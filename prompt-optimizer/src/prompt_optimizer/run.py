@@ -49,6 +49,7 @@ class OptimizerInputs:
     rows: tuple[FeedbackPoolRow, ...]
     allowed_topics: frozenset[str]
     prompt_parts: PromptParts
+    taxonomy_path: Path = DEFAULT_TAXONOMY_PATH
     pareto_rows: tuple[FeedbackPoolRow, ...] = ()
     heldout_rows: tuple[FeedbackPoolRow, ...] = ()
     dataset_name: str = "ds4-gepa-good-60"
@@ -60,6 +61,7 @@ class HarnessConfig:
     concurrency: int = DEFAULT_CONCURRENCY
     max_tokens: int = DEFAULT_MAX_TOKENS
     timeout_ms: int = 900_000
+    topic_taxonomy_path: Path = DEFAULT_TAXONOMY_PATH
     base_url: str | None = DEFAULT_BASE_URL
     context_window: int | None = None
     thinking: str = "medium"
@@ -91,6 +93,7 @@ def load_optimizer_inputs(
         rows=pool.rows,
         allowed_topics=load_taxonomy(taxonomy_path),
         prompt_parts=load_seed_prompt(seed_prompt_path),
+        taxonomy_path=taxonomy_path,
     )
 
 
@@ -111,6 +114,7 @@ def load_evalstate_optimizer_inputs(
         heldout_rows=load_evalstate_split(heldout_path, allowed_topics, split_name="heldout"),
         allowed_topics=allowed_topics,
         prompt_parts=load_overlay_seed_prompt(seed_prompt_path, seed_overlay_path),
+        taxonomy_path=taxonomy_path,
         dataset_name="evalstate-openclaw-git-labels",
     )
 
@@ -140,6 +144,7 @@ def static_empty_harness() -> StaticClassifierHarness:
 def localpager_agent_harness(config: HarnessConfig) -> LocalpagerAgentHarness:
     return LocalpagerAgentHarness(
         model=config.model,
+        topic_taxonomy_path=config.topic_taxonomy_path,
         base_url=config.base_url,
         context_window=config.context_window,
         thinking=config.thinking,
@@ -346,6 +351,7 @@ def _jsonable_config(config: GEPARunConfig) -> dict[str, Any]:
         len(seed_routing_policy) if seed_routing_policy is not None else None
     )
     harness = payload["harness"]
+    harness["topic_taxonomy_path"] = str(config.harness.topic_taxonomy_path)
     if harness["state_dir"] is not None:
         harness["state_dir"] = str(harness["state_dir"])
     return payload

@@ -38,6 +38,7 @@ class RunTest(unittest.TestCase):
         self.assertEqual(config.thinking, "medium")
         self.assertEqual(config.max_tokens, 8192)
         self.assertEqual(DEFAULT_MAX_TOKENS, 8192)
+        self.assertEqual(config.topic_taxonomy_path.name, "openclaw-routing-topics.json")
 
     def test_evaluate_seed_reports_scores(self) -> None:
         inputs = _inputs()
@@ -143,6 +144,7 @@ class RunTest(unittest.TestCase):
         self.assertNotIn("__ALLOWED_TOPICS_JSON__", routing_policy)
         self.assertIn("## Evalstate Taxonomy", inputs.prompt_parts.prefix)
         self.assertIn("## Target", inputs.prompt_parts.suffix)
+        self.assertEqual(inputs.taxonomy_path, taxonomy)
 
     def test_write_result_artifacts_writes_best_prompt(self) -> None:
         inputs = _inputs()
@@ -166,6 +168,10 @@ class RunTest(unittest.TestCase):
             self.assertTrue((output_dir / "best.routing_policy.md").exists())
             saved_summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(saved_summary["config"]["harness"]["model"], "gemma-test")
+            self.assertEqual(
+                saved_summary["config"]["harness"]["topic_taxonomy_path"],
+                str(Path("examples/profiles/openclaw-routing-topics.json").resolve()),
+            )
             self.assertEqual(saved_summary["config"]["max_candidate_proposals"], 16)
             self.assertEqual(saved_summary["config"]["seed_routing_policy_chars"], 22)
             self.assertIsNotNone(saved_summary["config"]["seed_routing_policy_sha256"])

@@ -266,6 +266,7 @@ def _harness_config(args: argparse.Namespace) -> HarnessConfig:
         model=args.model,
         concurrency=args.concurrency,
         max_tokens=args.max_tokens,
+        topic_taxonomy_path=_taxonomy_path(args),
         thinking=args.thinking,
         timeout_ms=args.timeout_ms,
         base_url=args.base_url,
