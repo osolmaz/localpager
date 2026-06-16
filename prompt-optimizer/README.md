@@ -1,8 +1,9 @@
 # Localpager Prompt Optimizer
 
 Offline tooling for improving the OpenClaw routing prompt with GEPA. The
-optimizer reads the canonical DS4 dataset, starts from the v9.1 seed prompt,
-and scores candidates against Localpager routing labels.
+optimizer can read either the original DS4/Shaun 60-row setup or evalstate's
+published OpenClaw Git-label splits. DS4 mode starts from the v9.1 seed prompt;
+evalstate mode starts from the v10 prompt and v2 topic taxonomy.
 
 This package does not run inside the Localpager worker. It is a lab tool whose
 production output is a reviewed prompt file.
@@ -21,10 +22,11 @@ Or run the commands directly:
 PYTHONPATH=prompt-optimizer/src python3 -m unittest discover -s prompt-optimizer/tests
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed --limit 1
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary --dataset evalstate
 ```
 
-The summary command expects the local dataset checkout and Shaun feedback set
-paths described in `docs/2026-06-12-prompt-optimizer-gepa-plan.md`.
+The summary commands expect the local dataset checkouts and paths described in
+`docs/2026-06-12-prompt-optimizer-gepa-plan.md`.
 
 ## Scope
 
@@ -32,8 +34,9 @@ The implementation covers:
 
 - loading canonical `ds4.jsonl`
 - loading Shaun's `gepa-good-60` row identities
+- loading evalstate's `feedback300`, `pareto60`, and `bench78` split files
 - validating labels against the OpenClaw taxonomy
-- normalizing the v9.1 prompt template into Localpager placeholders
+- normalizing prompt templates into Localpager placeholders
 - extracting the editable `routing_policy` block
 - scoring predictions with Shaun/evalstate's row-aware multilabel metric
 - evaluating candidates through a mockable GEPA adapter shape
@@ -52,6 +55,28 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --harness localpager-agent \
   --model gemma-12b-q4km-reason \
   --max-tokens 4096 \
+  --limit 1
+```
+
+Evalstate mode uses these defaults:
+
+- train/feedback pool:
+  `/home/bob/repos/openclaw-git-labels/data/splits/feedback300.jsonl`
+- GEPA Pareto validation set:
+  `/home/bob/repos/openclaw-git-labels/data/splits/pareto60.jsonl`
+- held-out reporting set:
+  `/home/bob/repos/openclaw-git-labels/data/splits/bench78.jsonl`
+- taxonomy: `examples/profiles/openclaw-routing-topics.v2.json`
+- seed prompt:
+  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`
+
+Static smoke checks do not make model calls:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary --dataset evalstate
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
+  --dataset evalstate \
+  --eval-split pareto \
   --limit 1
 ```
 
@@ -102,9 +127,11 @@ GEPA optimization is explicit because a live run can take a long time:
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
+  --dataset evalstate \
   --max-metric-calls 20 \
   --row-limit 4 \
   --model gemma-12b-q4km-reason \
+  --thinking medium \
   --max-tokens 4096
 ```
 
@@ -120,6 +147,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --reflection-minibatch-size 4 \
   --concurrency 2 \
   --model gemma-12b-q4km-reason \
+  --thinking medium \
   --max-tokens 4096
 ```
 

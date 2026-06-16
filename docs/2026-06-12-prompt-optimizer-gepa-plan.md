@@ -176,9 +176,61 @@ To keep many rollouts tractable:
   parsing, de-duplication, ordering for stable output, and validation that labels
   are in the configured taxonomy.
 - Pin sampling: temperature 0, fixed seed, matching the production worker.
-- Log the dataset revision, v9.1 seed prompt path, loaded 12B model identifier,
-  concurrency, every candidate, its scores, and the chosen prompt to a run
-  directory so a run is reproducible from saved inputs.
+- Log the dataset revision, seed prompt path, taxonomy path, loaded model
+  identifier, concurrency, every candidate, its scores, and the chosen prompt to
+  a run directory so a run is reproducible from saved inputs.
+
+### Evalstate v2 split setup
+
+For the next GEPA run, use evalstate's published OpenClaw Git-label dataset
+with the v2 topic taxonomy and v10 prompt:
+
+- Feedback/minibatch pool: `feedback300.jsonl`.
+- Pareto validation set for GEPA candidate selection: `pareto60.jsonl`.
+- Held-out reporting set that GEPA must not optimize against: `bench78.jsonl`.
+- Local split checkout:
+  `/home/bob/repos/openclaw-git-labels/data/splits/`.
+- Local taxonomy:
+  `examples/profiles/openclaw-routing-topics.v2.json`.
+- Local seed prompt:
+  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`.
+
+The evalstate rows already include the saved `target`, `github_context`, and
+`expected_topics`. For this dataset, the gold labels are exactly
+`expected_topics` from the split rows, validated against the v2 taxonomy. The
+optimizer must pass the saved `github_context` into `localpager-agent`; it must
+not refetch GitHub context or silently fall back to DS4 row fields.
+
+The GEPA CLI mode for this setup is `--dataset evalstate`. It trains on
+`feedback300`, uses `pareto60` as GEPA's `valset`, and keeps `bench78` available
+for explicit held-out evaluation/reporting after the optimizer run.
+
+Static preflight commands:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary --dataset evalstate
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
+  --dataset evalstate \
+  --eval-split pareto \
+  --limit 1
+```
+
+Run command shape, when ready:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
+  --dataset evalstate \
+  --max-metric-calls 480 \
+  --max-candidate-proposals 16 \
+  --reflection-minibatch-size 4 \
+  --concurrency 4 \
+  --model SERVED_MODEL_ID \
+  --base-url http://127.0.0.1:VLLM_PORT/v1 \
+  --thinking medium \
+  --max-tokens 4096
+```
+
+Do not start this run until the code and static smoke checks have passed.
 
 ### Initial feedback/minibatch pool
 
@@ -306,8 +358,8 @@ useful.
 ## Milestones
 
 1. Scaffold `prompt-optimizer/` (pyproject, package skeleton, README).
-2. `dataset.py`: load DS4 rows, cache the v9.1 seed prompt and GitHub contexts,
-   three-way split.
+2. `dataset.py`: load DS4 rows or evalstate split rows, cache prompt inputs and
+   saved GitHub contexts, three-way split.
 3. `harness.py` + `metric.py`: classify one row through `localpager-agent` and
    score it vs DS4 using the weighted FP/FN/over-labeling objective, with a mock
    model path for fast tests.
@@ -330,12 +382,11 @@ tested first slice exists even if no full GEPA optimization run has completed:
 - `dataset.py` loads canonical `ds4.jsonl`, loads Shaun's `gepa-good-60` row
   identities, validates all 60 rows against the configured taxonomy, and reports
   the feedback-pool composition.
-- Prompt handling loads the v9.1 seed prompt, normalizes the Handlebars
-  variables to Localpager placeholders, extracts the editable `routing_policy`,
-  and preserves the frozen scaffold in tests.
-- `metric.py` implements the weighted FP/FN/over-labeling score with tests that
-  prove random extra labels hurt, false positives cost more than false
-  negatives, and invalid labels fail instead of earning partial credit.
+- Prompt handling loads the correct seed prompt for the selected dataset,
+  normalizes the Handlebars variables to Localpager placeholders, extracts the
+  editable `routing_policy`, and preserves the frozen scaffold in tests.
+- `metric.py` implements the row-aware score with tests that prove random extra
+  labels hurt and invalid labels fail instead of earning partial credit.
 - A small CLI or test fixture can print a deterministic summary of the chosen
   dataset, prompt seed, and scoring config.
 

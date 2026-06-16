@@ -76,7 +76,7 @@ class LocalpagerAdapter:
                 trajectories.append(
                     LocalpagerTrajectory(
                         row_id=row.ds4.id,
-                        target=row.ds4.url,
+                        target=row.ds4.target or row.ds4.url,
                         title=row.ds4.title,
                         gold_topics=row.ds4.topics_of_interest,
                         predicted_topics=output.topics_of_interest,

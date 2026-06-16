@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,7 +13,11 @@ DEFAULT_DS4_PATH = Path("/home/bob/oc/openclaw-classification-dataset/ds4.jsonl"
 DEFAULT_FEEDBACK_MANIFEST_PATH = Path(
     "/home/bob/scratch/shaun-openclaw-data-rows/gepa-good-60.rows.jsonl"
 )
+DEFAULT_EVALSTATE_TRAIN_PATH = Path("/home/bob/repos/openclaw-git-labels/data/splits/feedback300.jsonl")
+DEFAULT_EVALSTATE_PARETO_PATH = Path("/home/bob/repos/openclaw-git-labels/data/splits/pareto60.jsonl")
+DEFAULT_EVALSTATE_HELDOUT_PATH = Path("/home/bob/repos/openclaw-git-labels/data/splits/bench78.jsonl")
 DEFAULT_TAXONOMY_PATH = REPO_ROOT / "examples/profiles/openclaw-routing-topics.json"
+DEFAULT_V2_TAXONOMY_PATH = REPO_ROOT / "examples/profiles/openclaw-routing-topics.v2.json"
 
 
 class DatasetError(ValueError):
@@ -29,6 +34,8 @@ class DS4Row:
     title: str
     topics_of_interest: tuple[str, ...]
     raw: dict[str, Any]
+    target: str | None = None
+    github_context: str | None = None
 
 
 @dataclass(frozen=True)
@@ -138,6 +145,34 @@ def build_feedback_pool(ds4_path: Path, manifest_path: Path, taxonomy_path: Path
     )
 
 
+def build_evalstate_pool(split_path: Path, taxonomy_path: Path, *, split_name: str | None = None) -> FeedbackPool:
+    allowed_topics = load_taxonomy(taxonomy_path)
+    rows = load_evalstate_split(split_path, allowed_topics, split_name=split_name or split_path.stem)
+    return FeedbackPool(
+        rows=rows,
+        composition={split_name or split_path.stem: len(rows)},
+        source_row_count=len(rows),
+    )
+
+
+def load_evalstate_split(
+    path: Path,
+    allowed_topics: Iterable[str] | None = None,
+    *,
+    split_name: str,
+) -> tuple[FeedbackPoolRow, ...]:
+    allowed = frozenset(allowed_topics) if allowed_topics is not None else None
+    rows: list[FeedbackPoolRow] = []
+    seen: set[str] = set()
+    for raw in load_jsonl(path):
+        row = _parse_evalstate_row(raw, allowed, split_name)
+        if row.ds4.id in seen:
+            raise DatasetError(f"duplicate evalstate row id in {path}: {row.ds4.id}")
+        seen.add(row.ds4.id)
+        rows.append(row)
+    return tuple(rows)
+
+
 def _topic_ids_from_taxonomy(root: Any) -> list[str]:
     if not isinstance(root, dict):
         raise DatasetError("taxonomy root must be a JSON object")
@@ -173,6 +208,8 @@ def _parse_ds4_row(raw: dict[str, Any], allowed_topics: frozenset[str] | None) -
         title=_required_str(raw, "title", f"DS4 row {row_id}"),
         topics_of_interest=topics,
         raw=raw,
+        target=raw.get("target") if isinstance(raw.get("target"), str) else None,
+        github_context=raw.get("github_context") if isinstance(raw.get("github_context"), str) else None,
     )
 
 
@@ -190,6 +227,56 @@ def _parse_feedback_manifest_row(raw: dict[str, Any]) -> FeedbackManifestRow:
         ds4_topics=_normal_topics(raw.get("ds4_topics"), f"feedback row {row_id}", None),
         raw=raw,
     )
+
+
+def _parse_evalstate_row(
+    raw: dict[str, Any],
+    allowed_topics: frozenset[str] | None,
+    split_name: str,
+) -> FeedbackPoolRow:
+    row_id = _required_str(raw, "id", "evalstate row")
+    target = _required_str(raw, "target", f"evalstate row {row_id}")
+    title = _required_str(raw, "title", f"evalstate row {row_id}")
+    github_context = _required_str(raw, "github_context", f"evalstate row {row_id}")
+    topics = _normal_topics(raw.get("expected_topics"), f"evalstate row {row_id}", allowed_topics)
+    repo, item_type, number, url = _evalstate_identity(target, github_context)
+    ds4 = DS4Row(
+        id=row_id,
+        repo=repo,
+        item_type=item_type,
+        number=number,
+        url=url or target,
+        title=title,
+        topics_of_interest=topics,
+        raw=raw,
+        target=target,
+        github_context=github_context,
+    )
+    manifest = FeedbackManifestRow(
+        id=row_id,
+        source_set="evalstate-openclaw-git-labels",
+        audit_bucket=split_name,
+        repo=repo,
+        item_type=item_type,
+        number=number,
+        url=url or target,
+        title=title,
+        ds4_topics=topics,
+        raw=raw,
+    )
+    return FeedbackPoolRow(manifest=manifest, ds4=ds4)
+
+
+def _evalstate_identity(target: str, github_context: str) -> tuple[str, str, int, str]:
+    repo = target.split(" ", 1)[0] if " " in target else ""
+    item_type = "github_pr" if "github_pr" in target else "github_issue" if "github_issue" in target else "github_item"
+    number = 0
+    if match := re.search(r"#([0-9]+)", target):
+        number = int(match.group(1))
+    url = ""
+    if match := re.search(r"(?m)^- URL: (\S+)$", github_context):
+        url = match.group(1)
+    return repo, item_type, number, url
 
 
 def _normal_topics(

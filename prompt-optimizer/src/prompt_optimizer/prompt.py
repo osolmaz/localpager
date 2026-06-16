@@ -9,6 +9,10 @@ DEFAULT_SEED_PROMPT_PATH = Path(
     "/home/bob/oc/openclaw-classification-dataset/prompts/"
     "localpager-openclaw-routing-v9.1-monologue-cap.hbs"
 )
+DEFAULT_EVALSTATE_SEED_PROMPT_PATH = Path(
+    "/home/bob/oc/openclaw-classification-dataset/prompts/"
+    "localpager-openclaw-routing-v10-production.hbs"
+)
 
 REQUIRED_PLACEHOLDERS = (
     "__TARGET__",
@@ -18,6 +22,10 @@ REQUIRED_PLACEHOLDERS = (
 )
 
 ROUTING_POLICY_START = "\n## Goal\n"
+ROUTING_POLICY_START_MARKERS = (
+    ROUTING_POLICY_START,
+    "\n## Inner Monologue\n",
+)
 ROUTING_POLICY_END = "\n## Target\n"
 
 
@@ -72,10 +80,11 @@ def normalize_template_variables(template: str) -> str:
 
 
 def split_seed_prompt(template: str) -> PromptParts:
-    start = template.find(ROUTING_POLICY_START)
+    start, _start_marker = _find_first_marker(template, ROUTING_POLICY_START_MARKERS)
     end = template.find(ROUTING_POLICY_END)
     if start < 0:
-        raise PromptError(f"missing routing policy start marker: {ROUTING_POLICY_START.strip()}")
+        markers = ", ".join(marker.strip() for marker in ROUTING_POLICY_START_MARKERS)
+        raise PromptError(f"missing routing policy start marker; expected one of: {markers}")
     if end < 0:
         raise PromptError(f"missing routing policy end marker: {ROUTING_POLICY_END.strip()}")
     if end <= start:
@@ -100,3 +109,10 @@ def validate_placeholders(template: str) -> None:
 
 def _sha256(value: str) -> str:
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _find_first_marker(template: str, markers: tuple[str, ...]) -> tuple[int, str]:
+    matches = [(index, marker) for marker in markers if (index := template.find(marker)) >= 0]
+    if not matches:
+        return -1, ""
+    return min(matches, key=lambda match: match[0])

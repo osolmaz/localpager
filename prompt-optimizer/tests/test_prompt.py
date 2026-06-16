@@ -56,6 +56,38 @@ class PromptTest(unittest.TestCase):
         self.assertIn("__TARGET__", parts.suffix)
         self.assertEqual(parts.assemble(parts.routing_policy), parts.template)
 
+    def test_extracts_v10_inner_monologue_policy_block(self) -> None:
+        prompt = """# Classifier
+
+{{{allowed_topics_json}}}
+{{{topic_descriptions}}}
+
+## Inner Monologue
+
+Keep reasoning short.
+
+## Evalstate Boundary Guidance
+
+Use the smallest correct topic set.
+
+## Target
+
+`{{target}}`
+
+## GitHub Context
+
+{{{github_context}}}
+"""
+
+        parts = split_seed_prompt(normalize_template_variables(prompt))
+
+        self.assertIn("## Inner Monologue", parts.routing_policy)
+        self.assertIn("## Evalstate Boundary Guidance", parts.routing_policy)
+        self.assertNotIn("## Target", parts.routing_policy)
+        self.assertIn("__ALLOWED_TOPICS_JSON__", parts.prefix)
+        self.assertIn("__TARGET__", parts.suffix)
+        self.assertEqual(parts.assemble(parts.routing_policy), parts.template)
+
     def test_rejects_missing_placeholders(self) -> None:
         with self.assertRaisesRegex(PromptError, "missing required placeholder"):
             validate_placeholders("__TARGET__ only")
