@@ -54,6 +54,41 @@ events. This is not a random-more-labels win: mean predicted labels rose by
 only 0.10 labels per row, precision stayed high at `0.8731`, and exact matches
 improved.
 
+## Whole 330-Row Check
+
+After the heldout check, the selected GEPA-best prompt was rerun over the full
+330-row evalstate set with the same Qwen NVFP4 model, `medium` thinking,
+`8192` max output tokens, and concurrency `4`. The runtime template used the
+same GEPA-best routing policy text, with prompt-optimizer internal placeholders
+converted back to the Handlebars variables expected by the evalstate runner.
+
+The initial full run completed `330` rows with `7` structured-output failures.
+Those 7 rows were rerun with the same prompt/model/settings and all succeeded,
+producing `outputs.repaired.jsonl` with `0` remaining errors.
+
+```text
+Full 330 rows, repaired outputs (Change = GEPA best - v10 seed)
+
+Metric                         v10 seed       GEPA best      Change
+GEPA mean score (higher)       .7307          .7350*          +.0043
+Micro F1 (higher)              .8231*         .8206           -.0025
+Precision (higher)             .8344*         .8246           -.0098
+Recall (higher)                .8120          .8167*          +.0047
+Exact match (higher)           .5242          .5424*          +.0182
+Any overlap (higher)           .9909*         .9818           -.0091
+False positives (lower)        102*           110             +8
+False negatives (lower)        119            116*            -3
+Over-label total (lower)       57             56*             -1
+Mean predicted labels          1.8667         1.9000          +.0333
+```
+
+Conclusion: the full-set check does not make GEPA-best a clear production
+improvement over v10. It narrowly improves the GEPA-style objective and exact
+match, but the standard micro-F1 is slightly lower because GEPA-best trades 3
+fewer false negatives for 8 extra false positives. Since false positives are
+generally worse for this classifier, v10 remains the safer default unless the
+goal is specifically to favor recall/exact-match over precision.
+
 ## Artifacts
 
 - Best prompt: `2026-06-17-gepa-evalstate-qwen-overlay-best.prompt.md`
@@ -61,6 +96,10 @@ improved.
 - GEPA summary: `2026-06-17-gepa-evalstate-qwen-overlay-summary.json`
 - Heldout GEPA-best summary: `2026-06-17-gepa-evalstate-qwen-overlay-heldout-best.summary.json`
 - Heldout v10-seed summary: `2026-06-17-gepa-evalstate-qwen-overlay-heldout-seed.summary.json`
+- Full 330-row repaired outputs and score report:
+  `https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset/blob/main/benchmark-runs/qwen3-6-35b-a3b-nvfp4-thinking-medium-gepa-best-evalstate330-fixed-template-20260617T041156Z/summary.md`
+- Served whole-dataset graph:
+  `https://dutifuldev-scratch.static.hf.space/gepa-evalstate-qwen-overlay-c4-full-20260616T172947Z/whole-dataset-comparison.html`
 
 Untracked local HTML reports were also generated in the run directory:
 
@@ -88,3 +127,6 @@ Untracked local HTML reports were also generated in the run directory:
   prompt may be partly fit to `pareto60`. Heldout still improves, but the
   production decision should weigh the modest heldout gain against the slight
   precision and over-label regressions.
+- Full-set residual risk: the 330-row repaired run confirms that the result is
+  a tradeoff, not a clean win. The GEPA objective improved by `+0.0043`, but
+  micro-F1 regressed by `-0.0025` and false positives increased by 8.
