@@ -45,6 +45,29 @@ compiling FlashInfer generated CUDA kernels. With `cutlass`, the log confirms:
 Using 'VLLM_CUTLASS' NvFp4 MoE backend
 ```
 
+## Backend Choice
+
+Gemma 4 26B-A4B is a Mixture-of-Experts model. vLLM needs a backend for the MoE
+layers, and this setup tested both the automatic path and the explicit CUTLASS
+path.
+
+FlashInfer is a CUDA inference-kernel library used by vLLM for fast serving
+paths. On this machine, vLLM `auto` selected a FlashInfer-related MoE backend
+reported as `FLASHINFER_CUTLASS`. That path tried to compile or load generated
+CUDA kernels during startup, memory use climbed, and the user service hit the
+`MemoryMax=90G` cap before the server became usable.
+
+CUTLASS is NVIDIA's CUDA template library for optimized GPU math kernels. Forcing
+`--moe-backend cutlass` kept vLLM on the plain CUTLASS MoE path. That path
+started reliably and still used optimized NVIDIA GPU kernels.
+
+This was a stability choice, not a hidden shortcut. The default path was tried
+and recorded as an OOM failure. We did not prove that FlashInfer can never be
+made to work on this machine, so there may still be performance tuning left if
+the goal is absolute maximum Gemma throughput. For the LocalPager benchmark
+goal, the CUTLASS backend was the documented working setup that avoided OOM and
+completed the run.
+
 ## Files
 
 - `examples/vllm/gemma4-26b-a4b-nvfp4.env.example`: copyable vLLM profile.
