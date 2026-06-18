@@ -10,10 +10,16 @@ from typing import Any
 from prompt_optimizer.adapter import LocalpagerAdapter, ROUTING_POLICY_COMPONENT
 from prompt_optimizer.dataset import (
     DEFAULT_DS4_PATH,
+    DEFAULT_EVALSTATE_HELDOUT_PATH,
+    DEFAULT_EVALSTATE_PARETO_PATH,
+    DEFAULT_EVALSTATE_TRAIN_PATH,
     DEFAULT_FEEDBACK_MANIFEST_PATH,
     DEFAULT_TAXONOMY_PATH,
+    DEFAULT_V2_TAXONOMY_PATH,
     FeedbackPoolRow,
     build_feedback_pool,
+    build_evalstate_pool,
+    load_evalstate_split,
     load_taxonomy,
 )
 from prompt_optimizer.harness import (
@@ -22,12 +28,20 @@ from prompt_optimizer.harness import (
     LocalpagerAgentHarness,
     StaticClassifierHarness,
 )
-from prompt_optimizer.prompt import DEFAULT_SEED_PROMPT_PATH, PromptParts, load_seed_prompt
+from prompt_optimizer.prompt import (
+    DEFAULT_EVALSTATE_SEED_OVERLAY_PATH,
+    DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
+    DEFAULT_SEED_PROMPT_PATH,
+    PromptParts,
+    load_overlay_seed_prompt,
+    load_seed_prompt,
+)
 from prompt_optimizer.reflection import CodexReflectionLM
 
-DEFAULT_MODEL = "gemma-12b-q4km-reason"
+DEFAULT_MODEL = "nvidia/Qwen3.6-35B-A3B-NVFP4"
+DEFAULT_BASE_URL = "http://127.0.0.1:8000/v1"
 FALLBACK_MODEL = "gemma-e4b-reason-test"
-DEFAULT_CONCURRENCY = 2
+DEFAULT_CONCURRENCY = 4
 
 
 @dataclass(frozen=True)
@@ -35,6 +49,10 @@ class OptimizerInputs:
     rows: tuple[FeedbackPoolRow, ...]
     allowed_topics: frozenset[str]
     prompt_parts: PromptParts
+    taxonomy_path: Path = DEFAULT_TAXONOMY_PATH
+    pareto_rows: tuple[FeedbackPoolRow, ...] = ()
+    heldout_rows: tuple[FeedbackPoolRow, ...] = ()
+    dataset_name: str = "ds4-gepa-good-60"
 
 
 @dataclass(frozen=True)
@@ -43,8 +61,10 @@ class HarnessConfig:
     concurrency: int = DEFAULT_CONCURRENCY
     max_tokens: int = DEFAULT_MAX_TOKENS
     timeout_ms: int = 900_000
-    base_url: str | None = None
+    topic_taxonomy_path: Path = DEFAULT_TAXONOMY_PATH
+    base_url: str | None = DEFAULT_BASE_URL
     context_window: int | None = None
+    thinking: str = "medium"
     state_dir: Path | None = None
 
 
@@ -56,6 +76,7 @@ class GEPARunConfig:
     reflection_minibatch_size: int = 4
     seed: int = 0
     row_limit: int | None = None
+    dataset_name: str | None = None
     seed_routing_policy: str | None = None
     harness: HarnessConfig = HarnessConfig()
 
@@ -72,6 +93,29 @@ def load_optimizer_inputs(
         rows=pool.rows,
         allowed_topics=load_taxonomy(taxonomy_path),
         prompt_parts=load_seed_prompt(seed_prompt_path),
+        taxonomy_path=taxonomy_path,
+    )
+
+
+def load_evalstate_optimizer_inputs(
+    *,
+    train_path: Path = DEFAULT_EVALSTATE_TRAIN_PATH,
+    pareto_path: Path = DEFAULT_EVALSTATE_PARETO_PATH,
+    heldout_path: Path = DEFAULT_EVALSTATE_HELDOUT_PATH,
+    taxonomy_path: Path = DEFAULT_V2_TAXONOMY_PATH,
+    seed_prompt_path: Path = DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
+    seed_overlay_path: Path = DEFAULT_EVALSTATE_SEED_OVERLAY_PATH,
+) -> OptimizerInputs:
+    allowed_topics = load_taxonomy(taxonomy_path)
+    train_pool = build_evalstate_pool(train_path, taxonomy_path, split_name="feedback")
+    return OptimizerInputs(
+        rows=train_pool.rows,
+        pareto_rows=load_evalstate_split(pareto_path, allowed_topics, split_name="pareto"),
+        heldout_rows=load_evalstate_split(heldout_path, allowed_topics, split_name="heldout"),
+        allowed_topics=allowed_topics,
+        prompt_parts=load_overlay_seed_prompt(seed_prompt_path, seed_overlay_path),
+        taxonomy_path=taxonomy_path,
+        dataset_name="evalstate-openclaw-git-labels",
     )
 
 
@@ -100,8 +144,10 @@ def static_empty_harness() -> StaticClassifierHarness:
 def localpager_agent_harness(config: HarnessConfig) -> LocalpagerAgentHarness:
     return LocalpagerAgentHarness(
         model=config.model,
+        topic_taxonomy_path=config.topic_taxonomy_path,
         base_url=config.base_url,
         context_window=config.context_window,
+        thinking=config.thinking,
         max_tokens=config.max_tokens,
         timeout_ms=config.timeout_ms,
         state_dir=config.state_dir,
@@ -162,6 +208,7 @@ def run_gepa(
     import gepa
 
     rows = list(_selected_rows(inputs.rows, config.row_limit, 0))
+    val_rows = list(inputs.pareto_rows or rows)
     harness = localpager_agent_harness(config.harness)
     adapter = make_adapter(inputs=inputs, harness=harness, concurrency=config.harness.concurrency)
     initial_candidate = (
@@ -178,7 +225,7 @@ def run_gepa(
     result = gepa.optimize(
         seed_candidate=initial_candidate,
         trainset=rows,
-        valset=rows,
+        valset=val_rows,
         adapter=adapter,
         reflection_lm=CodexReflectionLM(),
         max_metric_calls=config.max_metric_calls,
@@ -209,6 +256,7 @@ def write_result_artifacts(
         "num_candidates": result.num_candidates,
         "total_metric_calls": result.total_metric_calls,
         "num_full_val_evals": result.num_full_val_evals,
+        "dataset_name": config.dataset_name,
         "config": _jsonable_config(config),
         "best_prompt_path": str(output_dir / "best.prompt.md"),
         "best_routing_policy_path": str(output_dir / "best.routing_policy.md"),
@@ -236,7 +284,7 @@ def evaluation_report(
     for index, (row, output, score) in enumerate(zip(rows, batch.outputs, batch.scores, strict=True)):
         report = {
             "id": row.ds4.id,
-            "target": row.ds4.url,
+            "target": row.ds4.target or row.ds4.url,
             "title": row.ds4.title,
             "gold_topics": list(row.ds4.topics_of_interest),
             "predicted_topics": list(output.topics_of_interest),
@@ -252,6 +300,15 @@ def evaluation_report(
                         "false_positives": list(row_score.false_positives),
                         "false_negatives": list(row_score.false_negatives),
                         "over_label_count": row_score.over_label_count,
+                        "duplicate_label_count": row_score.duplicate_label_count,
+                        "over_cardinality_count": row_score.over_cardinality_count,
+                        "precision": row_score.precision,
+                        "recall": row_score.recall,
+                        "f1": row_score.f1,
+                        "row_jaccard": row_score.row_jaccard,
+                        "row_topic_f1": row_score.row_topic_f1,
+                        "row_exact": row_score.row_exact,
+                        "policy_penalty": row_score.policy_penalty,
                         "loss": row_score.loss,
                     }
                 )
@@ -294,6 +351,7 @@ def _jsonable_config(config: GEPARunConfig) -> dict[str, Any]:
         len(seed_routing_policy) if seed_routing_policy is not None else None
     )
     harness = payload["harness"]
+    harness["topic_taxonomy_path"] = str(config.harness.topic_taxonomy_path)
     if harness["state_dir"] is not None:
         harness["state_dir"] = str(harness["state_dir"])
     return payload

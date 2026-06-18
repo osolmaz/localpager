@@ -10,17 +10,36 @@ from prompt_optimizer.dataset import DS4Row, FeedbackManifestRow, FeedbackPoolRo
 from prompt_optimizer.harness import StaticClassifierHarness
 from prompt_optimizer.prompt import normalize_template_variables, split_seed_prompt
 from prompt_optimizer.run import (
+    DEFAULT_BASE_URL,
+    DEFAULT_CONCURRENCY,
+    DEFAULT_MAX_TOKENS,
+    DEFAULT_MODEL,
     GEPARunConfig,
     HarnessConfig,
     OptimizerInputs,
     evaluate_routing_policy,
     evaluate_seed,
+    load_evalstate_optimizer_inputs,
     seed_candidate,
     write_result_artifacts,
 )
 
 
 class RunTest(unittest.TestCase):
+    def test_live_harness_defaults_use_qwen_c4_profile(self) -> None:
+        config = HarnessConfig()
+
+        self.assertEqual(DEFAULT_MODEL, "nvidia/Qwen3.6-35B-A3B-NVFP4")
+        self.assertEqual(DEFAULT_BASE_URL, "http://127.0.0.1:8000/v1")
+        self.assertEqual(DEFAULT_CONCURRENCY, 4)
+        self.assertEqual(config.model, DEFAULT_MODEL)
+        self.assertEqual(config.base_url, DEFAULT_BASE_URL)
+        self.assertEqual(config.concurrency, 4)
+        self.assertEqual(config.thinking, "medium")
+        self.assertEqual(config.max_tokens, 8192)
+        self.assertEqual(DEFAULT_MAX_TOKENS, 8192)
+        self.assertEqual(config.topic_taxonomy_path.name, "openclaw-routing-topics.json")
+
     def test_evaluate_seed_reports_scores(self) -> None:
         inputs = _inputs()
 
@@ -80,6 +99,53 @@ class RunTest(unittest.TestCase):
         self.assertEqual(set(candidate), {ROUTING_POLICY_COMPONENT})
         self.assertIn("## Goal", candidate[ROUTING_POLICY_COMPONENT])
 
+    def test_evalstate_inputs_default_to_overlay_only_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            taxonomy = root / "topics.json"
+            train = root / "feedback300.jsonl"
+            pareto = root / "pareto60.jsonl"
+            heldout = root / "bench78.jsonl"
+            taxonomy.write_text(json.dumps({"topics": {"acp": {}, "gateway": {}}}), encoding="utf-8")
+            row = json.dumps(
+                {
+                    "id": "openclaw-openclaw-1",
+                    "target": "openclaw/openclaw github_pr #1: Gateway ACP work",
+                    "github_context": "\n".join(
+                        [
+                            "GitHub item:",
+                            "- Repository: openclaw/openclaw",
+                            "- Type: github_pr",
+                            "- Number: 1",
+                            "- URL: https://github.com/openclaw/openclaw/pull/1",
+                            "- Title: Gateway ACP work",
+                        ]
+                    ),
+                    "expected_topics": ["acp", "gateway"],
+                    "title": "Gateway ACP work",
+                }
+            )
+            for path in (train, pareto, heldout):
+                path.write_text(row + "\n", encoding="utf-8")
+
+            inputs = load_evalstate_optimizer_inputs(
+                train_path=train,
+                pareto_path=pareto,
+                heldout_path=heldout,
+                taxonomy_path=taxonomy,
+            )
+        candidate = seed_candidate(inputs.prompt_parts)
+        routing_policy = candidate[ROUTING_POLICY_COMPONENT]
+
+        self.assertIn("# Decision Procedure", routing_policy)
+        self.assertIn("# Suppression Rules", routing_policy)
+        self.assertNotIn("Allowed topic IDs", routing_policy)
+        self.assertNotIn("## Evalstate Taxonomy", routing_policy)
+        self.assertNotIn("__ALLOWED_TOPICS_JSON__", routing_policy)
+        self.assertIn("## Evalstate Taxonomy", inputs.prompt_parts.prefix)
+        self.assertIn("## Target", inputs.prompt_parts.suffix)
+        self.assertEqual(inputs.taxonomy_path, taxonomy)
+
     def test_write_result_artifacts_writes_best_prompt(self) -> None:
         inputs = _inputs()
         with tempfile.TemporaryDirectory() as tmp:
@@ -102,6 +168,10 @@ class RunTest(unittest.TestCase):
             self.assertTrue((output_dir / "best.routing_policy.md").exists())
             saved_summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(saved_summary["config"]["harness"]["model"], "gemma-test")
+            self.assertEqual(
+                saved_summary["config"]["harness"]["topic_taxonomy_path"],
+                str(Path("examples/profiles/openclaw-routing-topics.json").resolve()),
+            )
             self.assertEqual(saved_summary["config"]["max_candidate_proposals"], 16)
             self.assertEqual(saved_summary["config"]["seed_routing_policy_chars"], 22)
             self.assertIsNotNone(saved_summary["config"]["seed_routing_policy_sha256"])

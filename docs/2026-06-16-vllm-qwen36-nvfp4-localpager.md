@@ -25,6 +25,8 @@ server on another port if the machine has enough memory.
 - `examples/vllm/start-qwen36-nvfp4.sh`: launcher that reads the profile.
 - `examples/vllm/localpager-worker-qwen36-nvfp4.snippet.json`: LocalPager
   worker config snippet.
+- `examples/vllm/benchmark-openai-completions.mjs`: reusable throughput probe
+  for the OpenAI-compatible endpoint.
 - `examples/systemd/localpager-vllm-qwen36-nvfp4.service`: optional user
   systemd service.
 
@@ -77,6 +79,17 @@ Merge this into `~/.config/localpager/config.json`:
 
 Use `4096` output tokens for classifier runs that need robust structured output.
 Shorter limits can create structural failures that are not prompt failures.
+
+To measure aggregate completion-token throughput against the running server:
+
+```bash
+node examples/vllm/benchmark-openai-completions.mjs \
+  --base-url http://127.0.0.1:8000/v1 \
+  --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
+  --concurrency 4 \
+  --requests 4 \
+  --max-tokens 512
+```
 
 ## Tool Choice
 

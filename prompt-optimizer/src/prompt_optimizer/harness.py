@@ -13,7 +13,7 @@ from prompt_optimizer.dataset import DEFAULT_TAXONOMY_PATH, DS4Row, FeedbackPool
 
 DEFAULT_CLASSIFIER_COMMAND = REPO_ROOT / "scripts/localpager-classifier"
 DEFAULT_SCHEMA_PATH = REPO_ROOT / "schemas/classification.schema.json"
-DEFAULT_MAX_TOKENS = 1536
+DEFAULT_MAX_TOKENS = 8192
 
 
 @dataclass(frozen=True)
@@ -57,6 +57,7 @@ class LocalpagerAgentHarness:
     topic_taxonomy_path: Path = DEFAULT_TAXONOMY_PATH
     base_url: str | None = None
     context_window: int | None = None
+    thinking: str = "medium"
     max_tokens: int = DEFAULT_MAX_TOKENS
     timeout_ms: int = 900_000
     state_dir: Path | None = None
@@ -68,10 +69,10 @@ class LocalpagerAgentHarness:
             prompt_path = tmp_path / "candidate.prompt.md"
             context_path = tmp_path / "github-context.md"
             prompt_path.write_text(prompt_text, encoding="utf-8")
-            context_path.write_text(render_ds4_context(row.ds4), encoding="utf-8")
+            context_path.write_text(row.ds4.github_context or render_ds4_context(row.ds4), encoding="utf-8")
             args = [
                 str(self.classifier_command),
-                row.ds4.url,
+                row.ds4.target or row.ds4.url,
                 "--model",
                 self.model,
                 "--schema",
@@ -116,6 +117,7 @@ class LocalpagerAgentHarness:
 
     def _env(self) -> dict[str, str]:
         env = os.environ.copy()
+        env["LOCALPAGER_AGENT_THINKING"] = self.thinking
         env["LOCALPAGER_AGENT_MAX_TOKENS"] = str(self.max_tokens)
         env["LOCALPAGER_AGENT_TIMEOUT_MS"] = str(self.timeout_ms)
         if self.base_url:
@@ -123,7 +125,7 @@ class LocalpagerAgentHarness:
         if self.context_window is not None:
             env["LOCALPAGER_AGENT_CONTEXT_WINDOW"] = str(self.context_window)
         if self.state_dir is not None:
-            env["LOCALPAGER_CLASSIFIER_STATE_DIR"] = str(self.state_dir)
+            env["LOCALPAGER_CLASSIFIER_STATE_DIR"] = str(self.state_dir.resolve())
         return env
 
 

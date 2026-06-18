@@ -74,7 +74,7 @@ class HarnessTest(unittest.TestCase):
                 f"""#!/usr/bin/env bash
 set -euo pipefail
 printf '%s\\n' "$@" > {capture_args}
-printf '%s %s\\n' "${{LOCALPAGER_AGENT_MAX_TOKENS:-}}" "${{LOCALPAGER_AGENT_TIMEOUT_MS:-}}" > {capture_env}
+printf '%s %s %s\\n' "${{LOCALPAGER_AGENT_THINKING:-}}" "${{LOCALPAGER_AGENT_MAX_TOKENS:-}}" "${{LOCALPAGER_AGENT_TIMEOUT_MS:-}}" > {capture_env}
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --prompt-template)
@@ -110,9 +110,76 @@ printf '%s\\n' '{{"topics_of_interest":["acp"],"description":"ok","caveats":[]}}
             self.assertEqual(output.topics_of_interest, ("acp",))
             self.assertIn("https://github.com/openclaw/openclaw/pull/1", capture_args.read_text(encoding="utf-8"))
             self.assertIn("--model\ngemma-test", capture_args.read_text(encoding="utf-8"))
-            self.assertEqual(capture_env.read_text(encoding="utf-8").strip(), "64 1000")
+            self.assertEqual(capture_env.read_text(encoding="utf-8").strip(), "medium 64 1000")
             self.assertEqual(capture_prompt.read_text(encoding="utf-8"), "candidate prompt")
             self.assertIn("Title: ACP runtime", capture_context.read_text(encoding="utf-8"))
+
+    def test_localpager_agent_harness_uses_saved_target_and_context(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            command = root / "fake-localpager-classifier"
+            capture_args = root / "args.txt"
+            capture_context = root / "context.md"
+            schema = root / "schema.json"
+            taxonomy = root / "topics.json"
+            schema.write_text("{}", encoding="utf-8")
+            taxonomy.write_text("{}", encoding="utf-8")
+            command.write_text(
+                f"""#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\\n' "$@" > {capture_args}
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --github-context-file)
+      cp "$2" {capture_context}
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+printf '%s\\n' '{{"topics_of_interest":["acp"],"description":"ok","caveats":[]}}'
+""",
+                encoding="utf-8",
+            )
+            command.chmod(0o755)
+            harness = LocalpagerAgentHarness(
+                model="gemma-test",
+                classifier_command=command,
+                schema_path=schema,
+                topic_taxonomy_path=taxonomy,
+            )
+            row = _pool_row()
+            row = FeedbackPoolRow(
+                manifest=row.manifest,
+                ds4=DS4Row(
+                    id=row.ds4.id,
+                    repo=row.ds4.repo,
+                    item_type=row.ds4.item_type,
+                    number=row.ds4.number,
+                    url=row.ds4.url,
+                    title=row.ds4.title,
+                    topics_of_interest=row.ds4.topics_of_interest,
+                    raw=row.ds4.raw,
+                    target="openclaw/openclaw github_pr #1: Saved target",
+                    github_context="Saved GitHub context\n",
+                ),
+            )
+
+            output = harness.classify(row, "candidate prompt")
+
+            self.assertEqual(output.topics_of_interest, ("acp",))
+            self.assertIn("openclaw/openclaw github_pr #1: Saved target", capture_args.read_text(encoding="utf-8"))
+            self.assertEqual(capture_context.read_text(encoding="utf-8"), "Saved GitHub context\n")
+
+    def test_localpager_agent_harness_state_dir_env_is_absolute(self) -> None:
+        harness = LocalpagerAgentHarness(model="gemma-test", state_dir=Path("relative-state-dir"))
+
+        env = harness._env()
+
+        self.assertTrue(Path(env["LOCALPAGER_CLASSIFIER_STATE_DIR"]).is_absolute())
+        self.assertTrue(env["LOCALPAGER_CLASSIFIER_STATE_DIR"].endswith("relative-state-dir"))
 
 
 def _pool_row() -> FeedbackPoolRow:

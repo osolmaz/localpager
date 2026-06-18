@@ -127,6 +127,8 @@ belong in a deployment setup document. See
 [Onur's Isengard Setup](docs/2026-06-02-onur-isengard-localpager-setup.md) for
 the current OpenClaw/Gemma deployment. For Qwen NVFP4 through vLLM, see
 [vLLM Qwen NVFP4 LocalPager Setup](docs/2026-06-16-vllm-qwen36-nvfp4-localpager.md).
+For the Gemma 4 26B-A4B NVFP4 profile and local benchmark, see
+[Gemma 4 26B-A4B NVFP4 on DGX Spark](examples/vllm/gemma4-26b-a4b-nvfp4-benchmark.md).
 
 If the classifier writes lines like these to stderr, Localpager stores them with
 the result:

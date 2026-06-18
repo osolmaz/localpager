@@ -54,15 +54,38 @@ The tool lives at `prompt-optimizer/` and is isolated from the Go build and CI:
 
 ## What GEPA optimizes (the candidate)
 
-Seed the run from the OpenClaw classification dataset prompt
+DS4 compatibility mode seeds from the OpenClaw classification dataset prompt
 `prompts/localpager-openclaw-routing-v9.1-monologue-cap.hbs` in
 `dutifuldev/openclaw-classification-dataset` at revision
 `8d1088276425ca72a5313c18cde4adef20ffe194`.
 
-The candidate is the editable routing-policy block of that v9.1 prompt, not the
-whole template. The scaffold stays frozen: output-shape rules, repository-read
-instructions, the v9.1 inner-monologue cap, topic placeholders, and target /
-GitHub-context placeholders.
+Evalstate v2 mode must use an overlay-only GEPA candidate. The v10 prompt is
+not optimized directly. Instead, split it into:
+
+- a fixed v10-based scaffold containing only stable task contract text:
+  task framing, evalstate v2 label list, evalstate topic definitions, output
+  schema, input placeholders, valid-label constraints, and max-3-label output
+  constraints;
+- one mutable routing-policy overlay placeholder, rendered into the scaffold
+  at runtime.
+
+The initial evalstate GEPA candidate should be a separate overlay seed file,
+not the full v10 prompt. Use Shaun/evalstate's overlay shape:
+
+```text
+Decision Procedure
+Cardinality Rules
+Boundary Overlays
+Suppression Rules
+```
+
+The overlay candidate may contain compact decision rules, tie-breakers,
+centrality tests, false-positive suppression rules, and false-negative recovery
+rules. It must not restate topic definitions, the allowed-topic enum, cue-word
+lists, the deliverable test, the output schema, or the cardinality law. Those
+belong to the fixed scaffold. If current v10 text mixes heuristic policy into
+the fixed body, move that policy text into the overlay seed or delete it if it
+duplicates evalstate's fixed definitions.
 
 The optimizer should normalize the dataset Handlebars variables
 (`{{target}}`, `{{{github_context}}}`, `{{{allowed_topics_json}}}`,
@@ -76,8 +99,21 @@ seed_candidate = {"routing_policy": "<the decision rules + cue tables>"}
 ```
 
 This is GEPA's "module" notion. It guarantees GEPA can only rewrite prose it is
-allowed to, and can never break the placeholder or schema contract. The template
-is assembled as: frozen scaffold + the current `routing_policy` block.
+allowed to, and can never break the placeholder, label, or schema contract. The
+template is assembled as: frozen scaffold + the current `routing_policy`
+overlay + fixed target/context suffix.
+
+Implemented artifact split:
+
+- GEPA-specific scaffold:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
+- Seed overlay:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-seed.md`.
+- Evalstate mode loads the scaffold as the prompt wrapper and the seed
+  overlay as `seed_candidate["routing_policy"]`.
+- Tests prove that evalstate candidates do not include topic definitions,
+  schema text, or the label enum, and that rendering reconstructs a full
+  Localpager prompt with the overlay inserted.
 
 ## Evaluation harness (the transfer rule)
 
@@ -88,7 +124,7 @@ lab transfers to deployment:
   (`scripts/localpager-render-profile.mjs`) so placeholders and the
   taxonomy-derived schema enum match exactly.
 - Run it through `localpager-classifier` → `localpager-agent` → Pi → the
-  already-loaded local 12B model → `final_json`.
+  Qwen vLLM endpoint → `final_json`.
 
 The runtime classifier harness is `localpager-agent`. The Python
 `prompt-optimizer` harness is only a driver: it assembles candidate prompt files,
@@ -101,42 +137,48 @@ To keep many rollouts tractable:
 - Pre-fetch and cache each dataset row's GitHub context once (pass
   `--github-context-file`), so rollouts never re-hit GitHub.
 - Keep the model server warm.
-- Run at concurrency 2: at most two classifier calls in flight against the local
-  12B model.
+- Run Qwen through vLLM at concurrency 4, matching the c4 serving profile's
+  `--max-num-seqs 4`.
 - Use `--thinking medium` for saved benchmark settings and future local
   classifier benchmark runs unless the experiment is explicitly marked as a
   different thinking-level comparison.
-- Use `--max-tokens 4096` for 12B classifier rollouts. This is the current
+- Use `--max-tokens 8192` for Qwen classifier rollouts. This is the current
   recommended cap for avoiding `final_json` structural failures on long
-  reasoning rows while keeping concurrency at 2.
-- If 12B rollout speed blocks iteration, use `gemma-e4b-reason-test` for
-  smoke/debug runs and explicitly marked exploratory optimizer iterations. E4B
-  scores are not transfer evidence: any candidate selected or filtered with E4B
-  must be re-evaluated on the 12B model before promotion, validation, or final
+  reasoning rows while keeping concurrency at 4.
+- If Qwen rollout speed blocks iteration, use `gemma-e4b-reason-test` for
+  smoke/debug runs and explicitly marked exploratory optimizer iterations.
+  E4B scores are not transfer evidence: any candidate selected or filtered with
+  E4B must be re-evaluated on Qwen before promotion, validation, or final
   reporting.
 - Add the one production-side seam below so rows stream through a warm process
   instead of spawning Pi per row.
 
 ## Scoring and ASI
 
-- Optimization metric (μ): a weighted multilabel routing score computed from
-  false positives, false negatives, and over-labeling against the DS4 labels.
-  Initial row loss:
+- Optimization metric (μ): Shaun/evalstate's later row-aware multilabel routing
+  score against the gold labels:
 
   ```text
-  2.0 * false_positives + 1.0 * false_negatives + 0.5 * max(0, predicted_count - gold_count)
+  score = 0.60 * row_jaccard
+        + 0.20 * row_topic_f1
+        + 0.20 * row_exact
+        - policy_penalties
   ```
 
-  False positives are intentionally worse than false negatives, and over-labeling
-  gets an extra penalty beyond the individual false-positive labels. Report topic
-  micro-F1, per-topic precision, and per-topic recall alongside this objective,
-  but select candidates by the weighted score.
+  `row_jaccard` is `TP / (TP + FP + FN)` for the row's topic set.
+  `row_topic_f1` is the row-level topic F1. `row_exact` is 1 only when the
+  predicted set exactly matches the gold set. `policy_penalties` apply when a
+  candidate breaks the label policy, currently duplicate predicted labels and
+  more than 3 predicted labels. This scorer is balanced rather than
+  recall-leaning: false positives and false negatives both reduce Jaccard, F1,
+  and exact match. Report topic micro-F1, per-topic precision, and per-topic
+  recall alongside this objective, but select candidates by the weighted score.
 - The metric must be game-resistant: proposing random extra labels must never
   help a candidate. A predicted label only improves the score when it is present
   in the row's gold label set. Every extra allowed label is a false positive,
-  increases the over-labeling penalty when it exceeds the gold count, and should
-  be surfaced in ASI feedback as label spam. Invalid labels are schema failures,
-  not partial credit.
+  reduces row Jaccard and row F1, prevents exact match, and should be surfaced in
+  ASI feedback as label spam. Invalid labels are schema failures, not partial
+  credit.
 - Feedback / ASI (μ_f): the per-row, per-topic mistakes turned into short
   natural-language notes, e.g. "item 412: predicted `config`; gold has none — an
   option was added but config behavior is not the subject." This is the same
@@ -144,11 +186,12 @@ To keep many rollouts tractable:
 
 ## Models
 
-- Task / evaluator LM: the already-loaded local 12B model we actually serve.
-  Non-negotiable for transfer; the prompt is tuned to that loaded model's quirks.
+- Task / evaluator LM: `nvidia/Qwen3.6-35B-A3B-NVFP4` served through vLLM at
+  `http://127.0.0.1:8000/v1`, using concurrency 4. Non-negotiable for transfer;
+  the prompt is tuned to that served model's quirks.
 - Fast fallback LM: `gemma-e4b-reason-test`, for smoke/debug runs or
   budget-limited exploration only. Log fallback use clearly and never compare E4B
-  scores directly against 12B scores.
+  scores directly against Qwen scores.
 - Reflection / proposer LM: Codex. Prefer a direct non-interactive Codex CLI
   bridge (`codex exec -`) wrapped as GEPA's `reflection_lm`; pass the reflection
   prompt on stdin and capture the final response from stdout or
@@ -170,9 +213,68 @@ To keep many rollouts tractable:
   parsing, de-duplication, ordering for stable output, and validation that labels
   are in the configured taxonomy.
 - Pin sampling: temperature 0, fixed seed, matching the production worker.
-- Log the dataset revision, v9.1 seed prompt path, loaded 12B model identifier,
-  concurrency, every candidate, its scores, and the chosen prompt to a run
-  directory so a run is reproducible from saved inputs.
+- Log the dataset revision, seed prompt path, taxonomy path, loaded model
+  identifier, concurrency, every candidate, its scores, and the chosen prompt to
+  a run directory so a run is reproducible from saved inputs.
+
+### Evalstate v2 split setup
+
+For the next GEPA run, use evalstate's published OpenClaw Git-label dataset
+with the v2 topic taxonomy and a v10-based overlay scaffold:
+
+- Feedback/minibatch pool: `feedback300.jsonl`.
+- Pareto validation set for GEPA candidate selection: `pareto60.jsonl`.
+- Held-out reporting set that GEPA must not optimize against: `bench78.jsonl`.
+- Local split checkout:
+  `/home/bob/repos/openclaw-git-labels/data/splits/`.
+- Local taxonomy:
+  `examples/profiles/openclaw-routing-topics.v2.json`.
+- Fixed scaffold source:
+  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`.
+- GEPA scaffold artifact:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
+- Seed overlay artifact:
+  `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-seed.md`.
+
+The production v10 prompt is the source for the fixed contract, not the GEPA
+candidate. The optimizer must only propose replacements for the overlay seed.
+
+The evalstate rows already include the saved `target`, `github_context`, and
+`expected_topics`. For this dataset, the gold labels are exactly
+`expected_topics` from the split rows, validated against the v2 taxonomy. The
+optimizer must pass the saved `github_context` into `localpager-agent`; it must
+not refetch GitHub context or silently fall back to DS4 row fields.
+
+The GEPA CLI mode for this setup is `--dataset evalstate`. It trains on
+`feedback300`, uses `pareto60` as GEPA's `valset`, and keeps `bench78` available
+for explicit held-out evaluation/reporting after the optimizer run.
+
+Static preflight commands:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary --dataset evalstate
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
+  --dataset evalstate \
+  --eval-split pareto \
+  --limit 1
+```
+
+Run command shape, when ready:
+
+```sh
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
+  --dataset evalstate \
+  --max-metric-calls 480 \
+  --max-candidate-proposals 16 \
+  --reflection-minibatch-size 4 \
+  --concurrency 4 \
+  --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
+  --base-url http://127.0.0.1:8000/v1 \
+  --thinking medium \
+  --max-tokens 8192
+```
+
+Do not start this run until the code and static smoke checks have passed.
 
 ### Initial feedback/minibatch pool
 
@@ -300,8 +402,8 @@ useful.
 ## Milestones
 
 1. Scaffold `prompt-optimizer/` (pyproject, package skeleton, README).
-2. `dataset.py`: load DS4 rows, cache the v9.1 seed prompt and GitHub contexts,
-   three-way split.
+2. `dataset.py`: load DS4 rows or evalstate split rows, cache prompt inputs and
+   saved GitHub contexts, three-way split.
 3. `harness.py` + `metric.py`: classify one row through `localpager-agent` and
    score it vs DS4 using the weighted FP/FN/over-labeling objective, with a mock
    model path for fast tests.
@@ -324,18 +426,17 @@ tested first slice exists even if no full GEPA optimization run has completed:
 - `dataset.py` loads canonical `ds4.jsonl`, loads Shaun's `gepa-good-60` row
   identities, validates all 60 rows against the configured taxonomy, and reports
   the feedback-pool composition.
-- Prompt handling loads the v9.1 seed prompt, normalizes the Handlebars
-  variables to Localpager placeholders, extracts the editable `routing_policy`,
-  and preserves the frozen scaffold in tests.
-- `metric.py` implements the weighted FP/FN/over-labeling score with tests that
-  prove random extra labels hurt, false positives cost more than false
-  negatives, and invalid labels fail instead of earning partial credit.
+- Prompt handling loads the correct seed prompt for the selected dataset,
+  normalizes the Handlebars variables to Localpager placeholders, extracts the
+  editable `routing_policy`, and preserves the frozen scaffold in tests.
+- `metric.py` implements the row-aware score with tests that prove random extra
+  labels hurt and invalid labels fail instead of earning partial credit.
 - A small CLI or test fixture can print a deterministic summary of the chosen
   dataset, prompt seed, and scoring config.
 
 Stretch goal for the same time box: classify one Shaun row through
 `localpager-agent` with a mock or live model path and parse `final_json`. Do not
-block the required first slice on a slow 12B rollout.
+block the required first slice on a slow live rollout.
 
 ## Successful run targets
 
@@ -350,10 +451,10 @@ GEPA run:
 - `max_metric_calls >= 480`.
 - `row_limit >= 30` if runtime allows. If runtime forces `row_limit = 18`,
   require stronger external validation before promotion.
-- `concurrency = 2` for 12B runs.
+- `concurrency = 4` for Qwen/vLLM runs.
 - `thinking = medium` for saved benchmark settings and future local classifier
   benchmark runs.
-- `max_tokens = 4096` for 12B classifier rollouts.
+- `max_tokens = 8192` for Qwen classifier rollouts.
 - No OOM, model-server instability, hidden retry storm, or untracked stale
   classifier processes competing for the loaded model.
 
@@ -387,10 +488,10 @@ scored `0.25` (`acp`, `gateway`, `sessions` vs DS4 gold `acp`, `gateway`,
 `agent_runtime`). With 12B and `--max-tokens 1536`, `final_json` parsed and
 scored `0.5` (`acp`, `gateway` vs the same DS4 gold). Later 60-row validation
 showed `1536` can still produce `final_json was not called` failures on harder
-rows, so the current recommended 12B rollout cap is `--max-tokens 4096`.
-Optimizer live defaults should therefore use 12B, concurrency 2,
-`--thinking medium`, and `--max-tokens 4096` unless a run is explicitly marked
-as E4B smoke/debug or a thinking-level comparison.
+rows, so the current recommended rollout cap remains `--max-tokens 8192`.
+Optimizer live defaults now use Qwen/vLLM, concurrency 4, `--thinking medium`,
+and `--max-tokens 8192` unless a run is explicitly marked as E4B smoke/debug or
+a thinking-level comparison.
 
 Live GEPA note from 2026-06-13: the best current 12B candidate is saved at
 `prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md`.
@@ -404,7 +505,7 @@ review before replacing a deployed OpenClaw prompt template.
 ## Open questions
 
 - Exact rollout budget vs. wall-clock threshold for switching exploratory runs
-  from the already-loaded local 12B model to `gemma-e4b-reason-test`.
+  from Qwen/vLLM to `gemma-e4b-reason-test`.
 - Whether to ever optimize more than the prompt (schema or topic list); if so,
   the library's `optimize_anything` / adapter framing is the fit, and the
   candidate grows beyond `routing_policy`.
