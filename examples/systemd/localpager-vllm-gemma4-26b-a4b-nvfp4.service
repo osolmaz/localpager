@@ -1,0 +1,22 @@
+[Unit]
+Description=LocalPager vLLM Gemma 4 26B-A4B NVFP4 server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=HOME=%h
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+WorkingDirectory=%h/repos/localpager
+ExecStart=%h/repos/localpager/examples/vllm/start-nvfp4.sh %h/.config/localpager/vllm-gemma4-26b-a4b-nvfp4.env
+Restart=on-failure
+RestartSec=30s
+TimeoutStartSec=10m
+Nice=5
+CPUWeight=50
+IOSchedulingClass=idle
+MemoryHigh=85G
+MemoryMax=90G
+
+[Install]
+WantedBy=default.target

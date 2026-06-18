@@ -45,6 +45,17 @@ compiling FlashInfer generated CUDA kernels. With `cutlass`, the log confirms:
 Using 'VLLM_CUTLASS' NvFp4 MoE backend
 ```
 
+## Files
+
+- `examples/vllm/gemma4-26b-a4b-nvfp4.env.example`: copyable vLLM profile.
+- `examples/vllm/start-nvfp4.sh`: launcher that reads the profile.
+- `examples/vllm/localpager-worker-gemma4-26b-a4b-nvfp4.snippet.json`:
+  LocalPager worker config snippet for this server.
+- `examples/systemd/localpager-vllm-gemma4-26b-a4b-nvfp4.service`: optional
+  user systemd service with the same memory cap used during local testing.
+- `examples/vllm/benchmark-openai-completions.mjs`: small OpenAI-compatible
+  throughput probe for reproducing the completion-token numbers.
+
 ## Throughput Results
 
 Local OpenAI-compatible API, `max_tokens=512`, `temperature=0`, 37 prompt
@@ -62,6 +73,21 @@ tokens per request:
 
 The recommended `seqs=32` service reported ready after 180s. It stayed below
 the `MemoryMax=90G` user-service cap during startup and benchmark runs.
+
+Reproduce the simple throughput probe against a running server:
+
+```bash
+node examples/vllm/benchmark-openai-completions.mjs \
+  --base-url http://127.0.0.1:8000/v1 \
+  --model nvidia/Gemma-4-26B-A4B-NVFP4 \
+  --concurrency 32 \
+  --requests 32 \
+  --max-tokens 512
+```
+
+For LocalPager classifier runs, keep `worker.max_concurrency` at or below the
+server `--max-num-seqs` value and keep `worker.agent_max_tokens` at `4096` for
+robust structured output.
 
 ## Failed Profiles
 
