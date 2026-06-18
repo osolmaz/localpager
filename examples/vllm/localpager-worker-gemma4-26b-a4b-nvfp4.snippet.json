@@ -1,0 +1,10 @@
+{
+  "worker": {
+    "max_concurrency": 32,
+    "model": "nvidia/Gemma-4-26B-A4B-NVFP4",
+    "agent_base_url": "http://127.0.0.1:8000/v1",
+    "agent_context_window": 8192,
+    "agent_max_tokens": 4096,
+    "agent_timeout_ms": 300000
+  }
+}
