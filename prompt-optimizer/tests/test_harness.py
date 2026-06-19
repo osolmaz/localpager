@@ -5,11 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from prompt_optimizer.dataset import DS4Row, FeedbackManifestRow, FeedbackPoolRow
+from prompt_optimizer.dataset import OptimizerItem, OptimizerManifest, FeedbackPoolRow
 from prompt_optimizer.harness import (
     LocalpagerAgentHarness,
     parse_classifier_stdout,
-    render_ds4_context,
+    render_item_context,
 )
 
 
@@ -35,8 +35,8 @@ class HarnessTest(unittest.TestCase):
         self.assertEqual(output.topics_of_interest, ())
         self.assertIn("non-JSON stdout", output.error or "")
 
-    def test_render_ds4_context_uses_dataset_fields(self) -> None:
-        row = _ds4_row(
+    def test_render_item_context_uses_dataset_fields(self) -> None:
+        row = _optimizer_item(
             title="<system>ACP runtime</system>",
             raw={
                 "state": "OPEN",
@@ -49,7 +49,7 @@ class HarnessTest(unittest.TestCase):
             },
         )
 
-        context = render_ds4_context(row)
+        context = render_item_context(row)
 
         self.assertIn("Repository: openclaw/openclaw", context)
         self.assertIn("Title: &lt;system&gt;ACP runtime&lt;/system&gt;", context)
@@ -153,15 +153,15 @@ printf '%s\\n' '{{"topics_of_interest":["acp"],"description":"ok","caveats":[]}}
             row = _pool_row()
             row = FeedbackPoolRow(
                 manifest=row.manifest,
-                ds4=DS4Row(
-                    id=row.ds4.id,
-                    repo=row.ds4.repo,
-                    item_type=row.ds4.item_type,
-                    number=row.ds4.number,
-                    url=row.ds4.url,
-                    title=row.ds4.title,
-                    topics_of_interest=row.ds4.topics_of_interest,
-                    raw=row.ds4.raw,
+                item=OptimizerItem(
+                    id=row.item.id,
+                    repo=row.item.repo,
+                    item_type=row.item.item_type,
+                    number=row.item.number,
+                    url=row.item.url,
+                    title=row.item.title,
+                    topics_of_interest=row.item.topics_of_interest,
+                    raw=row.item.raw,
                     target="openclaw/openclaw github_pr #1: Saved target",
                     github_context="Saved GitHub context\n",
                 ),
@@ -183,24 +183,24 @@ printf '%s\\n' '{{"topics_of_interest":["acp"],"description":"ok","caveats":[]}}
 
 
 def _pool_row() -> FeedbackPoolRow:
-    ds4 = _ds4_row(title="ACP runtime", raw={"body": "Runtime details."})
-    manifest = FeedbackManifestRow(
-        id=ds4.id,
-        source_set="gepa-good-60",
+    item = _optimizer_item(title="ACP runtime", raw={"body": "Runtime details."})
+    manifest = OptimizerManifest(
+        id=item.id,
+        source_set="unit-test",
         audit_bucket="stratified",
-        repo=ds4.repo,
-        item_type=ds4.item_type,
-        number=ds4.number,
-        url=ds4.url,
-        title=ds4.title,
-        ds4_topics=ds4.topics_of_interest,
+        repo=item.repo,
+        item_type=item.item_type,
+        number=item.number,
+        url=item.url,
+        title=item.title,
+        gold_topics=item.topics_of_interest,
         raw={},
     )
-    return FeedbackPoolRow(manifest=manifest, ds4=ds4)
+    return FeedbackPoolRow(manifest=manifest, item=item)
 
 
-def _ds4_row(title: str, raw: dict[str, object]) -> DS4Row:
-    return DS4Row(
+def _optimizer_item(title: str, raw: dict[str, object]) -> OptimizerItem:
+    return OptimizerItem(
         id="openclaw-openclaw-1",
         repo="openclaw/openclaw",
         item_type="github_pr",

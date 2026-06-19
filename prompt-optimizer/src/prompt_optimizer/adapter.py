@@ -36,7 +36,7 @@ class LocalpagerTrajectory:
 
 
 class LocalpagerAdapter:
-    """GEPA adapter that scores candidate routing policy text against DS4 rows."""
+    """GEPA adapter that scores candidate routing policy text against benchmark rows."""
 
     propose_new_texts = None
 
@@ -75,10 +75,10 @@ class LocalpagerAdapter:
             if trajectories is not None:
                 trajectories.append(
                     LocalpagerTrajectory(
-                        row_id=row.ds4.id,
-                        target=row.ds4.target or row.ds4.url,
-                        title=row.ds4.title,
-                        gold_topics=row.ds4.topics_of_interest,
+                        row_id=row.item.id,
+                        target=row.item.target or row.item.url,
+                        title=row.item.title,
+                        gold_topics=row.item.topics_of_interest,
                         predicted_topics=output.topics_of_interest,
                         score=row_score,
                         feedback=feedback,
@@ -164,19 +164,19 @@ class LocalpagerAdapter:
         if error is None:
             try:
                 row_score = score_row(
-                    row.ds4.topics_of_interest,
+                    row.item.topics_of_interest,
                     output.topics_of_interest,
                     self.allowed_topics,
                 )
                 score = row_score.score
-                feedback = asi_notes(row.ds4.id, row_score)
+                feedback = asi_notes(row.item.id, row_score)
             except InvalidLabelError as exc:
                 error = str(exc)
                 score = 0.0
-                feedback = (f"{row.ds4.id}: classifier emitted invalid label: {exc}",)
+                feedback = (f"{row.item.id}: classifier emitted invalid label: {exc}",)
         else:
             score = 0.0
-            feedback = (f"{row.ds4.id}: classifier failed: {error}",)
+            feedback = (f"{row.item.id}: classifier failed: {error}",)
         return output, score, row_score, feedback, error, row
 
 

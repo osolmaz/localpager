@@ -7,11 +7,9 @@ from pathlib import Path
 from typing import NoReturn
 
 from prompt_optimizer.dataset import (
-    DEFAULT_DS4_PATH,
     DEFAULT_EVALSTATE_HELDOUT_PATH,
     DEFAULT_EVALSTATE_PARETO_PATH,
     DEFAULT_EVALSTATE_TRAIN_PATH,
-    DEFAULT_FEEDBACK_MANIFEST_PATH,
     DEFAULT_TAXONOMY_PATH,
     load_taxonomy,
 )
@@ -20,7 +18,6 @@ from prompt_optimizer.metric import SCORING_CONFIG
 from prompt_optimizer.prompt import (
     DEFAULT_EVALSTATE_SEED_OVERLAY_PATH,
     DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
-    DEFAULT_SEED_PROMPT_PATH,
 )
 from prompt_optimizer.report import (
     summarize_evaluation_file,
@@ -39,7 +36,6 @@ from prompt_optimizer.run import (
     evaluate_seed,
     evaluate_routing_policy,
     load_evalstate_optimizer_inputs,
-    load_optimizer_inputs,
     localpager_agent_harness,
     run_gepa,
     static_empty_harness,
@@ -151,7 +147,6 @@ def _summary(args: argparse.Namespace) -> str:
     topics = load_taxonomy(taxonomy)
     prompt = inputs.prompt_parts
     payload = {
-        "dataset": args.dataset,
         "dataset_name": inputs.dataset_name,
         "train_rows": len(inputs.rows),
         "pareto_rows": len(inputs.pareto_rows),
@@ -169,15 +164,11 @@ def _summary(args: argparse.Namespace) -> str:
             "thinking": "medium",
             "max_tokens": DEFAULT_MAX_TOKENS,
         },
+        "train_split": str(args.train_split),
+        "pareto_split": str(args.pareto_split),
+        "heldout_split": str(args.heldout_split),
+        "seed_overlay_path": str(seed_overlay),
     }
-    if args.dataset == "ds4":
-        payload["ds4_path"] = str(args.ds4)
-        payload["feedback_manifest_path"] = str(args.feedback_manifest)
-    else:
-        payload["train_split"] = str(args.train_split)
-        payload["pareto_split"] = str(args.pareto_split)
-        payload["heldout_split"] = str(args.heldout_split)
-        payload["seed_overlay_path"] = str(seed_overlay)
     return json.dumps(payload, indent=2, sort_keys=True)
 
 
@@ -245,9 +236,6 @@ def _evaluation_harness(args: argparse.Namespace) -> ClassifierHarness:
 
 
 def _add_input_args(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--dataset", choices=("ds4", "evalstate"), default="ds4")
-    parser.add_argument("--ds4", type=Path, default=DEFAULT_DS4_PATH)
-    parser.add_argument("--feedback-manifest", type=Path, default=DEFAULT_FEEDBACK_MANIFEST_PATH)
     parser.add_argument("--train-split", type=Path, default=DEFAULT_EVALSTATE_TRAIN_PATH)
     parser.add_argument("--pareto-split", type=Path, default=DEFAULT_EVALSTATE_PARETO_PATH)
     parser.add_argument("--heldout-split", type=Path, default=DEFAULT_EVALSTATE_HELDOUT_PATH)
@@ -292,20 +280,13 @@ def _harness_config(args: argparse.Namespace) -> HarnessConfig:
 def _load_inputs(args: argparse.Namespace):
     taxonomy = _taxonomy_path(args)
     seed_prompt = _seed_prompt_path(args)
-    if args.dataset == "evalstate":
-        return load_evalstate_optimizer_inputs(
-            train_path=args.train_split,
-            pareto_path=args.pareto_split,
-            heldout_path=args.heldout_split,
-            taxonomy_path=taxonomy,
-            seed_prompt_path=seed_prompt,
-            seed_overlay_path=_seed_overlay_path(args),
-        )
-    return load_optimizer_inputs(
-        ds4_path=args.ds4,
-        feedback_manifest_path=args.feedback_manifest,
+    return load_evalstate_optimizer_inputs(
+        train_path=args.train_split,
+        pareto_path=args.pareto_split,
+        heldout_path=args.heldout_split,
         taxonomy_path=taxonomy,
         seed_prompt_path=seed_prompt,
+        seed_overlay_path=_seed_overlay_path(args),
     )
 
 
@@ -331,13 +312,13 @@ def _taxonomy_path(args: argparse.Namespace) -> Path:
 def _seed_prompt_path(args: argparse.Namespace) -> Path:
     if args.seed_prompt is not None:
         return args.seed_prompt
-    return DEFAULT_EVALSTATE_SEED_PROMPT_PATH if args.dataset == "evalstate" else DEFAULT_SEED_PROMPT_PATH
+    return DEFAULT_EVALSTATE_SEED_PROMPT_PATH
 
 
-def _seed_overlay_path(args: argparse.Namespace) -> Path | None:
+def _seed_overlay_path(args: argparse.Namespace) -> Path:
     if args.seed_overlay is not None:
         return args.seed_overlay
-    return DEFAULT_EVALSTATE_SEED_OVERLAY_PATH if args.dataset == "evalstate" else None
+    return DEFAULT_EVALSTATE_SEED_OVERLAY_PATH
 
 
 def die(message: str) -> NoReturn:

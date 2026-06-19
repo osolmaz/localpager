@@ -6,21 +6,21 @@
   "properties": {
     "topics_of_interest": {
       "type": "array",
-      "maxItems": 5,
+      "maxItems": 3,
       "uniqueItems": true,
       "items": {
         "type": "string",
         "enum": [
-          "local_models",
-          "model_serving",
-          "runtime_reliability",
-          "repo_infrastructure",
-          "developer_tools",
+          "bug",
+          "feature_request",
+          "docs",
           "tests_ci",
-          "api_surface",
+          "build_release",
+          "developer_experience",
+          "api_contract",
           "integrations",
           "security",
-          "docs"
+          "performance"
         ]
       }
     },

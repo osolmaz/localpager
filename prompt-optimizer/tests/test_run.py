@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from prompt_optimizer.adapter import ROUTING_POLICY_COMPONENT
-from prompt_optimizer.dataset import DS4Row, FeedbackManifestRow, FeedbackPoolRow
+from prompt_optimizer.dataset import OptimizerItem, OptimizerManifest, FeedbackPoolRow
 from prompt_optimizer.harness import StaticClassifierHarness
 from prompt_optimizer.prompt import normalize_template_variables, split_seed_prompt
 from prompt_optimizer.run import (
@@ -206,7 +206,7 @@ Old policy
 
 
 def _pool_row(row_id: str = "row-1", title: str = "ACP runtime") -> FeedbackPoolRow:
-    ds4 = DS4Row(
+    item = OptimizerItem(
         id=row_id,
         repo="openclaw/openclaw",
         item_type="github_pr",
@@ -216,19 +216,19 @@ def _pool_row(row_id: str = "row-1", title: str = "ACP runtime") -> FeedbackPool
         topics_of_interest=("acp",),
         raw={},
     )
-    manifest = FeedbackManifestRow(
-        id=ds4.id,
-        source_set="gepa-good-60",
+    manifest = OptimizerManifest(
+        id=item.id,
+        source_set="unit-test",
         audit_bucket="stratified",
-        repo=ds4.repo,
-        item_type=ds4.item_type,
-        number=ds4.number,
-        url=ds4.url,
-        title=ds4.title,
-        ds4_topics=ds4.topics_of_interest,
+        repo=item.repo,
+        item_type=item.item_type,
+        number=item.number,
+        url=item.url,
+        title=item.title,
+        gold_topics=item.topics_of_interest,
         raw={},
     )
-    return FeedbackPoolRow(manifest=manifest, ds4=ds4)
+    return FeedbackPoolRow(manifest=manifest, item=item)
 
 
 class _FakeResult:

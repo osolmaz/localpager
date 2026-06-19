@@ -2,17 +2,12 @@ from __future__ import annotations
 
 import json
 import re
-from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
-DEFAULT_DS4_PATH = Path("/home/bob/oc/openclaw-classification-dataset/ds4.jsonl")
-DEFAULT_FEEDBACK_MANIFEST_PATH = Path(
-    "/home/bob/scratch/shaun-openclaw-data-rows/gepa-good-60.rows.jsonl"
-)
 DEFAULT_EVALSTATE_TRAIN_PATH = Path("/home/bob/repos/openclaw-git-labels/data/splits/feedback300.jsonl")
 DEFAULT_EVALSTATE_PARETO_PATH = Path("/home/bob/repos/openclaw-git-labels/data/splits/pareto60.jsonl")
 DEFAULT_EVALSTATE_HELDOUT_PATH = Path("/home/bob/repos/openclaw-git-labels/data/splits/bench78.jsonl")
@@ -24,7 +19,7 @@ class DatasetError(ValueError):
 
 
 @dataclass(frozen=True)
-class DS4Row:
+class OptimizerItem:
     id: str
     repo: str
     item_type: str
@@ -38,7 +33,7 @@ class DS4Row:
 
 
 @dataclass(frozen=True)
-class FeedbackManifestRow:
+class OptimizerManifest:
     id: str
     source_set: str
     audit_bucket: str
@@ -47,14 +42,14 @@ class FeedbackManifestRow:
     number: int
     url: str
     title: str
-    ds4_topics: tuple[str, ...]
+    gold_topics: tuple[str, ...]
     raw: dict[str, Any]
 
 
 @dataclass(frozen=True)
 class FeedbackPoolRow:
-    manifest: FeedbackManifestRow
-    ds4: DS4Row
+    manifest: OptimizerManifest
+    item: OptimizerItem
 
 
 @dataclass(frozen=True)
@@ -96,54 +91,6 @@ def load_taxonomy(path: Path) -> frozenset[str]:
     return frozenset(topics)
 
 
-def load_ds4(path: Path, allowed_topics: Iterable[str] | None = None) -> tuple[DS4Row, ...]:
-    allowed = frozenset(allowed_topics) if allowed_topics is not None else None
-    rows: list[DS4Row] = []
-    seen: set[str] = set()
-    for raw in load_jsonl(path):
-        row = _parse_ds4_row(raw, allowed)
-        if row.id in seen:
-            raise DatasetError(f"duplicate DS4 row id: {row.id}")
-        seen.add(row.id)
-        rows.append(row)
-    return tuple(rows)
-
-
-def load_feedback_manifest(path: Path) -> tuple[FeedbackManifestRow, ...]:
-    rows: list[FeedbackManifestRow] = []
-    seen: set[str] = set()
-    for raw in load_jsonl(path):
-        row = _parse_feedback_manifest_row(raw)
-        if row.id in seen:
-            raise DatasetError(f"duplicate feedback row id: {row.id}")
-        seen.add(row.id)
-        rows.append(row)
-    return tuple(rows)
-
-
-def build_feedback_pool(ds4_path: Path, manifest_path: Path, taxonomy_path: Path) -> FeedbackPool:
-    allowed_topics = load_taxonomy(taxonomy_path)
-    ds4_rows = load_ds4(ds4_path, allowed_topics)
-    ds4_by_id = {row.id: row for row in ds4_rows}
-    manifest_rows = load_feedback_manifest(manifest_path)
-    pool_rows: list[FeedbackPoolRow] = []
-    for manifest in manifest_rows:
-        ds4 = ds4_by_id.get(manifest.id)
-        if ds4 is None:
-            raise DatasetError(f"feedback row missing from canonical DS4: {manifest.id}")
-        if manifest.ds4_topics and manifest.ds4_topics != ds4.topics_of_interest:
-            raise DatasetError(
-                "feedback manifest ds4_topics differs from canonical ds4.jsonl "
-                f"for {manifest.id}: manifest={manifest.ds4_topics!r} canonical={ds4.topics_of_interest!r}"
-            )
-        pool_rows.append(FeedbackPoolRow(manifest=manifest, ds4=ds4))
-    return FeedbackPool(
-        rows=tuple(pool_rows),
-        composition=dict(Counter(row.manifest.audit_bucket for row in pool_rows)),
-        source_row_count=len(ds4_rows),
-    )
-
-
 def build_evalstate_pool(split_path: Path, taxonomy_path: Path, *, split_name: str | None = None) -> FeedbackPool:
     allowed_topics = load_taxonomy(taxonomy_path)
     rows = load_evalstate_split(split_path, allowed_topics, split_name=split_name or split_path.stem)
@@ -165,9 +112,9 @@ def load_evalstate_split(
     seen: set[str] = set()
     for raw in load_jsonl(path):
         row = _parse_evalstate_row(raw, allowed, split_name)
-        if row.ds4.id in seen:
-            raise DatasetError(f"duplicate evalstate row id in {path}: {row.ds4.id}")
-        seen.add(row.ds4.id)
+        if row.item.id in seen:
+            raise DatasetError(f"duplicate evalstate row id in {path}: {row.item.id}")
+        seen.add(row.item.id)
         rows.append(row)
     return tuple(rows)
 
@@ -195,39 +142,6 @@ def _topic_ids_from_taxonomy(root: Any) -> list[str]:
     raise DatasetError("unsupported taxonomy shape")
 
 
-def _parse_ds4_row(raw: dict[str, Any], allowed_topics: frozenset[str] | None) -> DS4Row:
-    row_id = _required_str(raw, "id", "DS4 row")
-    topics = _normal_topics(raw.get("topics_of_interest"), f"DS4 row {row_id}", allowed_topics)
-    return DS4Row(
-        id=row_id,
-        repo=_required_str(raw, "repo", f"DS4 row {row_id}"),
-        item_type=_required_str(raw, "item_type", f"DS4 row {row_id}"),
-        number=_required_int(raw, "number", f"DS4 row {row_id}"),
-        url=_required_str(raw, "url", f"DS4 row {row_id}"),
-        title=_required_str(raw, "title", f"DS4 row {row_id}"),
-        topics_of_interest=topics,
-        raw=raw,
-        target=raw.get("target") if isinstance(raw.get("target"), str) else None,
-        github_context=raw.get("github_context") if isinstance(raw.get("github_context"), str) else None,
-    )
-
-
-def _parse_feedback_manifest_row(raw: dict[str, Any]) -> FeedbackManifestRow:
-    row_id = _required_str(raw, "id", "feedback row")
-    return FeedbackManifestRow(
-        id=row_id,
-        source_set=_required_str(raw, "source_set", f"feedback row {row_id}"),
-        audit_bucket=_required_str(raw, "audit_bucket", f"feedback row {row_id}"),
-        repo=_required_str(raw, "repo", f"feedback row {row_id}"),
-        item_type=_required_str(raw, "item_type", f"feedback row {row_id}"),
-        number=_required_int(raw, "number", f"feedback row {row_id}"),
-        url=_required_str(raw, "url", f"feedback row {row_id}"),
-        title=_required_str(raw, "title", f"feedback row {row_id}"),
-        ds4_topics=_normal_topics(raw.get("ds4_topics"), f"feedback row {row_id}", None),
-        raw=raw,
-    )
-
-
 def _parse_evalstate_row(
     raw: dict[str, Any],
     allowed_topics: frozenset[str] | None,
@@ -239,7 +153,7 @@ def _parse_evalstate_row(
     github_context = _required_str(raw, "github_context", f"evalstate row {row_id}")
     topics = _normal_topics(raw.get("expected_topics"), f"evalstate row {row_id}", allowed_topics)
     repo, item_type, number, url = _evalstate_identity(target, github_context)
-    ds4 = DS4Row(
+    item = OptimizerItem(
         id=row_id,
         repo=repo,
         item_type=item_type,
@@ -251,7 +165,7 @@ def _parse_evalstate_row(
         target=target,
         github_context=github_context,
     )
-    manifest = FeedbackManifestRow(
+    manifest = OptimizerManifest(
         id=row_id,
         source_set="evalstate-openclaw-git-labels",
         audit_bucket=split_name,
@@ -260,10 +174,10 @@ def _parse_evalstate_row(
         number=number,
         url=url or target,
         title=title,
-        ds4_topics=topics,
+        gold_topics=topics,
         raw=raw,
     )
-    return FeedbackPoolRow(manifest=manifest, ds4=ds4)
+    return FeedbackPoolRow(manifest=manifest, item=item)
 
 
 def _evalstate_identity(target: str, github_context: str) -> tuple[str, str, int, str]:

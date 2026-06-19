@@ -1,10 +1,9 @@
 # Localpager Prompt Optimizer
 
 Offline tooling for improving the OpenClaw routing prompt with GEPA. The
-optimizer can read either the original DS4/Shaun 60-row setup or evalstate's
-published OpenClaw Git-label splits. DS4 mode starts from the v9.1 seed prompt.
-Evalstate mode uses the repo-local OpenClaw benchmark taxonomy with a v10-based fixed scaffold and
-an overlay-only routing-policy candidate.
+optimizer uses evalstate's published OpenClaw Git-label splits, the repo-local
+OpenClaw benchmark taxonomy, and a v10-based fixed scaffold with an overlay-only
+routing-policy candidate.
 
 This package does not run inside the Localpager worker. It is a lab tool whose
 production output is a reviewed prompt file.
@@ -23,24 +22,21 @@ Or run the commands directly:
 PYTHONPATH=prompt-optimizer/src python3 -m unittest discover -s prompt-optimizer/tests
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed --limit 1
-PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary --dataset evalstate
 ```
 
-The summary commands expect the local dataset checkouts and paths described in
+The summary command expects the local dataset checkout and paths described in
 `docs/2026-06-12-prompt-optimizer-gepa-plan.md`.
 
 ## Scope
 
 The implementation covers:
 
-- loading canonical `ds4.jsonl`
-- loading Shaun's `gepa-good-60` row identities
 - loading evalstate's `feedback300`, `pareto60`, and `bench78` split files
 - validating labels against the OpenClaw taxonomy
 - normalizing prompt templates into Localpager placeholders
-- extracting the editable `routing_policy` block
-- supporting evalstate's v10 scaffold plus overlay-only GEPA candidate boundary
-- scoring predictions with Shaun/evalstate's row-aware multilabel metric
+- supporting the v10 scaffold plus overlay-only GEPA candidate boundary
+- scoring predictions with the row-aware multilabel metric used for the
+  evalstate runs
 - evaluating candidates through a mockable GEPA adapter shape
 - invoking the production `scripts/localpager-classifier` wrapper through a
   tested subprocess harness
@@ -48,6 +44,7 @@ The implementation covers:
 - wrapping `codex exec -` as a GEPA reflection language model
 - re-evaluating saved routing-policy candidates against explicit dataset slices
 - continuing a GEPA run from a saved routing-policy candidate
+- writing score and prompt-diff HTML reports for completed GEPA runs
 
 The `evaluate-seed` command defaults to a no-model static harness. To run a
 real one-row classifier smoke through the production wrapper, pass:
@@ -62,7 +59,7 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
   --limit 1
 ```
 
-Evalstate mode uses these defaults:
+Default inputs:
 
 - train/feedback pool:
   `/home/bob/repos/openclaw-git-labels/data/splits/feedback300.jsonl`
@@ -86,18 +83,17 @@ Evalstate mode uses these defaults:
 Static smoke checks do not make model calls:
 
 ```sh
-PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary --dataset evalstate
+PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summary
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-seed \
-  --dataset evalstate \
   --eval-split pareto \
   --limit 1
 ```
 
-Evalstate GEPA should not mutate the whole v10 prompt. The v10-based scaffold
-keeps the task contract fixed: label list, topic definitions, schema, input
-format, valid-label constraints, and max-3-label output constraints. GEPA only
-mutates the routing-policy overlay inserted into that scaffold. The overlay
-should keep Shaun/evalstate's compact section shape:
+GEPA should not mutate the whole v10 prompt. The v10-based scaffold keeps the
+task contract fixed: label list, topic definitions, schema, input format,
+valid-label constraints, and max-3-label output constraints. GEPA only mutates
+the routing-policy overlay inserted into that scaffold. The overlay should keep
+the compact section shape:
 
 ```text
 Decision Procedure
@@ -113,7 +109,7 @@ law.
 
 ## Scoring
 
-The optimizer uses Shaun/evalstate's later row-aware scorer:
+The optimizer uses the later row-aware scorer from the evalstate runs:
 
 ```text
 score = 0.60 * row_jaccard
@@ -122,14 +118,12 @@ score = 0.60 * row_jaccard
       - policy_penalties
 ```
 
-This keeps the score bounded from 0 to 1. The scorer is balanced rather than
-recall-leaning: false positives and false negatives both reduce row Jaccard,
-row topic F1, and exact row match. Current policy penalties cover duplicate
-predicted labels and more than 3 predicted labels.
+This keeps the score bounded from 0 to 1. False positives and false negatives
+both reduce row Jaccard, row topic F1, and exact row match. Current policy
+penalties cover duplicate predicted labels and more than 3 predicted labels.
 
-Use `--offset` with `--limit` to check held-out slices of Shaun's ordered
-60-row set. Saved routing-policy candidates can be scored without another GEPA
-run:
+Use `--eval-split`, `--offset`, and `--limit` to check explicit slices. Saved
+routing-policy candidates can be scored without another GEPA run:
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-candidate \
@@ -138,29 +132,16 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli evaluate-candida
   --base-url http://127.0.0.1:8000/v1 \
   --concurrency 4 \
   --max-tokens 8192 \
-  --routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md \
-  --candidate-name gepa-12b-six-best \
-  --limit 6 \
-  --offset 12
-```
-
-The current best reviewed artifact from the 60-row validation sequence is:
-
-```text
-prompt-optimizer/results/2026-06-14-gepa-12b-prop20-cardinality-repair.prompt.md
-```
-
-Its editable routing-policy block is:
-
-```text
-prompt-optimizer/results/2026-06-14-gepa-12b-prop20-cardinality-repair.routing_policy.md
+  --eval-split heldout \
+  --routing-policy prompt-optimizer/results/2026-06-17-gepa-evalstate-qwen-overlay-best.routing_policy.md \
+  --candidate-name gepa-evalstate-qwen-overlay \
+  --limit 20
 ```
 
 GEPA optimization is explicit because a live run can take a long time:
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
-  --dataset evalstate \
   --max-metric-calls 20 \
   --row-limit 4 \
   --model nvidia/Qwen3.6-35B-A3B-NVFP4 \
@@ -170,12 +151,12 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
   --max-tokens 8192
 ```
 
-To continue from a saved candidate instead of the v9.1 seed prompt, pass
+To continue from a saved candidate instead of the seed overlay, pass
 `--seed-routing-policy`:
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli optimize \
-  --seed-routing-policy prompt-optimizer/results/2026-06-13-gepa-12b-six-best.routing_policy.md \
+  --seed-routing-policy prompt-optimizer/results/2026-06-17-gepa-evalstate-qwen-overlay-best.routing_policy.md \
   --max-metric-calls 30 \
   --max-candidate-proposals 8 \
   --row-limit 12 \
@@ -191,14 +172,14 @@ Summarize a live or completed GEPA run without making model calls:
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli report-run \
-  --run-dir prompt-optimizer/out/gepa-12b-row30-prop16-from-proper-20260613T172903Z
+  --run-dir prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-YYYYMMDDTHHMMSSZ
 ```
 
 Write a self-contained score report with iteration and candidate-score charts:
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli plot-run \
-  --run-dir prompt-optimizer/out/gepa-12b-row30-prop16-from-proper-20260613T172903Z
+  --run-dir prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-YYYYMMDDTHHMMSSZ
 ```
 
 Write a self-contained prompt diff report for every saved candidate in a GEPA
@@ -210,9 +191,9 @@ PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli plot-prompt-diff
   --run-dir prompt-optimizer/out/gepa-evalstate-qwen-overlay-c4-full-YYYYMMDDTHHMMSSZ
 ```
 
-Summarize a saved 60-row validation JSON without making model calls:
+Summarize a saved evaluation JSON without making model calls:
 
 ```sh
 PYTHONPATH=prompt-optimizer/src python3 -m prompt_optimizer.cli summarize-evaluation \
-  --evaluation prompt-optimizer/out/validation-12b-row30-prop16-best-YYYYMMDDTHHMMSSZ/gepa-12b-row30-prop16-best-limit60.json
+  --evaluation prompt-optimizer/out/validation-evalstate-qwen-overlay-YYYYMMDDTHHMMSSZ/heldout.json
 ```

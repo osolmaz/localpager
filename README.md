@@ -41,7 +41,7 @@ The classifier command receives one target argument, usually a GitHub URL or
 
 ```json
 {
-  "topics_of_interest": ["bug", "release"],
+  "topics_of_interest": ["bug", "build_release"],
   "description": "Why this item matters.",
   "caveats": []
 }
@@ -118,15 +118,15 @@ candidate artifacts remain under `prompt-optimizer/results/`.
 Before the classifier runs, Localpager renders GitHub context into the prompt:
 stored title/body/labels plus optional comments, changed files, and selected PR
 diff. Prompt templates can include that block with `{{{github_context}}}`.
-For the local DS4 dataset and Gemma 4 prompt-optimization history that informed
-this design, see [DS4 Dataset and Gemma Prompt Optimization](docs/2026-06-01-ds4-dataset-gemma-prompt-optimization.md).
+For prompt provenance and dataset artifact ownership, see
+[Classifier Prompt Provenance](docs/2026-06-04-classifier-prompt-provenance.md).
 To test a prompt profile on a small live GitHub sample, use
 `scripts/localpager-experiment.mjs`; see
 [Classifier Experiment Runner](docs/2026-06-01-classifier-experiment-runner.md)
 and [Classifier Benchmark Metrics](docs/2026-06-01-classifier-benchmark-metrics.md).
 Machine-specific runtime values, such as the loaded model context window,
-parallelism, context truncation budget, and DS4/LM Studio exclusivity rules,
-belong in a deployment setup document. See
+parallelism, context truncation budget, and loaded local model, belong in a
+deployment setup document. See
 [Onur's Isengard Setup](docs/2026-06-02-onur-isengard-localpager-setup.md) for
 the current OpenClaw/Gemma deployment. For Qwen NVFP4 through vLLM, see
 [vLLM Qwen NVFP4 LocalPager Setup](docs/2026-06-16-vllm-qwen36-nvfp4-localpager.md).

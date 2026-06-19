@@ -26,6 +26,7 @@ async function main() {
   const topics = options.topicTaxonomy ? loadTopics(resolvePath(options.topicTaxonomy)) : [];
   const baseSchema = JSON.parse(readFileSync(resolvePath(options.schema), "utf8"));
   const runtimeSchema = renderSchema(baseSchema, topics);
+  const maxTopics = maxTopicsFromSchema(runtimeSchema);
   const promptTemplate = readFileSync(resolvePath(options.promptTemplate), "utf8");
 
   writeFileSync(path.join(outputDir, "schema.runtime.json"), JSON.stringify(runtimeSchema, null, 2) + "\n");
@@ -45,8 +46,8 @@ async function main() {
     writeFileSync(contextPath, context);
     writeFileSync(path.join(outputDir, "prompts", `${safeName}.md`), prompt);
 
-    const reference = await classify("reference", contextPath, topics, item, options);
-    const target = await classify("target", contextPath, topics, item, options);
+    const reference = await classify("reference", contextPath, topics, item, options, maxTopics);
+    const target = await classify("target", contextPath, topics, item, options, maxTopics);
     const comparison = compareOutputs(reference.output, target.output);
 
     referenceRows.push({ item: itemSummary(item), ...reference });
@@ -72,7 +73,7 @@ function parseArgs(args) {
     itemType: "both",
     limit: 5,
     outputDir: "",
-    schema: "schemas/classification.schema.json",
+    schema: "examples/profiles/repo-routing.schema.json",
     promptTemplate: "examples/profiles/repo-routing.prompt.md",
     topicTaxonomy: "examples/profiles/repo-routing-topics.json",
     githubBaseUrl: "https://api.github.com",
@@ -370,13 +371,13 @@ function oneLine(value) {
   return String(value).replace(/\s+/gu, " ").trim();
 }
 
-async function classify(side, contextPath, topics, item, opts) {
+async function classify(side, contextPath, topics, item, opts, maxTopics) {
   const model = side === "reference" ? opts.referenceModel : opts.targetModel;
   const baseUrl = side === "reference" ? opts.referenceBaseUrl : opts.targetBaseUrl;
   const started = Date.now();
   try {
     const output = model === "mock" ? mockOutput(topics, item) : await callLocalpagerClassifier(baseUrl, model, contextPath, item, opts);
-    const validation = validateOutput(output, topics);
+    const validation = validateOutput(output, topics, maxTopics);
     return {
       model,
       base_url: baseUrl || null,
@@ -642,6 +643,11 @@ function renderSchema(schema, topics) {
   return rendered;
 }
 
+function maxTopicsFromSchema(schema) {
+  const maxItems = schema?.properties?.topics_of_interest?.maxItems;
+  return Number.isInteger(maxItems) && maxItems > 0 ? maxItems : 5;
+}
+
 function renderPrompt(template, target, topics, githubContext) {
   const allowedTopicsJSON =
     topics.length > 0
@@ -667,14 +673,30 @@ function renderPrompt(template, target, topics, githubContext) {
     .replaceAll("__GITHUB_CONTEXT__", githubContext.trim())
     .replaceAll("__ALLOWED_TOPICS_JSON__", allowedTopicsJSON)
     .replaceAll("__TOPIC_TAXONOMY_JSON__", JSON.stringify({ topics }, null, 2))
-    .replaceAll("__TOPIC_DESCRIPTIONS__", descriptions);
+    .replaceAll("__TOPIC_DESCRIPTIONS__", descriptions)
+    .replace(handlebarsVarPattern("target", true), target)
+    .replace(handlebarsVarPattern("github_context", true), githubContext.trim())
+    .replace(handlebarsVarPattern("allowed_topics_json", true), allowedTopicsJSON)
+    .replace(handlebarsVarPattern("topic_taxonomy_json", true), JSON.stringify({ topics }, null, 2))
+    .replace(handlebarsVarPattern("topic_descriptions", true), descriptions)
+    .replace(handlebarsVarPattern("target", false), target)
+    .replace(handlebarsVarPattern("github_context", false), githubContext.trim())
+    .replace(handlebarsVarPattern("allowed_topics_json", false), allowedTopicsJSON)
+    .replace(handlebarsVarPattern("topic_taxonomy_json", false), JSON.stringify({ topics }, null, 2))
+    .replace(handlebarsVarPattern("topic_descriptions", false), descriptions);
+}
+
+function handlebarsVarPattern(name, raw) {
+  const braces = raw ? "\\{\\{\\{" : "\\{\\{";
+  const close = raw ? "\\}\\}\\}" : "\\}\\}";
+  return new RegExp(`${braces}\\s*${name}\\s*${close}`, "gu");
 }
 
 function truncateInline(value, maxLength) {
   return value.length <= maxLength ? value : `${value.slice(0, maxLength - 3)}...`;
 }
 
-function validateOutput(output, topics) {
+function validateOutput(output, topics, maxTopics) {
   const errors = [];
   const allowed = new Set(topics.map((topic) => topic.id));
   if (!output || typeof output !== "object" || Array.isArray(output)) {
@@ -688,8 +710,8 @@ function validateOutput(output, topics) {
   if (!Array.isArray(output.topics_of_interest)) {
     errors.push("topics_of_interest must be an array");
   } else {
-    if (output.topics_of_interest.length > 5) {
-      errors.push("topics_of_interest must contain at most 5 topics");
+    if (output.topics_of_interest.length > maxTopics) {
+      errors.push(`topics_of_interest must contain at most ${maxTopics} topics`);
     }
     if (new Set(output.topics_of_interest).size !== output.topics_of_interest.length) {
       errors.push("topics_of_interest must be unique");
