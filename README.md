@@ -33,15 +33,15 @@ The worker runs a classifier command. By default it uses:
 ```
 
 That wrapper calls `localpager-agent`, which points Pi at a local
-OpenAI-compatible model endpoint and forces the final answer through
-`schemas/classification.schema.json`.
+OpenAI-compatible model endpoint and forces the final answer through the
+configured classifier schema.
 
 The classifier command receives one target argument, usually a GitHub URL or
 `owner/repo#number`, and must print one JSON object to stdout:
 
 ```json
 {
-  "topics_of_interest": ["bug", "release"],
+  "topics_of_interest": ["bug", "build_release"],
   "description": "Why this item matters.",
   "caveats": []
 }
@@ -102,28 +102,31 @@ worker → wrapper → renderer → agent chain, prompt placeholders, and schema
 generation, see
 [Classifier Pipeline and Profile Rendering](docs/2026-06-12-classifier-pipeline-and-rendering.md).
 
-For OpenClaw maintainer routing, use a deployment prompt profile generated from
-the OpenClaw classification dataset with the OpenClaw topic keyword taxonomy in
-`examples/profiles/openclaw-routing-topics.json`. The repo also keeps historical
-v8 examples under `examples/profiles/` and the GEPA-reviewed candidate artifacts
-under `prompt-optimizer/results/`. The current prompt-optimizer artifact adds
-strict cardinality guidance, false-positive suppression, and label-spam
-resistance for maintainer-routing labels.
-`examples/profiles/openclaw-routing-topics.v2.json` is a staged v2 taxonomy for
-review only; current examples and defaults still use `openclaw-routing-topics.json`.
+For OpenClaw maintainer routing, this repo contains a self-contained v10
+profile matching the evalstate benchmark label set:
+
+```text
+examples/profiles/openclaw-routing.prompt.hbs
+examples/profiles/openclaw-routing.schema.json
+examples/profiles/openclaw-routing-topics.json
+```
+
+Those files are the default OpenClaw profile used by `scripts/localpager-classifier`
+when no profile flags or environment overrides are provided. The GEPA-reviewed
+candidate artifacts remain under `prompt-optimizer/results/`.
 
 Before the classifier runs, Localpager renders GitHub context into the prompt:
 stored title/body/labels plus optional comments, changed files, and selected PR
-diff. Prompt templates can include that block with `__GITHUB_CONTEXT__`.
-For the local DS4 dataset and Gemma 4 prompt-optimization history that informed
-this design, see [DS4 Dataset and Gemma Prompt Optimization](docs/2026-06-01-ds4-dataset-gemma-prompt-optimization.md).
+diff. Prompt templates can include that block with `{{{github_context}}}`.
+For prompt provenance and dataset artifact ownership, see
+[Classifier Prompt Provenance](docs/2026-06-04-classifier-prompt-provenance.md).
 To test a prompt profile on a small live GitHub sample, use
 `scripts/localpager-experiment.mjs`; see
 [Classifier Experiment Runner](docs/2026-06-01-classifier-experiment-runner.md)
 and [Classifier Benchmark Metrics](docs/2026-06-01-classifier-benchmark-metrics.md).
 Machine-specific runtime values, such as the loaded model context window,
-parallelism, context truncation budget, and DS4/LM Studio exclusivity rules,
-belong in a deployment setup document. See
+parallelism, context truncation budget, and loaded local model, belong in a
+deployment setup document. See
 [Onur's Isengard Setup](docs/2026-06-02-onur-isengard-localpager-setup.md) for
 the current OpenClaw/Gemma deployment. For Qwen NVFP4 through vLLM, see
 [vLLM Qwen NVFP4 LocalPager Setup](docs/2026-06-16-vllm-qwen36-nvfp4-localpager.md).

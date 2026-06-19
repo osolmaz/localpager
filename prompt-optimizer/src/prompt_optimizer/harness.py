@@ -9,10 +9,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from prompt_optimizer.dataset import DEFAULT_TAXONOMY_PATH, DS4Row, FeedbackPoolRow, REPO_ROOT
+from prompt_optimizer.dataset import DEFAULT_TAXONOMY_PATH, OptimizerItem, FeedbackPoolRow, REPO_ROOT
 
 DEFAULT_CLASSIFIER_COMMAND = REPO_ROOT / "scripts/localpager-classifier"
-DEFAULT_SCHEMA_PATH = REPO_ROOT / "schemas/classification.schema.json"
+DEFAULT_SCHEMA_PATH = REPO_ROOT / "examples/profiles/openclaw-routing.schema.json"
 DEFAULT_MAX_TOKENS = 8192
 
 
@@ -42,7 +42,7 @@ class StaticClassifierHarness:
     def classify(self, row: FeedbackPoolRow, prompt_text: str) -> ClassifierOutput:
         del prompt_text
         return ClassifierOutput(
-            topics_of_interest=self.predictions.get(row.ds4.id, ()),
+            topics_of_interest=self.predictions.get(row.item.id, ()),
             description="static test prediction",
         )
 
@@ -64,15 +64,15 @@ class LocalpagerAgentHarness:
     extra_agent_args: tuple[str, ...] = ()
 
     def classify(self, row: FeedbackPoolRow, prompt_text: str) -> ClassifierOutput:
-        with tempfile.TemporaryDirectory(prefix=f"localpager-gepa-{row.ds4.id}-") as tmp:
+        with tempfile.TemporaryDirectory(prefix=f"localpager-gepa-{row.item.id}-") as tmp:
             tmp_path = Path(tmp)
             prompt_path = tmp_path / "candidate.prompt.md"
             context_path = tmp_path / "github-context.md"
             prompt_path.write_text(prompt_text, encoding="utf-8")
-            context_path.write_text(row.ds4.github_context or render_ds4_context(row.ds4), encoding="utf-8")
+            context_path.write_text(row.item.github_context or render_item_context(row.item), encoding="utf-8")
             args = [
                 str(self.classifier_command),
-                row.ds4.target or row.ds4.url,
+                row.item.target or row.item.url,
                 "--model",
                 self.model,
                 "--schema",
@@ -172,7 +172,7 @@ def parse_classifier_stdout(stdout: str) -> ClassifierOutput:
     )
 
 
-def render_ds4_context(row: DS4Row) -> str:
+def render_item_context(row: OptimizerItem) -> str:
     raw = row.raw
     lines = ["GitHub item:"]
     _append_line(lines, "Repository", row.repo)

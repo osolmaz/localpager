@@ -55,9 +55,21 @@ chain.
 `--topic-taxonomy` and `--github-context-file`. It writes a rendered prompt and
 a rendered runtime schema.
 
-### Prompt placeholders
+### Prompt variables
 
-The prompt template is plain text with these literal placeholders replaced:
+Prompt templates can use the Handlebars-style variables used by
+`localpager-agent`:
+
+| Variable | Replaced with |
+| --- | --- |
+| `{{target}}` | the target ref (URL or `owner/repo#n`) |
+| `{{{github_context}}}` | the GitHub context markdown, trimmed |
+| `{{{allowed_topics_json}}}` | JSON array of taxonomy topic ids, or a "no taxonomy" sentence when none is configured |
+| `{{{topic_taxonomy_json}}}` | `{"topics":[...]}` with the normalized taxonomy |
+| `{{{topic_descriptions}}}` | a markdown list of `- id: description Cues: ...` lines |
+
+For compatibility with older profiles, the renderer also accepts these legacy
+literal placeholders:
 
 | Placeholder | Replaced with |
 | --- | --- |
@@ -65,15 +77,14 @@ The prompt template is plain text with these literal placeholders replaced:
 | `__GITHUB_CONTEXT__` | the GitHub context markdown, trimmed |
 | `__ALLOWED_TOPICS_JSON__` | JSON array of taxonomy topic ids, or a "no taxonomy" sentence when none is configured |
 | `__TOPIC_TAXONOMY_JSON__` | `{"topics":[...]}` with the normalized taxonomy |
-| `__TOPIC_DESCRIPTIONS__` | a markdown list of `` `id`: description cues: <kw> `` |
+| `__TOPIC_DESCRIPTIONS__` | a markdown list of `- id: description Cues: ...` lines |
 
 Notes:
 
-- Topic descriptions are truncated to 80 characters in the rendered list.
-- Only the **first** keyword per topic is emitted as a `cues:` hint
-  (`slice(0, 1)`), even when the taxonomy lists many. The taxonomy keyword lists
-  are hints for humans and for `__TOPIC_TAXONOMY_JSON__`, not a full cue dump in
-  the prompt.
+- When the base schema already has a `topics_of_interest.items.enum` containing
+  the same ids as the taxonomy, the renderer uses that enum order. This keeps
+  the OpenClaw v10 profile aligned with the evalstate benchmark schema.
+- Topic descriptions are emitted in full, with all configured cue words.
 
 ### Topic taxonomy shapes
 
@@ -92,10 +103,11 @@ When a taxonomy is supplied, the renderer overwrites
 `{ "type": "string", "enum": [<taxonomy ids>] }` and sets `uniqueItems: true`.
 
 This means the **base schema's** own topic constraints are overridden whenever a
-taxonomy is passed. `schemas/classification.schema.json` ships a free-form
-`pattern` for topics and `examples/profiles/repo-routing.schema.json` ships a
-hardcoded enum, but in both cases the taxonomy wins. With no `--topic-taxonomy`,
-the base schema passes through unchanged.
+taxonomy is passed, while preserving the base schema's enum order when it
+matches the taxonomy exactly. `schemas/classification.schema.json` ships a
+free-form `pattern` for topics and `examples/profiles/repo-routing.schema.json`
+ships a hardcoded enum, but in both cases the taxonomy wins. With no
+`--topic-taxonomy`, the base schema passes through unchanged.
 
 ## Flag-Forwarding Contract
 
@@ -131,25 +143,21 @@ handling, in `src/cli/cli.ts` and `src/structured/recovery.ts`:
 The `localpager-classifier` wrapper therefore invokes the agent exactly once and
 does no retry of its own.
 
-## Two Templating Systems
+## Template Contract
 
-There are two distinct templating layers; do not confuse them:
-
-- **Profile placeholders** (`__TARGET__`, `__GITHUB_CONTEXT__`, …) are
-  substituted by `localpager-render-profile.mjs` for the classifier prompt.
-- **Agent prompt templates** use Handlebars-style `{{var}}` / `{{{var}}}` /
-  `{{#if}}` and are rendered inside `localpager-agent`
-  (`src/prompts/template.ts`) via `--prompt-template` + `--prompt-var(s)`. The
-  `localpager-agent/examples/prompts/binary-classifier.hbs` example uses this
-  layer.
-
-The classifier path uses the placeholder layer; the agent's own
-`--prompt-template` layer is a separate, general-purpose feature.
+The current profile contract uses the same Handlebars-style variables as
+`localpager-agent`: `{{target}}`, `{{{github_context}}}`,
+`{{{allowed_topics_json}}}`, `{{{topic_taxonomy_json}}}`, and
+`{{{topic_descriptions}}}`. `localpager-render-profile.mjs` still accepts the
+older `__TARGET__`/`__GITHUB_CONTEXT__` placeholders so older generic profiles
+continue to render, but new profiles should use the Handlebars form. The
+OpenClaw benchmark profile in `examples/profiles/openclaw-routing.prompt.hbs`
+uses the Handlebars form.
 
 ## Files
 
 - `scripts/localpager-classifier` — wrapper command
-- `scripts/localpager-render-profile.mjs` — placeholder + schema-enum renderer
+- `scripts/localpager-render-profile.mjs` — prompt variable + schema-enum renderer
 - `internal/localpager/classifier.go` — worker → command bridge
 - `internal/localpager/context.go` — GitHub context builder
 - `localpager-agent/src/cli/cli.ts`, `src/structured/recovery.ts` — final_json

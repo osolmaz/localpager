@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from prompt_optimizer.adapter import LocalpagerAdapter, ROUTING_POLICY_COMPONENT
-from prompt_optimizer.dataset import DS4Row, FeedbackManifestRow, FeedbackPoolRow
+from prompt_optimizer.dataset import OptimizerItem, OptimizerManifest, FeedbackPoolRow
 from prompt_optimizer.harness import ClassifierOutput, StaticClassifierHarness
 from prompt_optimizer.prompt import normalize_template_variables, split_seed_prompt
 
@@ -126,7 +126,7 @@ Old policy
 
 
 def _pool_row(row_id: str, topics: list[str], title: str) -> FeedbackPoolRow:
-    ds4 = DS4Row(
+    item = OptimizerItem(
         id=row_id,
         repo="openclaw/openclaw",
         item_type="github_pr",
@@ -136,27 +136,27 @@ def _pool_row(row_id: str, topics: list[str], title: str) -> FeedbackPoolRow:
         topics_of_interest=tuple(topics),
         raw={},
     )
-    manifest = FeedbackManifestRow(
+    manifest = OptimizerManifest(
         id=row_id,
-        source_set="gepa-good-60",
+        source_set="unit-test",
         audit_bucket="stratified",
-        repo=ds4.repo,
-        item_type=ds4.item_type,
-        number=ds4.number,
-        url=ds4.url,
+        repo=item.repo,
+        item_type=item.item_type,
+        number=item.number,
+        url=item.url,
         title=title,
-        ds4_topics=tuple(topics),
+        gold_topics=tuple(topics),
         raw={},
     )
-    return FeedbackPoolRow(manifest=manifest, ds4=ds4)
+    return FeedbackPoolRow(manifest=manifest, item=item)
 
 
 class EchoHarness:
     def classify(self, row: FeedbackPoolRow, prompt_text: str) -> ClassifierOutput:
         del prompt_text
         return ClassifierOutput(
-            topics_of_interest=row.ds4.topics_of_interest,
-            description=row.ds4.id,
+            topics_of_interest=row.item.topics_of_interest,
+            description=row.item.id,
         )
 
 

@@ -1,4 +1,5 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 export type PromptTemplateOptions = {
@@ -22,10 +23,9 @@ export async function promptForwardedArgs(
   const values = await loadPromptValues(options.promptVarsPaths, options.promptVars);
   const template = await readFile(path.resolve(options.promptTemplatePath), "utf8");
   const prompt = renderPromptTemplate(template, values);
-  if (options.renderedPromptPath !== undefined) {
-    await writeRenderedPrompt(options.renderedPromptPath, prompt);
-  }
-  return [...options.forwardedArgs, "-p", prompt];
+  const renderedPromptPath = options.renderedPromptPath ?? (await temporaryRenderedPromptPath());
+  await writeRenderedPrompt(renderedPromptPath, prompt);
+  return [...options.forwardedArgs, "-p", `@${path.resolve(renderedPromptPath)}`];
 }
 
 export function renderPromptTemplate(template: string, values: PromptValues): string {
@@ -142,6 +142,11 @@ async function writeRenderedPrompt(filePath: string, prompt: string): Promise<vo
   const resolvedPath = path.resolve(filePath);
   await mkdir(path.dirname(resolvedPath), { recursive: true });
   await writeFile(resolvedPath, prompt, "utf8");
+}
+
+async function temporaryRenderedPromptPath(): Promise<string> {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-prompt-"));
+  return path.join(directory, "prompt.md");
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

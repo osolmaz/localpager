@@ -3,9 +3,9 @@ set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 agent_dir="$root/localpager-agent"
-schema="${LOCALPAGER_CLASSIFIER_SCHEMA:-$root/schemas/classification.schema.json}"
-prompt_template="${LOCALPAGER_CLASSIFIER_PROMPT_TEMPLATE:-$root/prompts/github-relevance-classifier.md}"
-topic_taxonomy="${LOCALPAGER_CLASSIFIER_TOPIC_TAXONOMY:-}"
+schema="${LOCALPAGER_CLASSIFIER_SCHEMA:-$root/examples/profiles/openclaw-routing.schema.json}"
+prompt_template="${LOCALPAGER_CLASSIFIER_PROMPT_TEMPLATE:-$root/examples/profiles/openclaw-routing.prompt.hbs}"
+topic_taxonomy="${LOCALPAGER_CLASSIFIER_TOPIC_TAXONOMY:-$root/examples/profiles/openclaw-routing-topics.json}"
 github_context_file="${LOCALPAGER_CLASSIFIER_GITHUB_CONTEXT_FILE:-}"
 
 if [[ $# -lt 1 ]]; then
@@ -148,9 +148,13 @@ echo "schema: $schema_path" >&2
 echo "session: $session_dir" >&2
 
 # localpager-agent owns the final_json tool and its own missing-output recovery,
-# so this is a single invocation: no wrapper-side retry.
-npm --prefix "$agent_dir" run -s localpager-agent -- \
+# so this is a single invocation: no wrapper-side retry. Invoke tsx directly
+# instead of going through npm and pass the rendered prompt by file path so large
+# GitHub contexts do not hit OS argument-length limits.
+"$agent_dir/node_modules/.bin/tsx" "$agent_dir/src/cli/main.ts" \
   --session-dir "$session_dir" \
   --final-schema "$schema_path" \
+  --prompt-template "$prompt_path" \
+  --write-rendered-prompt "$prompt_path" \
   ${agent_args[@]+"${agent_args[@]}"} \
-  -p "$(cat "$prompt_path")"
+  --

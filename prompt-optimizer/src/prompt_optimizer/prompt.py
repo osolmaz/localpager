@@ -7,10 +7,6 @@ from pathlib import Path
 
 PROMPT_OPTIMIZER_ROOT = Path(__file__).resolve().parents[2]
 
-DEFAULT_SEED_PROMPT_PATH = Path(
-    "/home/bob/oc/openclaw-classification-dataset/prompts/"
-    "localpager-openclaw-routing-v9.1-monologue-cap.hbs"
-)
 DEFAULT_EVALSTATE_SEED_PROMPT_PATH = (
     PROMPT_OPTIMIZER_ROOT
     / "prompts"
@@ -64,14 +60,6 @@ class PromptParts:
         candidate = self.prefix + routing_policy + self.suffix
         validate_placeholders(candidate)
         return candidate
-
-
-def load_seed_prompt(path: Path = DEFAULT_SEED_PROMPT_PATH) -> PromptParts:
-    try:
-        source = path.read_text(encoding="utf-8")
-    except FileNotFoundError as exc:
-        raise PromptError(f"missing seed prompt: {path}") from exc
-    return split_seed_prompt(normalize_template_variables(source))
 
 
 def load_overlay_seed_prompt(
