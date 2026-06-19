@@ -48,6 +48,40 @@ describe("Pi runtime config", () => {
     }
   });
 
+  it("writes resolved model metadata for alias-backed local servers", async () => {
+    const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-test-"));
+    try {
+      const runtime = await writeRuntimeConfig(options(stateDir), "deepseek-v4-pro", {
+        requestedModel: "deepseek-v4-pro",
+        availableModels: ["deepseek-v4-pro"],
+        contextWindow: 32768,
+        serverModelName: "DeepSeek V4 Flash"
+      });
+      const models = JSON.parse(await readFile(runtime.modelsPath, "utf8")) as {
+        providers: Record<string, { models: readonly { id: string; name?: string }[] }>;
+      };
+      expect(models.providers["local-openai"]?.models[0]).toMatchObject({
+        id: "deepseek-v4-pro",
+        name: "DeepSeek V4 Flash (deepseek-v4-pro)"
+      });
+
+      const metadata = JSON.parse(await readFile(runtime.modelMetadataPath, "utf8")) as unknown;
+      expect(metadata).toMatchObject({
+        backend: "openai-compatible",
+        baseUrl: "http://127.0.0.1:1234/v1",
+        requestedModel: "deepseek-v4-pro",
+        resolvedModel: "deepseek-v4-pro",
+        serverModelName: "DeepSeek V4 Flash",
+        availableModels: ["deepseek-v4-pro"],
+        contextWindow: 32768,
+        maxTokens: 8192,
+        thinking: "off"
+      });
+    } finally {
+      await rm(stateDir, { recursive: true, force: true });
+    }
+  });
+
   it("marks local models as reasoning-capable when Pi thinking is enabled", async () => {
     const stateDir = await mkdtemp(path.join(os.tmpdir(), "localpager-agent-test-"));
     try {

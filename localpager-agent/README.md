@@ -48,6 +48,12 @@ Check what localpager-agent will use:
 localpager-agent --status
 ```
 
+For OpenAI-compatible servers, `localpager-agent` records the resolved model id,
+the server-reported model name when present, discovered context metadata, and the
+available model ids in `<state-dir>/pi-config-runtime/model-metadata.json`.
+`--status` prints that path. This helps distinguish an alias such as
+`deepseek-v4-pro` from the concrete model name advertised by the server.
+
 ## Usage
 
 Run Pi interactively on the local model:
@@ -214,6 +220,11 @@ write, or edit are never passed through.
 `localpager-agent` also disables Pi context-file discovery by passing
 `--no-context-files`, so `AGENTS.md` and `CLAUDE.md` files from the caller's
 current directory are not loaded into local classification/chat runs.
+
+When launching Pi, `localpager-agent` prepends the directory of its own Node
+executable to the child process `PATH`. This keeps background service runs from
+accidentally finding an older system `node` when `localpager-agent` itself was
+started with a newer runtime.
 
 For `--final-schema` runs, `localpager-agent` replaces Pi's default coding-agent
 system prompt with a short structured-output prompt that names the available

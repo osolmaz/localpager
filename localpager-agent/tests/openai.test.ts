@@ -10,6 +10,15 @@ describe("OpenAI-compatible model discovery", () => {
     expect(models).toEqual([{ id: "gemma-4-e4b-it" }]);
   });
 
+  it("keeps optional model display names from the server", async () => {
+    const models = await listModels("http://local.test/v1", 1000, () =>
+      Promise.resolve(
+        jsonResponse({ data: [{ id: "deepseek-v4-pro", name: "DeepSeek V4 Flash" }] })
+      )
+    );
+    expect(models).toEqual([{ id: "deepseek-v4-pro", name: "DeepSeek V4 Flash" }]);
+  });
+
   it("resolves auto to the first model id", async () => {
     const resolved = await resolveLocalModel("http://local.test/v1", "auto", 1000, () =>
       Promise.resolve(jsonResponse({ data: [{ id: "gemma-4-e4b-it" }] }))
@@ -22,6 +31,18 @@ describe("OpenAI-compatible model discovery", () => {
       Promise.resolve(jsonResponse({ data: [{ id: "gemma-4-e4b-it", context_length: 120000 }] }))
     );
     expect(resolved.contextWindow).toBe(120000);
+  });
+
+  it("reports server model names when resolving aliases", async () => {
+    const resolved = await resolveLocalModel("http://local.test/v1", "deepseek-v4-pro", 1000, () =>
+      Promise.resolve(
+        jsonResponse({ data: [{ id: "deepseek-v4-pro", name: "DeepSeek V4 Flash" }] })
+      )
+    );
+    expect(resolved).toMatchObject({
+      model: "deepseek-v4-pro",
+      serverModelName: "DeepSeek V4 Flash"
+    });
   });
 
   it("reports the model endpoint when discovery cannot connect", async () => {

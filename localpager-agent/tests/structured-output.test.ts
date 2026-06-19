@@ -439,6 +439,16 @@ describe("structured output", () => {
     ]);
   });
 
+  it("launches Pi with the current Node executable directory first on PATH", async () => {
+    const plan = await createLaunchPlan(
+      { ...options("/tmp/localpager-agent-state"), forwardedArgs: ["-p", "inspect"] },
+      runtimeConfig("/tmp/localpager-agent-state"),
+      "gemma-4-e4b-it"
+    );
+
+    expect(plan.env["PATH"]?.split(path.delimiter)[0]).toBe(path.dirname(process.execPath));
+  });
+
   it("preserves caller-supplied system prompts in plain mode", async () => {
     const plan = await createLaunchPlan(
       {
@@ -580,7 +590,8 @@ function runtimeConfig(stateDir: string): RuntimeConfig {
   return {
     configDir: path.join(stateDir, "pi"),
     modelsPath: path.join(stateDir, "pi", "models.json"),
-    settingsPath: path.join(stateDir, "pi", "settings.json")
+    settingsPath: path.join(stateDir, "pi", "settings.json"),
+    modelMetadataPath: path.join(stateDir, "pi", "model-metadata.json")
   };
 }
 

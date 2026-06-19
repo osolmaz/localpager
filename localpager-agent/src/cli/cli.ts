@@ -2,8 +2,9 @@ import { errorMessage, fail, ok, type CommandResult } from "../common/result.js"
 import { parseLocalpagerAgentArgs, usage } from "../agent/options.js";
 import type { LocalpagerAgentOptions } from "../agent/options.js";
 import { resolveLocalModel } from "../llm/openai.js";
+import type { ResolvedLocalModel } from "../llm/openai.js";
 import { writeRuntimeConfig } from "../pi/config.js";
-import type { RuntimeConfig } from "../pi/config.js";
+import type { RuntimeConfig, RuntimeModelMetadata } from "../pi/config.js";
 import { createLaunchPlan, execLaunchPlan } from "../pi/launch.js";
 import { promptForwardedArgs } from "../prompts/template.js";
 import { createReposhellRuntime } from "../reposhell/bash-extension.js";
@@ -35,7 +36,7 @@ export async function run(args: readonly string[]): Promise<CommandResult> {
     const runtimeConfig = await writeRuntimeConfig(
       resolvedOptions,
       resolved.model,
-      resolved.contextWindow
+      runtimeModelMetadata(options, resolved)
     );
 
     if (resolvedOptions.status) {
@@ -95,14 +96,31 @@ type ResolvedModel = {
   readonly providerId: string;
   readonly availableModels: readonly string[];
   readonly contextWindow?: number;
+  readonly serverModelName?: string;
 };
 
 async function resolveModel(options: LocalpagerAgentOptions): Promise<ResolvedModel> {
   if (options.backend === "openai-compatible") {
     const resolved = await resolveLocalModel(options.baseUrl, options.model, options.timeoutMs);
-    return { ...resolved, providerId: options.providerId };
+    return localModelWithProviderId(resolved, options.providerId);
   }
   return resolvePiBuiltinModel(options);
+}
+
+function localModelWithProviderId(resolved: ResolvedLocalModel, providerId: string): ResolvedModel {
+  return { ...resolved, providerId };
+}
+
+function runtimeModelMetadata(
+  options: LocalpagerAgentOptions,
+  resolved: ResolvedModel
+): RuntimeModelMetadata {
+  return {
+    requestedModel: options.model,
+    availableModels: resolved.availableModels,
+    ...(resolved.contextWindow === undefined ? {} : { contextWindow: resolved.contextWindow }),
+    ...(resolved.serverModelName === undefined ? {} : { serverModelName: resolved.serverModelName })
+  };
 }
 
 function resolvePiBuiltinModel(options: LocalpagerAgentOptions): ResolvedModel {
@@ -223,12 +241,14 @@ function statusOutput(
       `backend: ${options.backend}`,
       `base url: ${options.baseUrl}`,
       `model: ${resolved.model}`,
+      `server model name: ${resolved.serverModelName ?? "unspecified"}`,
       `available models: ${availableModelsStatus(options, resolved)}`,
       `context window: ${String(options.contextWindow ?? resolved.contextWindow ?? "unspecified")}`,
       `provider id: ${options.providerId}`,
       `model source: ${modelSourceStatus(options)}`,
       `request params: ${requestParamsStatus(options)}`,
       `pi config dir: ${runtimeConfig.configDir}`,
+      `model metadata: ${runtimeConfig.modelMetadataPath}`,
       `session dir: ${options.sessionDir}`,
       `pi command: ${options.piCommand}`
     ].join("\n") + "\n"

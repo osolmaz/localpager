@@ -7,38 +7,52 @@ export type RuntimeConfig = {
   readonly configDir: string;
   readonly modelsPath: string;
   readonly settingsPath: string;
+  readonly modelMetadataPath: string;
+};
+
+export type RuntimeModelMetadata = {
+  readonly requestedModel?: string;
+  readonly availableModels?: readonly string[];
+  readonly contextWindow?: number;
+  readonly serverModelName?: string;
 };
 
 export async function writeRuntimeConfig(
   options: LocalpagerAgentOptions,
   model: string,
-  discoveredContextWindow?: number
+  metadataOrContextWindow?: RuntimeModelMetadata | number
 ): Promise<RuntimeConfig> {
+  const metadata = normalizeRuntimeModelMetadata(metadataOrContextWindow);
   const configDir = path.join(options.stateDir, "pi-config-runtime");
   await mkdir(configDir, { recursive: true });
   const modelsPath = path.join(configDir, "models.json");
   const settingsPath = path.join(configDir, "settings.json");
+  const modelMetadataPath = path.join(configDir, "model-metadata.json");
   if (options.backend === "openai-compatible") {
     await writeFile(
       modelsPath,
-      `${JSON.stringify(modelsConfig(options, model, discoveredContextWindow), null, 2)}\n`
+      `${JSON.stringify(modelsConfig(options, model, metadata), null, 2)}\n`
     );
   } else {
     await rm(modelsPath, { force: true });
   }
   await writeFile(
     settingsPath,
-    `${JSON.stringify(settingsConfig(options, model, discoveredContextWindow), null, 2)}\n`
+    `${JSON.stringify(settingsConfig(options, model, metadata), null, 2)}\n`
   );
-  return { configDir, modelsPath, settingsPath };
+  await writeFile(
+    modelMetadataPath,
+    `${JSON.stringify(modelMetadataConfig(options, model, metadata), null, 2)}\n`
+  );
+  return { configDir, modelsPath, settingsPath, modelMetadataPath };
 }
 
 function modelsConfig(
   options: LocalpagerAgentOptions,
   model: string,
-  discoveredContextWindow?: number
+  metadata: RuntimeModelMetadata
 ): unknown {
-  const contextWindow = options.contextWindow ?? discoveredContextWindow;
+  const contextWindow = options.contextWindow ?? metadata.contextWindow;
   const compat = modelCompat(model);
   return {
     providers: {
@@ -53,7 +67,7 @@ function modelsConfig(
         models: [
           withoutUndefined({
             id: model,
-            name: `Local model (${model})`,
+            name: modelDisplayName(model, metadata.serverModelName),
             reasoning: options.thinking !== "off" || compat !== undefined,
             compat,
             input: ["text"],
@@ -102,9 +116,9 @@ function withoutUndefined(value: Record<string, unknown>): Record<string, unknow
 function settingsConfig(
   options: LocalpagerAgentOptions,
   model: string,
-  discoveredContextWindow?: number
+  metadata: RuntimeModelMetadata
 ): unknown {
-  const contextWindow = options.contextWindow ?? discoveredContextWindow;
+  const contextWindow = options.contextWindow ?? metadata.contextWindow;
   return {
     defaultProvider: options.providerId,
     defaultModel: model,
@@ -113,6 +127,39 @@ function settingsConfig(
     quietStartup: true,
     compaction: compactionConfig(contextWindow)
   };
+}
+
+function modelMetadataConfig(
+  options: LocalpagerAgentOptions,
+  model: string,
+  metadata: RuntimeModelMetadata
+): unknown {
+  return withoutUndefined({
+    backend: options.backend,
+    baseUrl: options.backend === "openai-compatible" ? options.baseUrl : undefined,
+    requestedModel: metadata.requestedModel ?? options.model,
+    resolvedModel: model,
+    serverModelName: metadata.serverModelName,
+    availableModels: metadata.availableModels,
+    contextWindow: options.contextWindow ?? metadata.contextWindow,
+    maxTokens: options.maxTokens,
+    thinking: options.thinking
+  });
+}
+
+function normalizeRuntimeModelMetadata(
+  value: RuntimeModelMetadata | number | undefined
+): RuntimeModelMetadata {
+  if (value === undefined) {
+    return {};
+  }
+  return typeof value === "number" ? { contextWindow: value } : value;
+}
+
+function modelDisplayName(model: string, serverModelName: string | undefined): string {
+  return serverModelName === undefined || serverModelName.trim() === ""
+    ? `Local model (${model})`
+    : `${serverModelName} (${model})`;
 }
 
 function compactionConfig(contextWindow: number | undefined): unknown {

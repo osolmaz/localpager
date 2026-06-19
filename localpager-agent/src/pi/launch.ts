@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import type { StdioOptions } from "node:child_process";
 import { mkdir } from "node:fs/promises";
+import path from "node:path";
 
 import type { LocalpagerAgentOptions } from "../agent/options.js";
 import type { ReposhellRuntime } from "../reposhell/bash-extension.js";
@@ -50,6 +51,7 @@ export async function createLaunchPlan(
     finalSchemaOutputPath: finalSchemaRuntime?.outputPath,
     stdinMode: finalSchemaRuntime === undefined ? "inherit" : "ignore",
     env: {
+      PATH: childPathWithCurrentNode(),
       PI_CODING_AGENT_DIR: runtimeConfig.configDir,
       PI_CODING_AGENT_SESSION_DIR: options.sessionDir,
       PI_OFFLINE: process.env["PI_OFFLINE"] ?? "1",
@@ -57,6 +59,15 @@ export async function createLaunchPlan(
       PI_SKIP_VERSION_CHECK: process.env["PI_SKIP_VERSION_CHECK"] ?? "1"
     }
   };
+}
+
+function childPathWithCurrentNode(): string {
+  const nodeDir = path.dirname(process.execPath);
+  const currentPath = process.env["PATH"] ?? "";
+  const parts = currentPath
+    .split(path.delimiter)
+    .filter((entry) => entry !== "" && entry !== nodeDir);
+  return [nodeDir, ...parts].join(path.delimiter);
 }
 
 export async function execLaunchPlan(plan: LaunchPlan): Promise<number> {

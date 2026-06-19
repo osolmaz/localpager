@@ -4,6 +4,20 @@ type Fetcher = typeof fetch;
 
 export type ModelInfo = {
   readonly id: string;
+  readonly name?: string;
+  readonly contextWindow?: number;
+};
+
+export type ResolvedLocalModel = {
+  readonly model: string;
+  readonly availableModels: readonly string[];
+  readonly contextWindow?: number;
+  readonly serverModelName?: string;
+};
+
+type ResolvedLocalModelBase = {
+  readonly model: string;
+  readonly availableModels: readonly string[];
   readonly contextWindow?: number;
 };
 
@@ -45,28 +59,36 @@ export async function resolveLocalModel(
   requestedModel: string,
   timeoutMs = 3000,
   fetcher: Fetcher = fetch
-): Promise<{
-  readonly model: string;
-  readonly availableModels: readonly string[];
-  readonly contextWindow?: number;
-}> {
+): Promise<ResolvedLocalModel> {
   const modelInfos = await listModels(baseUrl, timeoutMs, fetcher);
   const availableModels = modelInfos.map((model) => model.id);
   if (requestedModel === "auto") {
-    const first = modelInfos[0];
-    if (first === undefined) {
-      throw new Error(`no models returned by ${normalizeBaseUrl(baseUrl)}/models`);
-    }
-    return withOptionalContextWindow({ model: first.id, availableModels }, first.contextWindow);
+    return resolveAutoModel(baseUrl, modelInfos, availableModels);
   }
   if (availableModels.length > 0 && !availableModels.includes(requestedModel)) {
     throw new Error(
       `model ${requestedModel} is not reported by ${normalizeBaseUrl(baseUrl)}/models; available: ${availableModels.join(", ")}`
     );
   }
-  return withOptionalContextWindow(
-    { model: requestedModel, availableModels },
-    modelInfos.find((model) => model.id === requestedModel)?.contextWindow
+  const selected = modelInfos.find((model) => model.id === requestedModel);
+  return resolvedLocalModel(
+    withOptionalContextWindow({ model: requestedModel, availableModels }, selected?.contextWindow),
+    selected?.name
+  );
+}
+
+function resolveAutoModel(
+  baseUrl: string,
+  modelInfos: readonly ModelInfo[],
+  availableModels: readonly string[]
+): ResolvedLocalModel {
+  const first = modelInfos[0];
+  if (first === undefined) {
+    throw new Error(`no models returned by ${normalizeBaseUrl(baseUrl)}/models`);
+  }
+  return resolvedLocalModel(
+    withOptionalContextWindow({ model: first.id, availableModels }, first.contextWindow),
+    first.name
   );
 }
 
@@ -75,7 +97,10 @@ function modelInfo(entry: Record<string, unknown>): ModelInfo | undefined {
   if (id === undefined) {
     return undefined;
   }
-  return withOptionalContextWindow({ id }, findContextWindow(entry));
+  return withOptionalContextWindow(
+    withOptionalName({ id }, optionalString(entry["name"])),
+    findContextWindow(entry)
+  );
 }
 
 function withOptionalContextWindow<T extends Record<string, unknown>>(
@@ -86,6 +111,26 @@ function withOptionalContextWindow<T extends Record<string, unknown>>(
     return value;
   }
   return { ...value, contextWindow };
+}
+
+function withOptionalName<T extends Record<string, unknown>>(
+  value: T,
+  name: string | undefined
+): T & { readonly name?: string } {
+  if (name === undefined || name.trim() === "") {
+    return value;
+  }
+  return { ...value, name };
+}
+
+function resolvedLocalModel(
+  value: ResolvedLocalModelBase,
+  serverModelName: string | undefined
+): ResolvedLocalModel {
+  if (serverModelName === undefined || serverModelName.trim() === "") {
+    return value;
+  }
+  return { ...value, serverModelName };
 }
 
 function findContextWindow(entry: Record<string, unknown>): number | undefined {
