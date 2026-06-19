@@ -6,18 +6,20 @@ date: 2026-06-04
 
 # Classifier Prompt Provenance
 
-Localpager keeps only the production classifier prompt and topic taxonomy in the
-GitHub repo. Bulky dataset-generation prompts, per-row rendered DS4 prompts, and
-prompt experiment metrics live in the Hugging Face dataset.
+Localpager keeps the production classifier prompt, output schema, and topic
+taxonomy in the GitHub repo. Bulky dataset-generation prompts, per-row rendered
+DS4 prompts, and prompt experiment metrics live in the Hugging Face dataset.
 
 ## Production Files
 
-- Production Gemma/OpenClaw routing prompt:
-  `examples/profiles/openclaw-routing-v8.prompt.md`
+- Production OpenClaw routing prompt:
+  `examples/profiles/openclaw-routing.prompt.hbs`
+- Production output schema:
+  `examples/profiles/openclaw-routing.schema.json`
 - Production topic taxonomy:
   `examples/profiles/openclaw-routing-topics.json`
-- Hugging Face snapshot of the production prompt:
-  `prompts/localpager-openclaw-routing-v8-production.prompt.md`
+- These files are the self-contained v10/evalstate benchmark profile now used
+  by Localpager.
 
 ## Dataset Provenance
 

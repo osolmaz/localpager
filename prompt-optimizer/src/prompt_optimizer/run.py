@@ -15,10 +15,9 @@ from prompt_optimizer.dataset import (
     DEFAULT_EVALSTATE_TRAIN_PATH,
     DEFAULT_FEEDBACK_MANIFEST_PATH,
     DEFAULT_TAXONOMY_PATH,
-    DEFAULT_V2_TAXONOMY_PATH,
     FeedbackPoolRow,
-    build_feedback_pool,
     build_evalstate_pool,
+    build_feedback_pool,
     load_evalstate_split,
     load_taxonomy,
 )
@@ -102,7 +101,7 @@ def load_evalstate_optimizer_inputs(
     train_path: Path = DEFAULT_EVALSTATE_TRAIN_PATH,
     pareto_path: Path = DEFAULT_EVALSTATE_PARETO_PATH,
     heldout_path: Path = DEFAULT_EVALSTATE_HELDOUT_PATH,
-    taxonomy_path: Path = DEFAULT_V2_TAXONOMY_PATH,
+    taxonomy_path: Path = DEFAULT_TAXONOMY_PATH,
     seed_prompt_path: Path = DEFAULT_EVALSTATE_SEED_PROMPT_PATH,
     seed_overlay_path: Path = DEFAULT_EVALSTATE_SEED_OVERLAY_PATH,
 ) -> OptimizerInputs:

@@ -228,9 +228,9 @@ with the v2 topic taxonomy and a v10-based overlay scaffold:
 - Local split checkout:
   `/home/bob/repos/openclaw-git-labels/data/splits/`.
 - Local taxonomy:
-  `examples/profiles/openclaw-routing-topics.v2.json`.
+  `examples/profiles/openclaw-routing-topics.json`.
 - Fixed scaffold source:
-  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`.
+  `examples/profiles/openclaw-routing.prompt.hbs`.
 - GEPA scaffold artifact:
   `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`.
 - Seed overlay artifact:
@@ -241,7 +241,8 @@ candidate. The optimizer must only propose replacements for the overlay seed.
 
 The evalstate rows already include the saved `target`, `github_context`, and
 `expected_topics`. For this dataset, the gold labels are exactly
-`expected_topics` from the split rows, validated against the v2 taxonomy. The
+`expected_topics` from the split rows, validated against the repo-local OpenClaw
+taxonomy. The
 optimizer must pass the saved `github_context` into `localpager-agent`; it must
 not refetch GitHub context or silently fall back to DS4 row fields.
 

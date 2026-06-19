@@ -33,8 +33,8 @@ The worker runs a classifier command. By default it uses:
 ```
 
 That wrapper calls `localpager-agent`, which points Pi at a local
-OpenAI-compatible model endpoint and forces the final answer through
-`schemas/classification.schema.json`.
+OpenAI-compatible model endpoint and forces the final answer through the
+configured classifier schema.
 
 The classifier command receives one target argument, usually a GitHub URL or
 `owner/repo#number`, and must print one JSON object to stdout:
@@ -102,19 +102,22 @@ worker → wrapper → renderer → agent chain, prompt placeholders, and schema
 generation, see
 [Classifier Pipeline and Profile Rendering](docs/2026-06-12-classifier-pipeline-and-rendering.md).
 
-For OpenClaw maintainer routing, use a deployment prompt profile generated from
-the OpenClaw classification dataset with the OpenClaw topic keyword taxonomy in
-`examples/profiles/openclaw-routing-topics.json`. The repo also keeps historical
-v8 examples under `examples/profiles/` and the GEPA-reviewed candidate artifacts
-under `prompt-optimizer/results/`. The current prompt-optimizer artifact adds
-strict cardinality guidance, false-positive suppression, and label-spam
-resistance for maintainer-routing labels.
-`examples/profiles/openclaw-routing-topics.v2.json` is a staged v2 taxonomy for
-review only; current examples and defaults still use `openclaw-routing-topics.json`.
+For OpenClaw maintainer routing, this repo contains a self-contained v10
+profile matching the evalstate benchmark label set:
+
+```text
+examples/profiles/openclaw-routing.prompt.hbs
+examples/profiles/openclaw-routing.schema.json
+examples/profiles/openclaw-routing-topics.json
+```
+
+Those files are the default OpenClaw profile used by `scripts/localpager-classifier`
+when no profile flags or environment overrides are provided. The GEPA-reviewed
+candidate artifacts remain under `prompt-optimizer/results/`.
 
 Before the classifier runs, Localpager renders GitHub context into the prompt:
 stored title/body/labels plus optional comments, changed files, and selected PR
-diff. Prompt templates can include that block with `__GITHUB_CONTEXT__`.
+diff. Prompt templates can include that block with `{{{github_context}}}`.
 For the local DS4 dataset and Gemma 4 prompt-optimization history that informed
 this design, see [DS4 Dataset and Gemma Prompt Optimization](docs/2026-06-01-ds4-dataset-gemma-prompt-optimization.md).
 To test a prompt profile on a small live GitHub sample, use

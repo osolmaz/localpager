@@ -119,18 +119,19 @@ A generic starter taxonomy lives at
 `examples/profiles/repo-routing.prompt.md`, and its fully expanded example
 schema is `examples/profiles/repo-routing.schema.json`.
 
-The OpenClaw routing prompt lives at
-`examples/profiles/openclaw-routing-v8.prompt.md`. It should be paired with the
-OpenClaw topic keyword taxonomy in
-`examples/profiles/openclaw-routing-topics.json`. That checked-in taxonomy was
-copied from the Hugging Face dataset
-`dutifuldev/openclaw-classification-dataset`:
-<https://huggingface.co/datasets/dutifuldev/openclaw-classification-dataset>.
-The Localpager profile and dataset labels use the same allowed topic IDs and
-keyword hints.
-That prompt is the production translation of the DS4/Gemma v8 routing policy:
-title-first centrality, one-topic default, second-topic gate, and explicit
-suppression of known Gemma false positives.
+The OpenClaw routing profile is self-contained in:
+
+```text
+examples/profiles/openclaw-routing.prompt.hbs
+examples/profiles/openclaw-routing.schema.json
+examples/profiles/openclaw-routing-topics.json
+```
+
+This is the v10 prompt and evalstate/OpenClaw Git-label topic set used for the
+330-row benchmark runs. It uses the same topic ids, topic definitions,
+cardinality limit, and schema contract as those benchmark runs. The
+`scripts/localpager-classifier` wrapper defaults to these three files unless a
+deployment passes explicit schema, prompt, or taxonomy paths.
 
 ## Schema Contract
 

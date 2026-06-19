@@ -3,7 +3,7 @@
 Offline tooling for improving the OpenClaw routing prompt with GEPA. The
 optimizer can read either the original DS4/Shaun 60-row setup or evalstate's
 published OpenClaw Git-label splits. DS4 mode starts from the v9.1 seed prompt.
-Evalstate mode uses the v2 topic taxonomy with a v10-based fixed scaffold and
+Evalstate mode uses the repo-local OpenClaw benchmark taxonomy with a v10-based fixed scaffold and
 an overlay-only routing-policy candidate.
 
 This package does not run inside the Localpager worker. It is a lab tool whose
@@ -70,9 +70,9 @@ Evalstate mode uses these defaults:
   `/home/bob/repos/openclaw-git-labels/data/splits/pareto60.jsonl`
 - held-out reporting set:
   `/home/bob/repos/openclaw-git-labels/data/splits/bench78.jsonl`
-- taxonomy: `examples/profiles/openclaw-routing-topics.v2.json`
+- taxonomy: `examples/profiles/openclaw-routing-topics.json`
 - fixed scaffold source:
-  `/home/bob/oc/openclaw-classification-dataset/prompts/localpager-openclaw-routing-v10-production.hbs`
+  `examples/profiles/openclaw-routing.prompt.hbs`
 - GEPA scaffold:
   `prompt-optimizer/prompts/localpager-openclaw-routing-v10-overlay-scaffold.hbs`
 - seed overlay:

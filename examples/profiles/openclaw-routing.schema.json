@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "OpenClawRoutingClassifierOutput",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "topics_of_interest",
+    "description",
+    "caveats"
+  ],
+  "properties": {
+    "topics_of_interest": {
+      "type": "array",
+      "description": "Central allowed OpenClaw maintainer routing topics. Use at most 3, in priority order, with the primary changed surface first.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "inference_api",
+          "self_hosted_inference",
+          "acpx",
+          "acp",
+          "coding_agent_integrations",
+          "mcp_tooling",
+          "model_lifecycle",
+          "codex",
+          "agent_runtime",
+          "sessions",
+          "gateway",
+          "exec_tools",
+          "approvals",
+          "sandboxing",
+          "hooks",
+          "cron_automation",
+          "chat_integrations",
+          "ui_tui",
+          "browser_automation",
+          "memory",
+          "security",
+          "config",
+          "packaging_deployment",
+          "docs",
+          "tests_ci",
+          "telemetry_usage",
+          "api_surface",
+          "queueing",
+          "notifications",
+          "skills_plugins",
+          "auth_identity",
+          "reliability",
+          "tool_calling"
+        ]
+      },
+      "minItems": 0,
+      "maxItems": 3
+    },
+    "description": {
+      "type": "string",
+      "description": "One concise evidence-backed sentence."
+    },
+    "caveats": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Uncertainty, missing context, or material limits only."
+    }
+  }
+}

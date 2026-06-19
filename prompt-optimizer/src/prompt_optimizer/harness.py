@@ -12,7 +12,7 @@ from typing import Protocol
 from prompt_optimizer.dataset import DEFAULT_TAXONOMY_PATH, DS4Row, FeedbackPoolRow, REPO_ROOT
 
 DEFAULT_CLASSIFIER_COMMAND = REPO_ROOT / "scripts/localpager-classifier"
-DEFAULT_SCHEMA_PATH = REPO_ROOT / "schemas/classification.schema.json"
+DEFAULT_SCHEMA_PATH = REPO_ROOT / "examples/profiles/openclaw-routing.schema.json"
 DEFAULT_MAX_TOKENS = 8192
 
 

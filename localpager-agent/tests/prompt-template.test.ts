@@ -68,12 +68,7 @@ describe("prompt templates", () => {
         forwardedArgs: ["--tools", "none"]
       });
 
-      expect(args).toEqual([
-        "--tools",
-        "none",
-        "-p",
-        "Title: from inline\nBody:\nfrom file body\n"
-      ]);
+      expect(args).toEqual(["--tools", "none", "-p", `@${path.resolve(renderedPath)}`]);
       await expect(readFile(renderedPath, "utf8")).resolves.toBe(
         "Title: from inline\nBody:\nfrom file body\n"
       );
@@ -127,7 +122,14 @@ describe("prompt templates", () => {
       const piArgs = JSON.parse(await readFile(argsPath, "utf8")) as string[];
       const promptIndex = piArgs.indexOf("-p");
       expect(promptIndex).toBeGreaterThan(-1);
-      expect(piArgs[promptIndex + 1]).toBe("Classify: inline title\nfile body");
+      const promptArg = piArgs[promptIndex + 1];
+      if (promptArg === undefined) {
+        throw new Error("missing prompt argument after -p");
+      }
+      expect(promptArg.startsWith("@")).toBe(true);
+      await expect(readFile(promptArg.slice(1), "utf8")).resolves.toBe(
+        "Classify: inline title\nfile body"
+      );
       expect(piArgs).toContain("--some-pi-flag");
     } finally {
       await close(server);

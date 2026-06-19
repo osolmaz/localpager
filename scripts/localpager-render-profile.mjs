@@ -11,8 +11,9 @@ if (!options.target || !options.schema || !options.promptTemplate || !options.ou
   usage(2);
 }
 
-const topics = options.topicTaxonomy ? loadTopics(options.topicTaxonomy) : [];
 const schema = JSON.parse(readFileSync(options.schema, "utf8"));
+const loadedTopics = options.topicTaxonomy ? loadTopics(options.topicTaxonomy) : [];
+const topics = orderTopicsForSchema(loadedTopics, schema);
 const promptTemplate = readFileSync(options.promptTemplate, "utf8");
 const githubContext = options.githubContextFile
   ? readFileSync(options.githubContextFile, "utf8")
@@ -132,7 +133,7 @@ function normalizeTopic(topic) {
       id: topic.id,
       description: typeof topic.description === "string" ? topic.description : "",
       keywords: Array.isArray(topic.keywords)
-        ? topic.keywords.filter((keyword) => typeof keyword === "string").slice(0, 1)
+        ? topic.keywords.filter((keyword) => typeof keyword === "string")
         : [],
     };
   }
@@ -166,14 +167,8 @@ function renderPrompt(template, target, topics, githubContext) {
     topics.length > 0
       ? topics
           .map((topic) => {
-            const details = [];
-            if (topic.description) {
-              details.push(truncateInline(topic.description, 80));
-            }
-            if (topic.keywords.length > 0) {
-              details.push(`cues: ${topic.keywords.join(", ")}`);
-            }
-            return details.length > 0 ? `- \`${topic.id}\`: ${details.join(" ")}` : `- \`${topic.id}\``;
+            const cues = topic.keywords.length > 0 ? ` Cues: ${topic.keywords.join(", ")}.` : "";
+            return `- ${topic.id}: ${topic.description}${cues}`;
           })
           .join("\n")
       : "No topic taxonomy configured.";
@@ -182,9 +177,40 @@ function renderPrompt(template, target, topics, githubContext) {
     .replaceAll("__GITHUB_CONTEXT__", githubContext.trim())
     .replaceAll("__ALLOWED_TOPICS_JSON__", allowedTopicsJSON)
     .replaceAll("__TOPIC_TAXONOMY_JSON__", taxonomyJSON)
-    .replaceAll("__TOPIC_DESCRIPTIONS__", descriptions);
+    .replaceAll("__TOPIC_DESCRIPTIONS__", descriptions)
+    .replace(handlebarsVarPattern("target", true), target)
+    .replace(handlebarsVarPattern("github_context", true), githubContext.trim())
+    .replace(handlebarsVarPattern("allowed_topics_json", true), allowedTopicsJSON)
+    .replace(handlebarsVarPattern("topic_taxonomy_json", true), taxonomyJSON)
+    .replace(handlebarsVarPattern("topic_descriptions", true), descriptions)
+    .replace(handlebarsVarPattern("target", false), target)
+    .replace(handlebarsVarPattern("github_context", false), githubContext.trim())
+    .replace(handlebarsVarPattern("allowed_topics_json", false), allowedTopicsJSON)
+    .replace(handlebarsVarPattern("topic_taxonomy_json", false), taxonomyJSON)
+    .replace(handlebarsVarPattern("topic_descriptions", false), descriptions);
 }
 
-function truncateInline(value, maxLength) {
-  return value.length <= maxLength ? value : `${value.slice(0, maxLength - 3)}...`;
+function handlebarsVarPattern(name, raw) {
+  const open = raw ? "\\{\\{\\{" : "\\{\\{";
+  const close = raw ? "\\}\\}\\}" : "\\}\\}";
+  return new RegExp(`${open}\\s*${escapeRegExp(name)}\\s*${close}`, "gu");
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+}
+
+function orderTopicsForSchema(topics, schema) {
+  if (topics.length === 0) {
+    return topics;
+  }
+  const enumValues = schema?.properties?.topics_of_interest?.items?.enum;
+  if (!Array.isArray(enumValues) || enumValues.some((value) => typeof value !== "string")) {
+    return topics;
+  }
+  const topicById = new Map(topics.map((topic) => [topic.id, topic]));
+  if (enumValues.length !== topics.length || enumValues.some((id) => !topicById.has(id))) {
+    return topics;
+  }
+  return enumValues.map((id) => topicById.get(id));
 }

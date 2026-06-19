@@ -17,7 +17,6 @@ DEFAULT_EVALSTATE_TRAIN_PATH = Path("/home/bob/repos/openclaw-git-labels/data/sp
 DEFAULT_EVALSTATE_PARETO_PATH = Path("/home/bob/repos/openclaw-git-labels/data/splits/pareto60.jsonl")
 DEFAULT_EVALSTATE_HELDOUT_PATH = Path("/home/bob/repos/openclaw-git-labels/data/splits/bench78.jsonl")
 DEFAULT_TAXONOMY_PATH = REPO_ROOT / "examples/profiles/openclaw-routing-topics.json"
-DEFAULT_V2_TAXONOMY_PATH = REPO_ROOT / "examples/profiles/openclaw-routing-topics.v2.json"
 
 
 class DatasetError(ValueError):

@@ -18,8 +18,8 @@
     "limit": 100
   },
   "classifier": {
-    "schema": "./schemas/classification.schema.json",
-    "prompt_template": "./prompts/github-relevance-classifier.md",
+    "schema": "./examples/profiles/openclaw-routing.schema.json",
+    "prompt_template": "./examples/profiles/openclaw-routing.prompt.hbs",
     "topic_taxonomy": "./examples/profiles/openclaw-routing-topics.json",
     "reposhell_default_repo": "localpager",
     "reposhell_visible_repos": ["localpager"],

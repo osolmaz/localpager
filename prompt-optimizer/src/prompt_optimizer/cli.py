@@ -13,7 +13,6 @@ from prompt_optimizer.dataset import (
     DEFAULT_EVALSTATE_TRAIN_PATH,
     DEFAULT_FEEDBACK_MANIFEST_PATH,
     DEFAULT_TAXONOMY_PATH,
-    DEFAULT_V2_TAXONOMY_PATH,
     load_taxonomy,
 )
 from prompt_optimizer.harness import ClassifierHarness
@@ -326,7 +325,7 @@ def _inputs_for_eval(args: argparse.Namespace):
 def _taxonomy_path(args: argparse.Namespace) -> Path:
     if args.taxonomy is not None:
         return args.taxonomy
-    return DEFAULT_V2_TAXONOMY_PATH if args.dataset == "evalstate" else DEFAULT_TAXONOMY_PATH
+    return DEFAULT_TAXONOMY_PATH
 
 
 def _seed_prompt_path(args: argparse.Namespace) -> Path:

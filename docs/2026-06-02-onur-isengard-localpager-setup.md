@@ -26,7 +26,8 @@ same time on this machine.
 
 - Repo: `/home/bob/repos/localpager`
 - Live config: `/home/bob/.config/localpager/config.json`
-- Live prompt: `/home/bob/.config/localpager/openclaw.prompt.md`
+- Classifier schema: `/home/bob/repos/localpager/examples/profiles/openclaw-routing.schema.json`
+- Live prompt: `/home/bob/repos/localpager/examples/profiles/openclaw-routing.prompt.hbs`
 - Topic taxonomy: `/home/bob/repos/localpager/examples/profiles/openclaw-routing-topics.json`
 - SQLite state: `/home/bob/.local/state/localpager/localpager.sqlite`
 - Classifier artifacts: `/home/bob/.local/state/localpager/classifier`
