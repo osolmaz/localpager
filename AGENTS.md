@@ -4,11 +4,11 @@ These instructions apply to this repository.
 
 ## Slophammer
 
-This repo follows `dutifuldev/slophammer` standards. If applying or updating
+This repo follows `osolmaz/slophammer` standards. If applying or updating
 those standards, start from:
 
 ```text
-https://raw.githubusercontent.com/dutifuldev/slophammer/refs/heads/main/docs/AGENT_ENTRYPOINT.md
+https://raw.githubusercontent.com/osolmaz/slophammer/refs/heads/main/docs/AGENT_ENTRYPOINT.md
 ```
 
 ## Local Checks
