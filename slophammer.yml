@@ -1,15 +1,20 @@
 go:
-  coverage_threshold: 85
+  coverage:
+    threshold: 85
   targets:
     - internal/config
     - internal/sources/kind.go
     - internal/sources/stats.go
   exclude:
     - "**/*_test.go"
-    - "localpager-agent/**"
-    - "reposhell/**"
-    - "examples/**"
-    - "bin/**"
+    - pattern: "localpager-agent/**"
+      reason: separate agent module with its own build and test workflow
+    - pattern: "reposhell/**"
+      reason: separate nested Go module with its own Slophammer configuration
+    - pattern: "examples/**"
+      reason: sample programs are documentation fixtures rather than shipped production code
+    - pattern: "bin/**"
+      reason: generated local command artifacts contain no maintained source
   dry:
     max_findings: 0
     paths:
@@ -17,8 +22,10 @@ go:
       - internal
     exclude:
       - "**/*_test.go"
-      - "localpager-agent/**"
-      - "examples/**"
+      - pattern: "localpager-agent/**"
+        reason: separate agent module with its own build and test workflow
+      - pattern: "examples/**"
+        reason: sample programs are documentation fixtures rather than shipped production code
     structural:
       enabled: true
       threshold: 0.82
@@ -27,7 +34,8 @@ go:
     copied_blocks:
       enabled: true
       min_tokens: 100
-  crap_max_score: 8
+  crap:
+    max_score: 8
   mutation:
     targets:
       - internal/config
