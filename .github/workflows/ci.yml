@@ -37,12 +37,22 @@ jobs:
       - run: go test ./...
       - run: go test ./...
         working-directory: reposhell
+      - run: slophammer-go dry ./cmd/reposhell --max-candidates 0
+        working-directory: reposhell
+      - run: slophammer-go crap ./cmd/reposhell --max-score 8
+        working-directory: reposhell
+      - run: slophammer-go mutate . --target cmd/reposhell/main.go
+        working-directory: reposhell
       - run: ./scripts/check-go-quality.sh
-      - run: go run github.com/osolmaz/slophammer/go/cmd/slophammer-go@v0.4.1 dry . --max-candidates 0
-      - run: go run github.com/osolmaz/slophammer/go/cmd/slophammer-go@v0.4.1 crap . --max-score 8
-      - run: go run github.com/osolmaz/slophammer/go/cmd/slophammer-go@v0.4.1 mutate . --scan
+      - run: slophammer-go dry . --max-candidates 0
+        working-directory: .
+      - run: slophammer-go crap . --max-score 8
+        working-directory: .
+      - run: slophammer-go mutate . --scan
+        working-directory: .
       - run: golangci-lint run
         working-directory: reposhell
       - run: npm ci --prefix localpager-agent
       - run: npm --prefix localpager-agent run check
-      - run: go run github.com/osolmaz/slophammer/go/cmd/slophammer-go@v0.4.1 check . --execute
+      - run: slophammer-go check . --execute
+        working-directory: .
