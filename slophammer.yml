@@ -38,9 +38,9 @@ go:
     max_score: 8
   mutation:
     targets:
-      - internal/config
-      - internal/localpager
-      - internal/sources/github
+      - internal/config/config.go
+      - internal/localpager/policy.go
+      - internal/sources/kind.go
   dependency_boundaries:
     - from: cmd
       allow:
